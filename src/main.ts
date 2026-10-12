@@ -3,6 +3,7 @@ import { HabitsModal } from './habits';
 import { NextDayPlannerModal } from './planner';
 import { PomodoroManager } from './pomodoro';
 import { PomodoroModal } from './pomodoro-modal';
+import { AnalyticsModal } from './analytics-modal';
 import { DEFAULT_SETTINGS, StudyFlowSettings, StudyFlowSettingTab } from './settings';
 import { QuickCaptureModal, TasksManagerModal } from './tasks';
 import { StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
@@ -40,6 +41,10 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addRibbonIcon('calendar-check', 'Study Flow: Planificar el día siguiente', () => {
       new NextDayPlannerModal(this.app, this).open();
+    });
+
+    this.addRibbonIcon('bar-chart-2', 'Study Flow: Métricas y Rendimiento', () => {
+      new AnalyticsModal(this.app, this).open();
     });
 
     // Commands
@@ -80,6 +85,14 @@ export default class StudyFlowPlugin extends Plugin {
       name: 'Abrir registro de hábitos diarios',
       callback: () => {
         new HabitsModal(this.app, this).open();
+      },
+    });
+
+    this.addCommand({
+      id: 'open-analytics-dashboard',
+      name: 'Abrir métricas y rendimiento de estudio',
+      callback: () => {
+        new AnalyticsModal(this.app, this).open();
       },
     });
 
@@ -191,6 +204,9 @@ export default class StudyFlowPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    if (!Array.isArray(this.settings.focusHistory)) {
+      this.settings.focusHistory = [];
+    }
   }
 
   async saveSettings(): Promise<void> {

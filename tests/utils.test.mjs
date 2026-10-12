@@ -86,3 +86,80 @@ test('formatTaskWithPriority prefixes standard emojis', () => {
   assert.equal(formatTaskWithPriority('Hacer ejercicio', 'low'), '🔽 Hacer ejercicio');
   assert.equal(formatTaskWithPriority('Hacer ejercicio', 'none'), 'Hacer ejercicio');
 });
+
+test('extractTagsFromText extracts hashtags and wikilinks correctly', async () => {
+  const { extractTagsFromText } = await import('../src/analytics.ts');
+  const tags = extractTagsFromText('Estudiar #algebra y repasar [[Teorema de Gauss]] con #examen-final');
+  assert.deepEqual(tags, ['#algebra', '#examen-final', '[[Teorema de Gauss]]']);
+
+  assert.deepEqual(extractTagsFromText('Tarea sin tags'), []);
+});
+
+test('formatMinutesHuman formats minutes into human readable duration', async () => {
+  const { formatMinutesHuman } = await import('../src/analytics.ts');
+  assert.equal(formatMinutesHuman(0), '0m');
+  assert.equal(formatMinutesHuman(45), '45m');
+  assert.equal(formatMinutesHuman(60), '1h');
+  assert.equal(formatMinutesHuman(150), '2h 30m');
+});
+
+test('computeWeeklyFocusTrend aggregates daily minutes over last 7 days', async () => {
+  const { computeWeeklyFocusTrend } = await import('../src/analytics.ts');
+  const refDate = new Date('2026-10-12T12:00:00Z');
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-12', durationMinutes: 25, tags: ['#dev'] },
+    { id: '2', timestamp: 2, date: '2026-10-12', durationMinutes: 50, tags: ['#dev'] },
+    { id: '3', timestamp: 3, date: '2026-10-11', durationMinutes: 25, tags: ['#math'] },
+  ];
+
+  const trend = computeWeeklyFocusTrend(sessions, refDate, 7);
+  assert.equal(trend.length, 7);
+
+  const todayEntry = trend.find((t) => t.date === '2026-10-12');
+  assert.ok(todayEntry);
+  assert.equal(todayEntry.totalMinutes, 75);
+  assert.equal(todayEntry.sessionCount, 2);
+  assert.equal(todayEntry.isToday, true);
+
+  const yesterdayEntry = trend.find((t) => t.date === '2026-10-11');
+  assert.ok(yesterdayEntry);
+  assert.equal(yesterdayEntry.totalMinutes, 25);
+  assert.equal(yesterdayEntry.sessionCount, 1);
+});
+
+test('computeTagDistribution calculates percentages by tag', async () => {
+  const { computeTagDistribution } = await import('../src/analytics.ts');
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-12', durationMinutes: 75, tags: ['#dev'] },
+    { id: '2', timestamp: 2, date: '2026-10-12', durationMinutes: 25, tags: ['#math'] },
+  ];
+
+  const dist = computeTagDistribution(sessions);
+  assert.equal(dist.length, 2);
+  assert.equal(dist[0].tag, '#dev');
+  assert.equal(dist[0].totalMinutes, 75);
+  assert.equal(dist[0].percentage, 75);
+  assert.equal(dist[1].tag, '#math');
+  assert.equal(dist[1].totalMinutes, 25);
+  assert.equal(dist[1].percentage, 25);
+});
+
+test('computeTasksOverview calculates priority breakdown and rate', async () => {
+  const { computeTasksOverview } = await import('../src/analytics.ts');
+  const tasks = [
+    { id: '1', originalLine: '', text: 'T1', sourceFile: '', completed: true, statusChar: 'x', priority: 'high' },
+    { id: '2', originalLine: '', text: 'T2', sourceFile: '', completed: false, statusChar: ' ', priority: 'high' },
+    { id: '3', originalLine: '', text: 'T3', sourceFile: '', completed: false, statusChar: ' ', priority: 'medium' },
+    { id: '4', originalLine: '', text: 'T4', sourceFile: '', completed: false, statusChar: ' ', priority: 'none' },
+  ];
+
+  const stat = computeTasksOverview(tasks);
+  assert.equal(stat.totalAll, 4);
+  assert.equal(stat.totalCompleted, 1);
+  assert.equal(stat.totalPending, 3);
+  assert.equal(stat.completionRate, 25);
+  assert.equal(stat.byPriority.high, 1); // 1 pending high
+  assert.equal(stat.byPriority.medium, 1); // 1 pending medium
+  assert.equal(stat.byPriority.none, 1);
+});
+

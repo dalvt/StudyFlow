@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
+import type { FocusSessionRecord } from './analytics';
 
 export interface StudyFlowSettings {
   pomodoroWorkDuration: number;
@@ -12,6 +13,7 @@ export interface StudyFlowSettings {
   logPomodoroToDailyNote: boolean;
   enableChimeSound: boolean;
   chimeVolume: number;
+  focusHistory: FocusSessionRecord[];
 }
 
 export const DEFAULT_SETTINGS: StudyFlowSettings = {
@@ -24,6 +26,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   logPomodoroToDailyNote: true,
   enableChimeSound: true,
   chimeVolume: 0.7,
+  focusHistory: [],
 };
 
 export class StudyFlowSettingTab extends PluginSettingTab {
@@ -177,5 +180,23 @@ export class StudyFlowSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    // Analytics section
+    containerEl.createEl('h3', { text: 'Métricas & Estadísticas' });
+
+    new Setting(containerEl)
+      .setName('Sincronizar historial con Notas Diarias')
+      .setDesc('Escanea tus notas diarias en busca de sesiones de pomodoro registradas previamente.')
+      .addButton((btn) =>
+        btn
+          .setButtonText('Sincronizar ahora')
+          .onClick(async () => {
+            const { syncHistoricalSessionsFromVault } = await import('./analytics');
+            const count = await syncHistoricalSessionsFromVault(this.app, this.plugin.settings);
+            await this.plugin.saveSettings();
+            new Notice(`Se sincronizaron ${count} sesiones históricas desde tus notas.`);
+          })
+      );
   }
 }
+

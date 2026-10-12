@@ -23,10 +23,11 @@ import {
   PendingTaskItem,
   TaskPriority,
 } from './utils';
+import { renderAnalyticsDashboard } from './analytics-ui';
 
 export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
 
-type ActiveTab = 'pomodoro' | 'tasks' | 'habits' | 'planner';
+type ActiveTab = 'pomodoro' | 'tasks' | 'habits' | 'planner' | 'analytics';
 
 const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
@@ -148,6 +149,7 @@ export class StudyFlowView extends ItemView {
       { id: 'tasks', label: 'Tareas', icon: 'check-square' },
       { id: 'habits', label: 'Hábitos', icon: 'flame' },
       { id: 'planner', label: 'Plan', icon: 'calendar-days' },
+      { id: 'analytics', label: 'Métricas', icon: 'bar-chart-2' },
     ];
 
     tabs.forEach((tab) => {
@@ -175,6 +177,8 @@ export class StudyFlowView extends ItemView {
       await this.renderHabitsTab(contentBody);
     } else if (this.activeTab === 'planner') {
       await this.renderPlannerTab(contentBody);
+    } else if (this.activeTab === 'analytics') {
+      await this.renderAnalyticsTab(contentBody);
     }
   }
 
@@ -1065,5 +1069,12 @@ ${tasksBlock}`;
       console.error('Error applying plan:', err);
       new Notice('Error al guardar el plan');
     }
+  }
+
+  // ===================== ANALYTICS TAB =====================
+  private async renderAnalyticsTab(container: HTMLElement): Promise<void> {
+    await renderAnalyticsDashboard(container, this.app, this.plugin, async () => {
+      await this.renderView();
+    });
   }
 }

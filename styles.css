@@ -1266,3 +1266,428 @@
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
 }
+
+/* =========================================
+   10. Study Flow Analytics Dashboard
+   ========================================= */
+.study-flow-analytics-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.study-flow-analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 0 2px 0;
+}
+
+.study-flow-analytics-title-block h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.study-flow-analytics-header-icon {
+  display: inline-flex;
+  color: var(--text-accent);
+}
+
+.study-flow-analytics-subtitle {
+  margin: 4px 0 0 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.study-flow-analytics-actions button.is-loading svg {
+  animation: study-flow-spin 1s linear infinite;
+}
+
+/* KPI Cards Grid */
+.study-flow-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.study-flow-kpi-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.study-flow-kpi-card:hover {
+  border-color: var(--interactive-accent);
+  transform: translateY(-1px);
+}
+
+.study-flow-kpi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.study-flow-kpi-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.study-flow-kpi-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study-flow-kpi-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.study-flow-kpi-icon.is-primary {
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+}
+
+.study-flow-kpi-icon.is-accent {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.study-flow-kpi-icon.is-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.study-flow-kpi-icon.is-success {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.study-flow-kpi-value {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-normal);
+  line-height: 1.2;
+}
+
+.study-flow-kpi-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Chart Card */
+.study-flow-chart-card {
+  padding: 18px;
+  border-radius: var(--radius-l);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.study-flow-chart-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-chart-title-left h4 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-chart-icon {
+  display: inline-flex;
+  color: var(--interactive-accent);
+}
+
+.study-flow-chart-badge {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  background: var(--background-modifier-hover);
+  color: var(--text-accent);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* Flex Bar Chart */
+.study-flow-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  height: 160px;
+  padding: 10px 0 0 0;
+}
+
+.study-flow-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.study-flow-bar-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.study-flow-bar-col.is-today .study-flow-bar-val {
+  color: #10b981;
+}
+
+.study-flow-bar-track {
+  width: 100%;
+  max-width: 32px;
+  flex: 1;
+  background: var(--background-modifier-hover);
+  border-radius: 6px 6px 2px 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.study-flow-bar-fill {
+  width: 100%;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, var(--interactive-accent), rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4));
+  transition: height 0.3s ease;
+}
+
+.study-flow-bar-fill.is-today-fill {
+  background: linear-gradient(180deg, #10b981, #059669);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.study-flow-bar-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.study-flow-bar-day {
+  font-weight: 600;
+}
+
+.study-flow-bar-date {
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+.study-flow-bar-today-pill {
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin-top: 1px;
+}
+
+/* Two-column subgrid */
+.study-flow-analytics-subgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 700px) {
+  .study-flow-analytics-subgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.study-flow-card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.study-flow-card-header-row h4 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.study-flow-tag-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.study-flow-tag-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-ui-smaller);
+}
+
+.study-flow-tag-badge {
+  font-weight: 600;
+  color: var(--text-accent);
+  background: var(--background-modifier-hover);
+  padding: 2px 8px;
+  border-radius: var(--radius-s);
+}
+
+.study-flow-tag-time {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.study-flow-tag-track {
+  width: 100%;
+  height: 6px;
+  background: var(--background-modifier-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.study-flow-tag-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.study-flow-subheading {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.study-flow-health-section {
+  margin-bottom: 14px;
+}
+
+.study-flow-priority-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.study-flow-priority-pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  background: var(--background-modifier-hover);
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.study-flow-priority-pill.is-high {
+  border-left: 3px solid #ff4d4f;
+}
+
+.study-flow-priority-pill.is-medium {
+  border-left: 3px solid #fa8c16;
+}
+
+.study-flow-priority-pill.is-low {
+  border-left: 3px solid #52c41a;
+}
+
+.study-flow-priority-pill.is-none {
+  border-left: 3px solid var(--text-muted);
+}
+
+.study-flow-analytics-habit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.study-flow-analytics-habit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--background-primary);
+  border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-analytics-habit-name {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.study-flow-analytics-streak-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.study-flow-analytics-today-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+}
+
+.study-flow-analytics-today-status.is-done {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.study-flow-analytics-today-status.is-pending {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+.study-flow-analytics-modal .modal-content {
+  padding: 16px;
+  max-width: 800px;
+}
+

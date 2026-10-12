@@ -3,6 +3,7 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority } from './utils';
 import { toggleTaskCompletionInFile, TaskRecord } from './tasks';
+import { extractTagsFromText, getLocalDateString, FocusSessionRecord } from './analytics';
 
 export type PomodoroState = 'idle' | 'running' | 'paused';
 export type PomodoroMode = 'work' | 'break';
@@ -290,6 +291,7 @@ export class PomodoroManager {
 
     if (this.mode === 'work') {
       this.completedSessionsToday++;
+      const durationMin = Math.round(this.totalDurationSeconds / 60) || this.plugin.settings.pomodoroWorkDuration;
       const noticeMsg = this.activeTask
         ? `¡Pomodoro completado! Tarea: ${this.activeTask.text}`
         : '¡Pomodoro completado!';
@@ -298,6 +300,9 @@ export class PomodoroManager {
       if (this.plugin.settings.enableChimeSound) {
         playPomodoroChime('work', this.plugin.settings.chimeVolume);
       }
+
+      // Record to analytics history
+      await this.recordFocusSession(durationMin);
 
       if (this.plugin.settings.logPomodoroToDailyNote) {
         await this.logSession();
@@ -345,6 +350,38 @@ export class PomodoroManager {
     } catch (err) {
       console.error('Study Flow Assistant: Error registrando sesión de Pomodoro', err);
       new Notice('Error al registrar la sesión de Pomodoro');
+    }
+  }
+
+  private async recordFocusSession(durationMin: number): Promise<void> {
+    try {
+      const now = new Date();
+      const dateStr = getLocalDateString(now);
+      const taskText = this.activeTask?.text || '';
+      const tags = extractTagsFromText(taskText);
+
+      const session: FocusSessionRecord = {
+        id: `focus-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: Date.now(),
+        date: dateStr,
+        durationMinutes: durationMin,
+        taskText,
+        tags,
+      };
+
+      if (!this.plugin.settings.focusHistory) {
+        this.plugin.settings.focusHistory = [];
+      }
+      this.plugin.settings.focusHistory.push(session);
+
+      // Keep recent 1000 sessions
+      if (this.plugin.settings.focusHistory.length > 1000) {
+        this.plugin.settings.focusHistory = this.plugin.settings.focusHistory.slice(-1000);
+      }
+
+      await this.plugin.saveSettings();
+    } catch (err) {
+      console.error('Study Flow Assistant: Error guardando métricas de sesión de enfoque', err);
     }
   }
 
