@@ -2514,5 +2514,564 @@ body.is-study-flow-zen .workspace-split {
   opacity: 0.55;
 }
 
+/* =========================================
+   Pomodoro In-Place Durations Adjustment Panel
+   ========================================= */
+.study-flow-pomodoro-custom-panel {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 6px 0 10px 0;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  animation: study-flow-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes study-flow-slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.study-flow-custom-panel-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-custom-controls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.study-flow-stepper-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.study-flow-stepper-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.study-flow-stepper-controls {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-primary);
+  overflow: hidden;
+}
+
+.study-flow-stepper-btn {
+  background: transparent;
+  border: none;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.study-flow-stepper-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.study-flow-stepper-input {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-normal);
+  padding: 4px 2px;
+}
+
+.study-flow-stepper-input:focus {
+  outline: none;
+}
+
+.study-flow-custom-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-custom-check-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.study-flow-btn-sm {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--radius-s);
+}
+
+/* =========================================
+   Tasks Hub Redesign (Option A: Academic Hub)
+   ========================================= */
+.study-flow-tasks-main-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.study-flow-tasks-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.study-flow-stat-pill.is-pending {
+  color: var(--text-accent);
+  border-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
+}
+
+.study-flow-stat-pill.is-today-urgent {
+  color: #ff4d4f;
+  border-color: rgba(255, 77, 79, 0.35);
+  background: rgba(255, 77, 79, 0.1);
+  font-weight: 700;
+}
+
+.study-flow-stat-pill.is-today {
+  color: #fa8c16;
+  border-color: rgba(250, 140, 22, 0.3);
+  background: rgba(250, 140, 22, 0.08);
+}
+
+.study-flow-stat-pill.is-idea {
+  color: #eab308;
+  border-color: rgba(234, 179, 8, 0.3);
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.study-flow-stat-pill.is-completed {
+  color: var(--text-muted);
+}
+
+/* Search and Sort row */
+.study-flow-tasks-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-search-input-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.study-flow-search-icon {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.study-flow-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.study-flow-task-search-input {
+  width: 100%;
+  padding: 7px 28px 7px 30px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  font-size: 12px;
+  color: var(--text-normal);
+  transition: all 0.15s ease;
+}
+
+.study-flow-task-search-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.study-flow-search-clear-btn {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+
+.study-flow-search-clear-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-tasks-sort-select {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.study-flow-tasks-nav {
+  margin-top: 2px;
+}
+
+.study-flow-tab-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Task creation card */
+.study-flow-task-create-box {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-create-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-create-input {
+  flex: 1;
+}
+
+.study-flow-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+}
+
+.study-flow-create-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.study-flow-create-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-meta-col {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-meta-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.study-flow-date-input,
+.study-flow-tag-input {
+  font-size: 11.5px;
+  padding: 3px 6px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+}
+
+.study-flow-tag-input {
+  width: 90px;
+}
+
+/* Subject Grouping */
+.study-flow-subject-group-box {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.study-flow-subject-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-subject-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-subject-icon svg {
+  width: 15px;
+  height: 15px;
+  color: var(--interactive-accent);
+}
+
+.study-flow-subject-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-normal);
+}
+
+.study-flow-filter-subject-btn {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.study-flow-filter-subject-btn:hover {
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-subject-tasks-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-subject-active-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-radius: var(--radius-s);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
+  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.3);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-accent);
+  margin-bottom: 8px;
+}
+
+.study-flow-filter-clear-btn {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.study-flow-filter-clear-btn:hover {
+  color: var(--text-normal);
+}
+
+/* Task Item Card Layout */
+.study-flow-task-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  transition: all 0.15s ease;
+}
+
+.study-flow-task-card.is-editing {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
+}
+
+.study-flow-task-main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.study-flow-task-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-task-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.study-flow-subject-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
+  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
+  color: var(--text-accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-subject-chip:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+}
+
+/* Inline Edit */
+.study-flow-task-inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.study-flow-inline-edit-input {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+}
+
+.study-flow-btn-xs {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+/* Subtasks */
+.study-flow-subtasks-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--background-modifier-border);
+}
+
+.study-flow-subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.study-flow-subtask-cb {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.study-flow-subtask-text {
+  cursor: pointer;
+  color: var(--text-normal);
+}
+
+.study-flow-subtask-text.is-strikethrough {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+/* Actions Toolbar */
+.study-flow-task-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.study-flow-pomo-step-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  background: rgba(255, 77, 79, 0.12);
+  border: 1px solid rgba(255, 77, 79, 0.25);
+  color: #ff4d4f;
+}
+
+.study-flow-pomo-step-btn:hover {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+.study-flow-delete-btn:hover {
+  color: var(--text-error, #e53e3e);
+}
+
+
 
 

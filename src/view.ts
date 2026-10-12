@@ -15,11 +15,16 @@ import {
   toggleTaskCompletionInFile,
   promoteIdeaToTaskInFile,
   incrementTaskPomodoroInFile,
+  updateTaskTextInFile,
+  toggleSubtaskInFile,
+  addSubtaskToFile,
+  compareTasksByPriority,
 } from './tasks';
 import {
   appendTaskToMarkdownSection,
   extractPendingTasksFromContent,
   formatDeadlineHuman,
+  formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
   getDailyNotePath,
@@ -62,9 +67,16 @@ export class StudyFlowView extends ItemView {
   private isSelectingTaskForPomodoro: boolean = false;
   private pendingInboxTasks: PendingTaskItem[] = [];
 
+  // Pomodoro custom adjustments state
+  private isAdjustingPomodoroTimes: boolean = false;
+
   // Tasks state
   private tasks: TaskRecord[] = [];
-  private taskFilter: 'pending' | 'ideas' | 'completed' | 'all' = 'pending';
+  private taskFilter: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all' = 'inbox';
+  private taskSearchQuery: string = '';
+  private taskSortBy: 'urgency' | 'priority' | 'estimate' | 'alpha' = 'urgency';
+  private editingTaskId: string | null = null;
+  private selectedSubjectTag: string | null = null;
 
   // Habits state
   private habits: HabitItem[] = [];
@@ -246,6 +258,19 @@ export class StudyFlowView extends ItemView {
       });
     });
 
+    // In-place adjust toggle chip
+    const adjustBtn = presetsRow.createEl('button', {
+      cls: `study-flow-preset-chip study-flow-adjust-toggle-chip ${this.isAdjustingPomodoroTimes ? 'is-active' : ''}`,
+      attr: { 'aria-label': 'Configurar tiempos de foco y descanso' },
+    });
+    const adjIcon = adjustBtn.createSpan();
+    setIcon(adjIcon, 'sliders');
+    adjustBtn.createSpan({ text: this.isAdjustingPomodoroTimes ? 'Cerrar' : 'Ajustar' });
+    adjustBtn.addEventListener('click', () => {
+      this.isAdjustingPomodoroTimes = !this.isAdjustingPomodoroTimes;
+      this.renderView();
+    });
+
     const zenBtn = presetsRow.createEl('button', {
       cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
       attr: { 'aria-label': 'Alternar Modo Zen (plegar barras laterales)' },
@@ -257,6 +282,84 @@ export class StudyFlowView extends ItemView {
       this.plugin.zen.toggleZen();
       this.renderView();
     });
+
+    // In-place Custom Durations Panel
+    if (this.isAdjustingPomodoroTimes) {
+      const customPanel = card.createDiv({ cls: 'study-flow-pomodoro-custom-panel' });
+
+      const panelTitle = customPanel.createDiv({ cls: 'study-flow-custom-panel-title' });
+      panelTitle.createSpan({ text: '⏱️ Ajustar Tiempos de Foco y Descanso' });
+
+      const controlsRow = customPanel.createDiv({ cls: 'study-flow-custom-controls-row' });
+
+      // Work Duration Stepper
+      const workCol = controlsRow.createDiv({ cls: 'study-flow-stepper-col' });
+      workCol.createEl('span', { text: 'Foco (minutos)', cls: 'study-flow-stepper-label' });
+      const workControls = workCol.createDiv({ cls: 'study-flow-stepper-controls' });
+      const workMinusBtn = workControls.createEl('button', { text: '−', cls: 'study-flow-stepper-btn' });
+      const workInput = workControls.createEl('input', {
+        type: 'number',
+        cls: 'study-flow-stepper-input',
+        value: String(this.plugin.settings.pomodoroWorkDuration),
+        attr: { min: '1', max: '180', step: '5' },
+      });
+      const workPlusBtn = workControls.createEl('button', { text: '+', cls: 'study-flow-stepper-btn' });
+
+      workMinusBtn.addEventListener('click', () => {
+        const val = Math.max(1, (parseInt(workInput.value, 10) || 25) - 5);
+        workInput.value = String(val);
+      });
+      workPlusBtn.addEventListener('click', () => {
+        const val = Math.min(180, (parseInt(workInput.value, 10) || 25) + 5);
+        workInput.value = String(val);
+      });
+
+      // Break Duration Stepper
+      const breakCol = controlsRow.createDiv({ cls: 'study-flow-stepper-col' });
+      breakCol.createEl('span', { text: 'Descanso (minutos)', cls: 'study-flow-stepper-label' });
+      const breakControls = breakCol.createDiv({ cls: 'study-flow-stepper-controls' });
+      const breakMinusBtn = breakControls.createEl('button', { text: '−', cls: 'study-flow-stepper-btn' });
+      const breakInput = breakControls.createEl('input', {
+        type: 'number',
+        cls: 'study-flow-stepper-input',
+        value: String(this.plugin.settings.pomodoroBreakDuration),
+        attr: { min: '1', max: '60', step: '1' },
+      });
+      const breakPlusBtn = breakControls.createEl('button', { text: '+', cls: 'study-flow-stepper-btn' });
+
+      breakMinusBtn.addEventListener('click', () => {
+        const val = Math.max(1, (parseInt(breakInput.value, 10) || 5) - 1);
+        breakInput.value = String(val);
+      });
+      breakPlusBtn.addEventListener('click', () => {
+        const val = Math.min(60, (parseInt(breakInput.value, 10) || 5) + 1);
+        breakInput.value = String(val);
+      });
+
+      // Default Checkbox & Apply button
+      const actionsRow = customPanel.createDiv({ cls: 'study-flow-custom-actions-row' });
+      const checkWrap = actionsRow.createDiv({ cls: 'study-flow-custom-check-wrap' });
+      const defaultCheck = checkWrap.createEl('input', {
+        type: 'checkbox',
+        cls: 'study-flow-checkbox',
+        attr: { id: 'sf-save-default' },
+      });
+      defaultCheck.checked = true;
+      checkWrap.createEl('label', { text: 'Guardar como predeterminado', attr: { for: 'sf-save-default' } });
+
+      const applyBtn = actionsRow.createEl('button', {
+        cls: 'mod-cta study-flow-btn-sm',
+        text: 'Aplicar Tiempos',
+      });
+      applyBtn.addEventListener('click', async () => {
+        const workVal = Math.max(1, parseInt(workInput.value, 10) || 25);
+        const breakVal = Math.max(1, parseInt(breakInput.value, 10) || 5);
+        await this.plugin.pomodoro.setCustomWorkAndBreak(workVal, breakVal, defaultCheck.checked);
+        new Notice(`✓ Tiempos configurados: ${workVal}m foco / ${breakVal}m descanso`);
+        this.isAdjustingPomodoroTimes = false;
+        await this.renderView();
+      });
+    }
 
     // Active Task Linking Section
     await this.renderActiveTaskBannerInView(card, status);
@@ -667,38 +770,159 @@ export class StudyFlowView extends ItemView {
     renderHabitHeatmap(container, this.habits);
   }
 
-  // ===================== TASKS TAB =====================
+  // ===================== TASKS TAB (CENTRALIZED ACADEMIC HUB) =====================
   private async renderTasksTab(container: HTMLElement): Promise<void> {
     container.empty();
     await this.reloadTasks();
 
-    const card = container.createDiv({ cls: 'study-flow-card' });
+    const card = container.createDiv({ cls: 'study-flow-card study-flow-tasks-main-card' });
 
-    // Stats bar
-    const pendingCount = this.tasks.filter((t) => !t.completed && !t.isIdea).length;
-    const ideasCount = this.tasks.filter((t) => !t.completed && t.isIdea).length;
-    const completedCount = this.tasks.filter((t) => t.completed).length;
+    // 1. Stats Bar
+    const pendingTasks = this.tasks.filter((t) => !t.completed && !t.isIdea);
+    const todayTasks = pendingTasks.filter(
+      (t) => (t.daysRemaining !== undefined && t.daysRemaining <= 0) || t.dueDate === formatDateKey(new Date())
+    );
+    const ideasTasks = this.tasks.filter((t) => !t.completed && t.isIdea);
+    const completedTasks = this.tasks.filter((t) => t.completed);
 
-    const statsBar = card.createDiv({ cls: 'study-flow-stats-bar' });
-    statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
-    statsBar.createSpan({ text: `${ideasCount} ideas`, cls: 'study-flow-badge-stat is-idea' });
-    statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
+    const statsBar = card.createDiv({ cls: 'study-flow-tasks-stats-bar' });
+    const statPending = statsBar.createDiv({ cls: 'study-flow-stat-pill is-pending' });
+    statPending.createSpan({ text: '📋' });
+    statPending.createSpan({ text: `${pendingTasks.length} pendientes` });
 
-    // Quick Add Bar
-    const addBar = card.createDiv({ cls: 'study-flow-search-bar' });
-    const addInput = addBar.createEl('input', {
+    const statToday = statsBar.createDiv({
+      cls: `study-flow-stat-pill ${todayTasks.length > 0 ? 'is-today-urgent' : 'is-today'}`,
+    });
+    statToday.createSpan({ text: '📅' });
+    statToday.createSpan({ text: `${todayTasks.length} para hoy` });
+
+    const statIdeas = statsBar.createDiv({ cls: 'study-flow-stat-pill is-idea' });
+    statIdeas.createSpan({ text: '💡' });
+    statIdeas.createSpan({ text: `${ideasTasks.length} ideas` });
+
+    const statDone = statsBar.createDiv({ cls: 'study-flow-stat-pill is-completed' });
+    statDone.createSpan({ text: '✅' });
+    statDone.createSpan({ text: `${completedTasks.length} hechas` });
+
+    // 2. Search & Sort Bar
+    const searchRow = card.createDiv({ cls: 'study-flow-tasks-search-row' });
+    const searchWrap = searchRow.createDiv({ cls: 'study-flow-search-input-wrap' });
+    const sIcon = searchWrap.createSpan({ cls: 'study-flow-search-icon' });
+    setIcon(sIcon, 'search');
+
+    const searchInput = searchWrap.createEl('input', {
       type: 'text',
-      placeholder: 'Nueva entrada rápida...',
-      cls: 'study-flow-task-input',
+      cls: 'study-flow-task-search-input',
+      placeholder: 'Buscar tareas (#materia, texto, deadline)...',
+      value: this.taskSearchQuery,
+    });
+    searchInput.addEventListener('input', () => {
+      this.taskSearchQuery = searchInput.value.trim().toLowerCase();
+      renderList();
+    });
+
+    if (this.taskSearchQuery) {
+      const clearBtn = searchWrap.createEl('button', {
+        cls: 'study-flow-search-clear-btn',
+        text: '✕',
+        attr: { 'aria-label': 'Limpiar búsqueda' },
+      });
+      clearBtn.addEventListener('click', () => {
+        this.taskSearchQuery = '';
+        searchInput.value = '';
+        renderList();
+      });
+    }
+
+    const sortSelect = searchRow.createEl('select', { cls: 'study-flow-tasks-sort-select' });
+    sortSelect.createEl('option', { value: 'urgency', text: '⚡ Urgencia / Vencimiento' });
+    sortSelect.createEl('option', { value: 'priority', text: '⏫ Prioridad' });
+    sortSelect.createEl('option', { value: 'estimate', text: '🍅 Estimación Pomodoro' });
+    sortSelect.createEl('option', { value: 'alpha', text: '🔤 Alfabético (A-Z)' });
+    sortSelect.value = this.taskSortBy;
+    sortSelect.addEventListener('change', () => {
+      this.taskSortBy = sortSelect.value as any;
+      renderList();
+    });
+
+    // 3. Segmented Views Pills
+    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
+    const filters: Array<{
+      id: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all';
+      label: string;
+      count: number;
+      icon: string;
+    }> = [
+      { id: 'inbox', label: 'Inbox', count: pendingTasks.length, icon: 'inbox' },
+      { id: 'today', label: 'Hoy', count: todayTasks.length, icon: 'calendar-check' },
+      { id: 'subjects', label: 'Materias', count: pendingTasks.length, icon: 'book-open' },
+      { id: 'ideas', label: 'Ideas', count: ideasTasks.length, icon: 'sparkles' },
+      { id: 'completed', label: 'Hechas', count: completedTasks.length, icon: 'check-circle' },
+      { id: 'all', label: 'Todas', count: this.tasks.length, icon: 'layers' },
+    ];
+
+    filters.forEach((f) => {
+      const btn = filterRow.createEl('button', {
+        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
+      });
+      const iconSpan = btn.createSpan({ cls: 'study-flow-tab-icon' });
+      setIcon(iconSpan, f.icon);
+      btn.createSpan({ text: f.label });
+      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
+      btn.addEventListener('click', async () => {
+        this.taskFilter = f.id;
+        this.selectedSubjectTag = null;
+        container.empty();
+        await this.renderTasksTab(container);
+      });
+    });
+
+    // 4. Quick Add Card (Centralized Academic Capture)
+    const createBox = card.createDiv({ cls: 'study-flow-task-create-box' });
+
+    // Main line: Title input & type toggle & submit
+    const mainInputRow = createBox.createDiv({ cls: 'study-flow-create-main-row' });
+    const taskInput = mainInputRow.createEl('input', {
+      type: 'text',
+      placeholder: 'Nueva tarea o idea... (ej: Resolver guía práctica #algebra)',
+      cls: 'study-flow-task-input study-flow-create-input',
     });
 
     let addType: 'task' | 'idea' = 'task';
-    const typeSelect = addBar.createEl('select', { cls: 'study-flow-type-select' });
+    const typeSelect = mainInputRow.createEl('select', { cls: 'study-flow-type-select' });
     typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
     typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
 
+    const addBtn = mainInputRow.createEl('button', { cls: 'mod-cta study-flow-create-btn' });
+    const aIcon = addBtn.createSpan();
+    setIcon(aIcon, 'plus');
+    addBtn.createSpan({ text: 'Añadir' });
+
+    // Meta controls row (deadline, subject tag, priority, estimate)
+    const metaControlsRow = createBox.createDiv({ cls: 'study-flow-create-meta-row' });
+
+    // Deadline picker
+    const deadlineCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
+    deadlineCol.createSpan({ text: '📅 Vencimiento:', cls: 'study-flow-meta-label' });
+    const deadlineInput = deadlineCol.createEl('input', {
+      type: 'date',
+      cls: 'study-flow-date-input',
+    });
+
+    // Subject/Tag input
+    const subjectCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
+    subjectCol.createSpan({ text: '📚 Materia / Tag:', cls: 'study-flow-meta-label' });
+    const subjectInput = subjectCol.createEl('input', {
+      type: 'text',
+      placeholder: '#materia',
+      cls: 'study-flow-tag-input',
+    });
+
+    // Priority
+    const priorityCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
+    priorityCol.createSpan({ text: 'Prioridad:', cls: 'study-flow-meta-label' });
     let addPriority: TaskPriority = 'none';
-    const prioritySelect = addBar.createEl('select', { cls: 'study-flow-priority-select' });
+    const prioritySelect = priorityCol.createEl('select', { cls: 'study-flow-priority-select' });
     prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
     prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
     prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
@@ -707,32 +931,28 @@ export class StudyFlowView extends ItemView {
       addPriority = prioritySelect.value as TaskPriority;
     });
 
+    // Estimate
+    const estCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
+    estCol.createSpan({ text: 'Estimación:', cls: 'study-flow-meta-label' });
     let addEstimate: number = 0;
-    const estimateSelect = addBar.createEl('select', { cls: 'study-flow-estimate-select' });
+    const estimateSelect = estCol.createEl('select', { cls: 'study-flow-estimate-select' });
     estimateSelect.createEl('option', { value: '0', text: '🍅 -' });
     estimateSelect.createEl('option', { value: '1', text: '🍅 1 (25m)' });
     estimateSelect.createEl('option', { value: '2', text: '🍅 2 (50m)' });
     estimateSelect.createEl('option', { value: '3', text: '🍅 3 (1h15m)' });
     estimateSelect.createEl('option', { value: '4', text: '🍅 4 (1h40m)' });
-    estimateSelect.createEl('option', { value: '5', text: '🍅 5 (2h05m)' });
-    estimateSelect.createEl('option', { value: '6', text: '🍅 6 (2h30m)' });
+    estimateSelect.createEl('option', { value: '5', text: '🍅 5+' });
     estimateSelect.addEventListener('change', () => {
       addEstimate = parseInt(estimateSelect.value, 10) || 0;
     });
 
     typeSelect.addEventListener('change', () => {
       addType = typeSelect.value as 'task' | 'idea';
-      prioritySelect.style.display = addType === 'idea' ? 'none' : '';
-      estimateSelect.style.display = addType === 'idea' ? 'none' : '';
+      metaControlsRow.style.display = addType === 'idea' ? 'none' : 'flex';
     });
 
-    const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
-    const aIcon = addBtn.createSpan();
-    setIcon(aIcon, 'plus');
-    addBtn.createSpan({ text: 'Añadir' });
-
-    const handleAdd = async () => {
-      const val = addInput.value.trim();
+    const handleCreateTask = async () => {
+      const val = taskInput.value.trim();
       if (!val) return;
 
       const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
@@ -745,221 +965,508 @@ export class StudyFlowView extends ItemView {
         await this.app.vault.modify(file, updated);
         new Notice('💡 Idea añadida a tu banco');
       } else {
+        let textWithSubject = val;
+        const subVal = subjectInput.value.trim();
+        if (subVal) {
+          const formattedSub = subVal.startsWith('#') ? subVal : `#${subVal}`;
+          if (!textWithSubject.includes(formattedSub)) {
+            textWithSubject = `${textWithSubject} ${formattedSub}`;
+          }
+        }
+
         let finalText = addPriority !== 'none'
-          ? formatTaskWithPriority(val, addPriority)
-          : val;
+          ? formatTaskWithPriority(textWithSubject, addPriority)
+          : textWithSubject;
+
         if (addEstimate > 0) {
           finalText = formatTaskWithPomodoroEstimate(finalText, addEstimate);
         }
+
+        if (deadlineInput.value) {
+          finalText = formatTaskWithDeadline(finalText, deadlineInput.value);
+        }
+
         const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
         await this.app.vault.modify(file, updated);
-        new Notice('✓ Tarea añadida al Inbox');
+        new Notice('✓ Tarea agregada al Inbox');
       }
 
-      addInput.value = '';
+      taskInput.value = '';
+      subjectInput.value = '';
+      deadlineInput.value = '';
       prioritySelect.value = 'none';
       estimateSelect.value = '0';
       addPriority = 'none';
       addEstimate = 0;
+      container.empty();
       await this.renderTasksTab(container);
     };
 
-    addBtn.addEventListener('click', handleAdd);
-    addInput.addEventListener('keydown', (e) => {
+    addBtn.addEventListener('click', handleCreateTask);
+    taskInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        handleAdd();
+        handleCreateTask();
       }
     });
 
-    // Segmented Filters Bar
-    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control' });
-    const filters: Array<{ id: 'pending' | 'ideas' | 'completed' | 'all'; label: string; count: number }> = [
-      { id: 'pending', label: 'Pendientes', count: pendingCount },
-      { id: 'ideas', label: '💡 Ideas', count: ideasCount },
-      { id: 'completed', label: 'Completadas', count: completedCount },
-      { id: 'all', label: 'Todas', count: this.tasks.length },
-    ];
-
-    filters.forEach((f) => {
-      const btn = filterRow.createEl('button', {
-        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
-      });
-      btn.createSpan({ text: f.label });
-      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
-      btn.addEventListener('click', async () => {
-        this.taskFilter = f.id;
-        container.empty();
-        await this.renderTasksTab(container);
-      });
-    });
-
-    // Task Cards List
+    // 5. Task List Container
     const listContainer = card.createDiv({ cls: 'study-flow-task-list-cards' });
-    const displayed = this.tasks.filter((t) => {
-      if (this.taskFilter === 'pending') return !t.completed && !t.isIdea;
+
+    const renderList = () => {
+      listContainer.empty();
+      this.renderFilteredTaskList(listContainer, container);
+    };
+
+    renderList();
+  }
+
+  private renderFilteredTaskList(listContainer: HTMLElement, rootContainer: HTMLElement): void {
+    // 1. Filter by view mode
+    let filtered = this.tasks.filter((t) => {
+      if (this.taskFilter === 'inbox') return !t.completed && !t.isIdea;
+      if (this.taskFilter === 'today') {
+        if (t.completed || t.isIdea) return false;
+        const isOverdueOrToday = t.daysRemaining !== undefined && t.daysRemaining <= 0;
+        const isTodayDate = t.dueDate === formatDateKey(new Date());
+        return isOverdueOrToday || isTodayDate;
+      }
+      if (this.taskFilter === 'subjects') return !t.completed && !t.isIdea;
       if (this.taskFilter === 'ideas') return !t.completed && t.isIdea;
       if (this.taskFilter === 'completed') return t.completed;
-      return true;
+      return true; // 'all'
     });
 
-    if (displayed.length === 0) {
+    // 2. Search query filter
+    if (this.taskSearchQuery) {
+      const q = this.taskSearchQuery.toLowerCase();
+      filtered = filtered.filter((t) => {
+        if (t.text.toLowerCase().includes(q)) return true;
+        if (t.tags && t.tags.some((tag) => tag.toLowerCase().includes(q))) return true;
+        if (t.dueDate && t.dueDate.includes(q)) return true;
+        return false;
+      });
+    }
+
+    // 3. Subject filter if tag is clicked
+    if (this.selectedSubjectTag) {
+      filtered = filtered.filter((t) => t.tags && t.tags.includes(this.selectedSubjectTag!));
+    }
+
+    // 4. Sort
+    filtered.sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (this.taskSortBy === 'urgency') {
+        if (a.daysRemaining !== undefined && b.daysRemaining !== undefined) {
+          return a.daysRemaining - b.daysRemaining;
+        }
+        if (a.daysRemaining !== undefined) return -1;
+        if (b.daysRemaining !== undefined) return 1;
+        return compareTasksByPriority(a, b);
+      }
+      if (this.taskSortBy === 'priority') {
+        return compareTasksByPriority(a, b);
+      }
+      if (this.taskSortBy === 'estimate') {
+        const estA = a.estimatedPomodoros || 0;
+        const estB = b.estimatedPomodoros || 0;
+        if (estB !== estA) return estB - estA;
+        return a.text.localeCompare(b.text);
+      }
+      if (this.taskSortBy === 'alpha') {
+        return a.text.localeCompare(b.text);
+      }
+      return 0;
+    });
+
+    // Empty state
+    if (filtered.length === 0) {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      setIcon(emptyIcon, this.taskFilter === 'ideas' ? 'sparkles' : 'check-circle-2');
-      emptyState.createEl('h4', {
-        text: this.taskFilter === 'ideas'
-          ? 'No hay ideas espontáneas guardadas'
-          : (this.taskFilter === 'pending' ? '¡Todo al día!' : 'No hay tareas'),
+      if (this.taskFilter === 'ideas') {
+        setIcon(emptyIcon, 'sparkles');
+        emptyState.createEl('h4', { text: 'No hay ideas en el banco' });
+        emptyState.createEl('p', { text: 'Anotá tus ideas sin presión de fechas ni foco para no olvidarlas.' });
+      } else if (this.taskFilter === 'today') {
+        setIcon(emptyIcon, 'calendar-check');
+        emptyState.createEl('h4', { text: '¡Nada pendiente para hoy!' });
+        emptyState.createEl('p', { text: 'Todas las tareas urgentes están resueltas o no tienen vencimiento hoy.' });
+      } else if (this.taskFilter === 'completed') {
+        setIcon(emptyIcon, 'check-circle-2');
+        emptyState.createEl('h4', { text: 'Sin tareas completadas aún' });
+        emptyState.createEl('p', { text: 'Marcá tus tareas como hechas y las verás reflejadas aquí.' });
+      } else {
+        setIcon(emptyIcon, 'check-circle-2');
+        emptyState.createEl('h4', { text: this.taskSearchQuery ? 'Sin resultados para la búsqueda' : '¡Todo al día!' });
+        emptyState.createEl('p', {
+          text: this.taskSearchQuery
+            ? 'Probá con otro término o limpiá el buscador.'
+            : 'Añadí una nueva tarea con el formulario de arriba.',
+        });
+      }
+      return;
+    }
+
+    // If subject view without selected tag, render grouped by subject!
+    if (this.taskFilter === 'subjects' && !this.selectedSubjectTag) {
+      // Group tasks by tag
+      const groups = new Map<string, TaskRecord[]>();
+      filtered.forEach((task) => {
+        const tags = (task.tags && task.tags.length > 0) ? task.tags : ['#general'];
+        tags.forEach((tag) => {
+          const groupName = tag.startsWith('#') ? tag : `#${tag}`;
+          if (!groups.has(groupName)) {
+            groups.set(groupName, []);
+          }
+          groups.get(groupName)!.push(task);
+        });
       });
-      emptyState.createEl('p', {
-        text: this.taskFilter === 'ideas'
-          ? 'Capturá tus ideas aquí para no perderlas sin saturar tu foco del día a día.'
-          : (this.taskFilter === 'pending' ? 'No tienes tareas pendientes en tu Inbox.' : 'Añade una nueva tarea arriba.'),
+
+      // Render each group
+      groups.forEach((tasksInGroup, groupTag) => {
+        const groupCard = listContainer.createDiv({ cls: 'study-flow-subject-group-box' });
+        const groupHeader = groupCard.createDiv({ cls: 'study-flow-subject-group-header' });
+        const headerLeft = groupHeader.createDiv({ cls: 'study-flow-subject-header-left' });
+        const gIcon = headerLeft.createSpan({ cls: 'study-flow-subject-icon' });
+        setIcon(gIcon, 'book-open');
+        headerLeft.createEl('h4', {
+          text: groupTag.toUpperCase(),
+          cls: 'study-flow-subject-title',
+        });
+        headerLeft.createSpan({
+          text: `${tasksInGroup.length} tareas`,
+          cls: 'study-flow-count-pill',
+        });
+
+        const filterSubjectBtn = groupHeader.createEl('button', {
+          cls: 'study-flow-icon-action-btn-styled study-flow-filter-subject-btn',
+          text: 'Filtrar materia',
+        });
+        filterSubjectBtn.addEventListener('click', () => {
+          this.selectedSubjectTag = groupTag;
+          listContainer.empty();
+          this.renderFilteredTaskList(listContainer, rootContainer);
+        });
+
+        const tasksBox = groupCard.createDiv({ cls: 'study-flow-subject-tasks-wrapper' });
+        tasksInGroup.forEach((task) => {
+          this.renderTaskCardItem(tasksBox, task, rootContainer);
+        });
+      });
+      return;
+    }
+
+    // If a subject tag is actively selected, show breadcrumb back button
+    if (this.selectedSubjectTag) {
+      const banner = listContainer.createDiv({ cls: 'study-flow-subject-active-banner' });
+      banner.createSpan({ text: `📚 Filtrando por: ${this.selectedSubjectTag}` });
+      const clearSubBtn = banner.createEl('button', {
+        cls: 'study-flow-filter-clear-btn',
+        text: '← Ver todas las materias',
+      });
+      clearSubBtn.addEventListener('click', () => {
+        this.selectedSubjectTag = null;
+        listContainer.empty();
+        this.renderFilteredTaskList(listContainer, rootContainer);
+      });
+    }
+
+    // Standard list rendering
+    filtered.forEach((task) => {
+      this.renderTaskCardItem(listContainer, task, rootContainer);
+    });
+  }
+
+  private renderTaskCardItem(container: HTMLElement, task: TaskRecord, rootContainer: HTMLElement): void {
+    const isEditing = this.editingTaskId === task.id;
+    const itemCard = container.createDiv({
+      cls: `study-flow-task-card ${task.completed ? 'is-done' : ''} ${isEditing ? 'is-editing' : ''}`,
+    });
+
+    // Checkbox
+    const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
+    const cb = cbWrapper.createEl('input', { type: 'checkbox' });
+    cb.checked = task.completed;
+    cb.addEventListener('change', async () => {
+      await toggleTaskCompletionInFile(this.app, task, cb.checked);
+      task.completed = cb.checked;
+      new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
+      rootContainer.empty();
+      await this.renderTasksTab(rootContainer);
+    });
+
+    // Main column
+    const mainCol = itemCard.createDiv({ cls: 'study-flow-task-main-col' });
+
+    if (isEditing) {
+      // Inline Editing Input Row
+      const editRow = mainCol.createDiv({ cls: 'study-flow-task-inline-edit' });
+      const editInput = editRow.createEl('input', {
+        type: 'text',
+        cls: 'study-flow-inline-edit-input',
+        value: task.text,
+      });
+      editInput.focus();
+
+      const saveBtn = editRow.createEl('button', {
+        cls: 'mod-cta study-flow-btn-xs',
+        text: 'Guardar',
+      });
+      const cancelBtn = editRow.createEl('button', {
+        cls: 'study-flow-btn-xs',
+        text: 'Cancelar',
+      });
+
+      const handleSave = async () => {
+        const newText = editInput.value.trim();
+        if (newText && newText !== task.text) {
+          await updateTaskTextInFile(this.app, task, newText);
+          new Notice('✓ Tarea actualizada');
+        }
+        this.editingTaskId = null;
+        rootContainer.empty();
+        await this.renderTasksTab(rootContainer);
+      };
+
+      saveBtn.addEventListener('click', handleSave);
+      editInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSave();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          this.editingTaskId = null;
+          rootContainer.empty();
+          this.renderTasksTab(rootContainer);
+        }
+      });
+      cancelBtn.addEventListener('click', () => {
+        this.editingTaskId = null;
+        rootContainer.empty();
+        this.renderTasksTab(rootContainer);
       });
     } else {
-      displayed.forEach((task) => {
-        const itemCard = listContainer.createDiv({
-          cls: `study-flow-task-card ${task.completed ? 'is-done' : ''}`,
-        });
+      // Normal Display Row
+      const titleRow = mainCol.createDiv({ cls: 'study-flow-task-title-row' });
+      const textSpan = titleRow.createEl('span', {
+        text: task.text,
+        cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
+      });
+      textSpan.addEventListener('click', () => {
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      });
 
-        const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
-        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
-        cb.checked = task.completed;
+      // Tags & Badges Row
+      const badgesRow = mainCol.createDiv({ cls: 'study-flow-task-badges-row' });
 
-        cb.addEventListener('change', async () => {
-          await toggleTaskCompletionInFile(this.app, task, cb.checked);
-          task.completed = cb.checked;
-          new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
-          container.empty();
-          await this.renderTasksTab(container);
-        });
-
-        const textSpan = itemCard.createEl('span', {
-          text: task.text,
-          cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
-        });
-        textSpan.addEventListener('click', () => {
-          cb.checked = !cb.checked;
-          cb.dispatchEvent(new Event('change'));
-        });
-
-        if (task.isIdea) {
-          itemCard.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
-
-          const promoteBtn = itemCard.createEl('button', {
-            cls: 'study-flow-promote-btn',
-            attr: { 'aria-label': 'Promover a tarea accionable' },
-          });
-          const pIcon = promoteBtn.createSpan();
-          setIcon(pIcon, 'arrow-up-right');
-          promoteBtn.createSpan({ text: 'A Tarea' });
-          promoteBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await promoteIdeaToTaskInFile(this.app, task);
-            new Notice(`✓ "${task.text}" promovida a tarea`);
-            container.empty();
-            await this.renderTasksTab(container);
-          });
-        } else {
-          if (task.priority === 'high') {
-            itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
-          } else if (task.priority === 'medium') {
-            itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
-          } else if (task.priority === 'low') {
-            itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
-          }
-
-          const estCount = task.estimatedPomodoros || 0;
-          const compCount = task.completedPomodoros || 0;
-          if (estCount > 0 || compCount > 0) {
-            let badgeLabel = '';
-            let badgeCls = 'study-flow-estimate-badge';
-            if (compCount > 0 && estCount > 0) {
-              badgeLabel = `🍅 ${compCount}/${estCount}`;
-              if (compCount >= estCount) badgeCls += ' is-met';
-            } else if (estCount > 0) {
-              badgeLabel = `🍅 ${estCount}`;
-            } else if (compCount > 0) {
-              badgeLabel = `🍅 ${compCount}`;
-            }
-            itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
-          }
-
-          if (task.dueDate) {
-            const badgeText =
-              task.daysRemaining !== undefined
-                ? formatDeadlineHuman(task.daysRemaining, task.dueDate)
-                : `📅 ${task.dueDate}`;
-            let badgeCls = 'study-flow-deadline-badge';
-            if (task.daysRemaining !== undefined) {
-              if (task.daysRemaining < 0) badgeCls += ' is-overdue';
-              else if (task.daysRemaining === 0) badgeCls += ' is-today';
-              else if (task.daysRemaining <= 3) badgeCls += ' is-soon';
-            }
-            itemCard.createSpan({ text: badgeText, cls: badgeCls });
-          }
-
-          // Quick step: log +1 Pomodoro directly
-          const addPomoBtn = itemCard.createEl('button', {
-            cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
-            attr: { 'aria-label': 'Registrar pomodoro a esta tarea (+1 🍅)' },
-          });
-          addPomoBtn.createSpan({ text: '+🍅' });
-          addPomoBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const res = await incrementTaskPomodoroInFile(this.app, task);
-            if (res) {
-              new Notice(`🍅 Pomodoro registrado para "${task.text}"`);
-              container.empty();
-              await this.renderTasksTab(container);
-            }
-          });
-
-          // Quick action: Link to Pomodoro
-          const linkPomodoroBtn = itemCard.createEl('button', {
-            cls: 'study-flow-icon-action-btn',
-            attr: { 'aria-label': 'Enfocar con Pomodoro' },
-          });
-          setIcon(linkPomodoroBtn, 'timer');
-          linkPomodoroBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            this.plugin.pomodoro.setActiveTask({
-              id: task.id,
-              text: task.text,
-              sourceFile: task.sourceFile,
-            });
-            this.activeTab = 'pomodoro';
-            this.containerEl.empty();
-            await this.renderView();
-          });
+      if (task.isIdea) {
+        badgesRow.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
+      } else {
+        if (task.priority === 'high') {
+          badgesRow.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+        } else if (task.priority === 'medium') {
+          badgesRow.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+        } else if (task.priority === 'low') {
+          badgesRow.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
         }
 
-        itemCard.createSpan({
-          text: '#Inbox',
-          cls: 'study-flow-source-chip',
+        const estCount = task.estimatedPomodoros || 0;
+        const compCount = task.completedPomodoros || 0;
+        if (estCount > 0 || compCount > 0) {
+          let badgeLabel = '';
+          let badgeCls = 'study-flow-estimate-badge';
+          if (compCount > 0 && estCount > 0) {
+            badgeLabel = `🍅 ${compCount}/${estCount}`;
+            if (compCount >= estCount) badgeCls += ' is-met';
+          } else if (estCount > 0) {
+            badgeLabel = `🍅 ${estCount}`;
+          } else if (compCount > 0) {
+            badgeLabel = `🍅 ${compCount}`;
+          }
+          badgesRow.createSpan({ text: badgeLabel, cls: badgeCls });
+        }
+
+        if (task.dueDate) {
+          const badgeText =
+            task.daysRemaining !== undefined
+              ? formatDeadlineHuman(task.daysRemaining, task.dueDate)
+              : `📅 ${task.dueDate}`;
+          let badgeCls = 'study-flow-deadline-badge';
+          if (task.daysRemaining !== undefined) {
+            if (task.daysRemaining < 0) badgeCls += ' is-overdue';
+            else if (task.daysRemaining === 0) badgeCls += ' is-today';
+            else if (task.daysRemaining <= 3) badgeCls += ' is-soon';
+          }
+          badgesRow.createSpan({ text: badgeText, cls: badgeCls });
+        }
+      }
+
+      // Subject tags chips
+      if (task.tags && task.tags.length > 0) {
+        task.tags.forEach((tag) => {
+          const tagChip = badgesRow.createSpan({
+            text: tag.startsWith('#') ? tag : `#${tag}`,
+            cls: 'study-flow-subject-chip',
+          });
+          tagChip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
+            this.taskFilter = 'subjects';
+            rootContainer.empty();
+            this.renderTasksTab(rootContainer);
+          });
+        });
+      }
+
+      // Source indicator chip
+      const isDaily = task.sourceFile.includes('/')
+        ? task.sourceFile.split('/').pop()?.replace('.md', '')
+        : task.sourceFile.replace('.md', '');
+      badgesRow.createSpan({
+        text: task.sourceFile.includes('Inbox') ? '📥 Inbox' : `📄 ${isDaily}`,
+        cls: 'study-flow-source-chip',
+      });
+    }
+
+    // Subtasks Section (if any exist)
+    const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+    if (hasSubtasks) {
+      const subtasksWrap = mainCol.createDiv({ cls: 'study-flow-subtasks-wrapper' });
+      task.subtasks!.forEach((sub) => {
+        const subItem = subtasksWrap.createDiv({ cls: 'study-flow-subtask-item' });
+        const subCb = subItem.createEl('input', { type: 'checkbox', cls: 'study-flow-subtask-cb' });
+        subCb.checked = sub.completed;
+        subCb.addEventListener('change', async (e) => {
+          e.stopPropagation();
+          await toggleSubtaskInFile(this.app, task.sourceFile, sub.text, subCb.checked);
+          sub.completed = subCb.checked;
+          new Notice(subCb.checked ? '✓ Subtarea completada' : 'Subtarea desmarcada');
+          rootContainer.empty();
+          await this.renderTasksTab(rootContainer);
         });
 
-        const delBtn = itemCard.createEl('button', {
-          cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Eliminar entrada' },
+        const subSpan = subItem.createEl('span', {
+          text: sub.text,
+          cls: `study-flow-subtask-text ${sub.completed ? 'is-strikethrough' : ''}`,
         });
-        setIcon(delBtn, 'trash-2');
-        delBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await deleteTaskFromFile(this.app, task);
-          new Notice('Entrada eliminada');
-          container.empty();
-          await this.renderTasksTab(container);
+        subSpan.addEventListener('click', () => {
+          subCb.checked = !subCb.checked;
+          subCb.dispatchEvent(new Event('change'));
         });
       });
     }
+
+    // Card Right-Side Actions Toolbar
+    const actionsToolbar = itemCard.createDiv({ cls: 'study-flow-task-actions-toolbar' });
+
+    if (!task.completed && !task.isIdea) {
+      // +🍅 Quick Pomodoro increment
+      const addPomoBtn = actionsToolbar.createEl('button', {
+        cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
+        attr: { 'aria-label': 'Registrar pomodoro a esta tarea (+1 🍅)' },
+      });
+      addPomoBtn.createSpan({ text: '+🍅' });
+      addPomoBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const res = await incrementTaskPomodoroInFile(this.app, task);
+        if (res) {
+          new Notice(`🍅 Pomodoro registrado para "${task.text}"`);
+          rootContainer.empty();
+          await this.renderTasksTab(rootContainer);
+        }
+      });
+
+      // Link to Pomodoro
+      const linkPomodoroBtn = actionsToolbar.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Enfocar con Pomodoro' },
+      });
+      setIcon(linkPomodoroBtn, 'timer');
+      linkPomodoroBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        this.plugin.pomodoro.setActiveTask({
+          id: task.id,
+          text: task.text,
+          sourceFile: task.sourceFile,
+        });
+        this.activeTab = 'pomodoro';
+        this.containerEl.empty();
+        await this.renderView();
+      });
+
+      // Add subtask quick button
+      const addSubBtn = actionsToolbar.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Añadir subtarea' },
+      });
+      setIcon(addSubBtn, 'list-plus');
+      addSubBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const subPrompt = window.prompt(`Nueva subtarea para "${task.text}":`);
+        if (subPrompt && subPrompt.trim()) {
+          await addSubtaskToFile(this.app, task, subPrompt.trim());
+          new Notice('✓ Subtarea agregada');
+          rootContainer.empty();
+          await this.renderTasksTab(rootContainer);
+        }
+      });
+    }
+
+    if (task.isIdea) {
+      const promoteBtn = actionsToolbar.createEl('button', {
+        cls: 'study-flow-promote-btn',
+        attr: { 'aria-label': 'Promover a tarea accionable' },
+      });
+      const pIcon = promoteBtn.createSpan();
+      setIcon(pIcon, 'arrow-up-right');
+      promoteBtn.createSpan({ text: 'A Tarea' });
+      promoteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await promoteIdeaToTaskInFile(this.app, task);
+        new Notice(`✓ "${task.text}" promovida a tarea`);
+        rootContainer.empty();
+        await this.renderTasksTab(rootContainer);
+      });
+    }
+
+    // Edit inline button
+    const editBtn = actionsToolbar.createEl('button', {
+      cls: 'study-flow-icon-action-btn',
+      attr: { 'aria-label': 'Editar tarea' },
+    });
+    setIcon(editBtn, 'pencil');
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.editingTaskId = this.editingTaskId === task.id ? null : task.id;
+      rootContainer.empty();
+      this.renderTasksTab(rootContainer);
+    });
+
+    // Delete button
+    const delBtn = actionsToolbar.createEl('button', {
+      cls: 'study-flow-icon-action-btn study-flow-delete-btn',
+      attr: { 'aria-label': 'Eliminar entrada' },
+    });
+    setIcon(delBtn, 'trash-2');
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await deleteTaskFromFile(this.app, task);
+      new Notice('Entrada eliminada');
+      rootContainer.empty();
+      await this.renderTasksTab(rootContainer);
+    });
   }
 
   private async reloadTasks(): Promise<void> {
     this.tasks = [];
-    const files = [this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md'];
-    for (const p of files) {
+    const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+    const dailyPath = getDailyNotePath(this.plugin.settings, 0);
+    const filesToScan = [inboxPath];
+    if (dailyPath && dailyPath !== inboxPath) {
+      filesToScan.push(dailyPath);
+    }
+    for (const p of filesToScan) {
       const f = this.app.vault.getAbstractFileByPath(p);
       if (f instanceof TFile) {
         try {

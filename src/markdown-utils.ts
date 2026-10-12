@@ -1,3 +1,34 @@
+/**
+ * Extracts hashtags (#materia) and wikilinks ([[Nota]]) from text.
+ */
+export function extractTagsFromText(text: string): string[] {
+  if (!text) return [];
+  const tags: string[] = [];
+
+  // Match hashtags (including accented characters)
+  const hashMatches = text.match(/#[\w\u00C0-\u017F-]+/g);
+  if (hashMatches) {
+    hashMatches.forEach((t) => {
+      const clean = t.toLowerCase();
+      if (!tags.includes(clean)) tags.push(clean);
+    });
+  }
+
+  // Match wikilinks [[Page Name]]
+  const linkMatches = text.match(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
+  if (linkMatches) {
+    linkMatches.forEach((linkStr) => {
+      const match = linkStr.match(/\[\[([^\]|]+)/);
+      if (match && match[1]) {
+        const link = `[[${match[1].trim()}]]`;
+        if (!tags.includes(link)) tags.push(link);
+      }
+    });
+  }
+
+  return tags;
+}
+
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
 
 export interface PendingTaskItem {
@@ -288,3 +319,106 @@ export function formatDailyNoteFileName(
 
   return formatted.endsWith('.md') ? formatted : `${formatted}.md`;
 }
+
+export interface SubtaskItem {
+  text: string;
+  completed: boolean;
+  originalLine: string;
+}
+
+export interface TaskRecord extends PendingTaskItem {
+  completed: boolean;
+  statusChar: string;
+  priority: TaskPriority;
+  estimatedPomodoros?: number;
+  completedPomodoros?: number;
+  dueDate?: string;
+  dueTime?: string;
+  daysRemaining?: number;
+  tags?: string[];
+  subtasks?: SubtaskItem[];
+}
+
+export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
+  const priorityWeight: Record<TaskPriority, number> = {
+    high: 3,
+    medium: 2,
+    none: 1,
+    low: 0,
+  };
+  if (a.completed !== b.completed) {
+    return a.completed ? 1 : -1;
+  }
+  // Prioritize imminent/overdue deadlines
+  if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) {
+    return a.dueDate.localeCompare(b.dueDate);
+  }
+  if (a.dueDate && !b.dueDate && (a.daysRemaining !== undefined && a.daysRemaining <= 1)) {
+    return -1;
+  }
+  if (!a.dueDate && b.dueDate && (b.daysRemaining !== undefined && b.daysRemaining <= 1)) {
+    return 1;
+  }
+
+  const diff = priorityWeight[b.priority] - priorityWeight[a.priority];
+  if (diff !== 0) return diff;
+  return a.text.localeCompare(b.text);
+}
+
+export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
+  const tasks: TaskRecord[] = [];
+  const lines = content.split(/\r?\n/);
+  let currentSection = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const headerMatch = line.match(/^#{1,6}\s+(.*)$/);
+    if (headerMatch) {
+      currentSection = headerMatch[1].trim().toLowerCase();
+    }
+
+    const subtaskMatch = line.match(/^(\s{2,}|\t+)-\s+\[(.)\]\s+(.*)$/);
+    if (subtaskMatch && tasks.length > 0) {
+      const parent = tasks[tasks.length - 1];
+      if (!parent.subtasks) parent.subtasks = [];
+      parent.subtasks.push({
+        text: subtaskMatch[3].trim(),
+        completed: subtaskMatch[2].toLowerCase() === 'x',
+        originalLine: line,
+      });
+      continue;
+    }
+
+    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*)$/);
+    if (match) {
+      const statusChar = match[1];
+      const taskText = match[2].trim();
+      const completed = statusChar.toLowerCase() === 'x';
+      const { priority } = parseTaskPriority(taskText);
+      const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
+      const { dueDate, dueTime } = parseTaskDeadline(taskText);
+      const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
+      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
+      const tags = extractTagsFromText(taskText);
+      tasks.push({
+        id: `${sourceFile}#L${i + 1}:${taskText}`,
+        originalLine: line,
+        text: taskText,
+        sourceFile,
+        completed,
+        statusChar,
+        priority,
+        isIdea,
+        estimatedPomodoros: estimated,
+        completedPomodoros: pomodoroCompleted,
+        dueDate,
+        dueTime,
+        daysRemaining,
+        tags,
+      });
+    }
+  }
+
+  return tasks.sort(compareTasksByPriority);
+}
+

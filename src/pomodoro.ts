@@ -165,6 +165,20 @@ export class PomodoroManager {
     this.notifyListeners();
   }
 
+  public async setCustomWorkAndBreak(
+    workMinutes: number,
+    breakMinutes: number,
+    saveAsDefault: boolean = false
+  ): Promise<void> {
+    if (saveAsDefault) {
+      this.plugin.settings.pomodoroWorkDuration = Math.max(1, workMinutes);
+      this.plugin.settings.pomodoroBreakDuration = Math.max(1, breakMinutes);
+      await this.plugin.saveSettings();
+    }
+    const targetMins = this.mode === 'work' ? workMinutes : breakMinutes;
+    this.setCustomMinutes(targetMins, this.mode);
+  }
+
   public toggleStartPause(): void {
     if (this.state === 'idle' || this.state === 'paused') {
       this.start();

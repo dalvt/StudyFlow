@@ -12,88 +12,19 @@ import {
   parseTaskPomodoroEstimate,
   parseTaskPriority,
   PendingTaskItem,
+  extractTagsFromText,
   TaskPriority,
 } from './utils';
 
-export interface TaskRecord extends PendingTaskItem {
-  completed: boolean;
-  statusChar: string;
-  priority: TaskPriority;
-  estimatedPomodoros?: number;
-  completedPomodoros?: number;
-  dueDate?: string;
-  dueTime?: string;
-  daysRemaining?: number;
-}
+import {
+  SubtaskItem,
+  TaskRecord,
+  compareTasksByPriority,
+  extractAllTasksFromContent,
+} from './markdown-utils';
 
-export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
-  const priorityWeight: Record<TaskPriority, number> = {
-    high: 3,
-    medium: 2,
-    none: 1,
-    low: 0,
-  };
-  if (a.completed !== b.completed) {
-    return a.completed ? 1 : -1;
-  }
-  // Prioritize imminent/overdue deadlines
-  if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) {
-    return a.dueDate.localeCompare(b.dueDate);
-  }
-  if (a.dueDate && !b.dueDate && (a.daysRemaining !== undefined && a.daysRemaining <= 1)) {
-    return -1;
-  }
-  if (!a.dueDate && b.dueDate && (b.daysRemaining !== undefined && b.daysRemaining <= 1)) {
-    return 1;
-  }
-
-  const diff = priorityWeight[b.priority] - priorityWeight[a.priority];
-  if (diff !== 0) return diff;
-  return a.text.localeCompare(b.text);
-}
-
-export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
-  const tasks: TaskRecord[] = [];
-  const lines = content.split(/\r?\n/);
-  let currentSection = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const headerMatch = line.match(/^#{1,6}\s+(.*)$/);
-    if (headerMatch) {
-      currentSection = headerMatch[1].trim().toLowerCase();
-    }
-
-    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*)$/);
-    if (match) {
-      const statusChar = match[1];
-      const taskText = match[2].trim();
-      const completed = statusChar.toLowerCase() === 'x';
-      const { priority } = parseTaskPriority(taskText);
-      const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
-      const { dueDate, dueTime } = parseTaskDeadline(taskText);
-      const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
-      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
-      tasks.push({
-        id: `${sourceFile}#L${i + 1}:${taskText}`,
-        originalLine: line,
-        text: taskText,
-        sourceFile,
-        completed,
-        statusChar,
-        priority,
-        isIdea,
-        estimatedPomodoros: estimated,
-        completedPomodoros: pomodoroCompleted,
-        dueDate,
-        dueTime,
-        daysRemaining,
-      });
-    }
-  }
-
-  return tasks.sort(compareTasksByPriority);
-}
+export type { SubtaskItem, TaskRecord };
+export { compareTasksByPriority, extractAllTasksFromContent };
 
 export async function incrementTaskPomodoroInFile(
   app: App,
@@ -196,6 +127,97 @@ export async function toggleTaskCompletionInFile(
   return false;
 }
 
+export async function updateTaskTextInFile(
+  app: App,
+  task: { sourceFile: string; text: string },
+  newText: string
+): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(task.sourceFile);
+  if (!(file instanceof TFile)) return false;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+
+  let targetIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+    if (match && match[2].trim() === task.text) {
+      targetIndex = i;
+      lines[i] = `${match[1]}${newText.trim()}`;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) return false;
+  await app.vault.modify(file, lines.join('\n'));
+  return true;
+}
+
+export async function toggleSubtaskInFile(
+  app: App,
+  sourceFile: string,
+  subtaskText: string,
+  newCompleted: boolean
+): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(sourceFile);
+  if (!(file instanceof TFile)) return false;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+  const targetChar = newCompleted ? 'x' : ' ';
+
+  let found = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/);
+    if (match && match[4].trim() === subtaskText.trim()) {
+      lines[i] = `${match[1]}${targetChar}${match[3]}${match[4]}`;
+      found = true;
+      break;
+    }
+  }
+
+  if (found) {
+    await app.vault.modify(file, lines.join('\n'));
+    return true;
+  }
+  return false;
+}
+
+export async function addSubtaskToFile(
+  app: App,
+  task: { sourceFile: string; text: string },
+  subtaskText: string
+): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(task.sourceFile);
+  if (!(file instanceof TFile)) return false;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+
+  let targetIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^\s*-\s+\[.\]\s+(.*)$/);
+    if (match && match[1].trim() === task.text) {
+      targetIndex = i;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) return false;
+
+  // Insert after any existing subtasks of this task
+  let insertAt = targetIndex + 1;
+  while (insertAt < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[insertAt])) {
+    insertAt++;
+  }
+
+  lines.splice(insertAt, 0, `  - [ ] ${subtaskText.trim()}`);
+  await app.vault.modify(file, lines.join('\n'));
+  return true;
+}
+
 export async function deleteTaskFromFile(
   app: App,
   task: { sourceFile: string; text: string }
@@ -216,7 +238,11 @@ export async function deleteTaskFromFile(
   }
 
   if (foundIndex !== -1) {
-    lines.splice(foundIndex, 1);
+    let count = 1;
+    while (foundIndex + count < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[foundIndex + count])) {
+      count++;
+    }
+    lines.splice(foundIndex, count);
     await app.vault.modify(file, lines.join('\n'));
     return true;
   }

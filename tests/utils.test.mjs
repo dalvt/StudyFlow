@@ -334,4 +334,91 @@ test('getWeekDays generates 7 days Monday to Sunday', async () => {
   assert.equal(days[6].dateStr, '2026-10-18');
 });
 
+test('extractAllTasksFromContent extracts tasks, subtasks, tags, and pomodoros', async () => {
+  const { extractAllTasksFromContent } = await import('../src/markdown-utils.ts');
+  const markdown = `# Inbox
+
+## Tareas
+- [ ] Resolver guía práctica 4 #algebra 📅 2026-10-15 🍅 0/3 ⏫
+  - [x] Ejercicios 1 a 5
+  - [ ] Ejercicios 6 a 10
+- [x] Repasar teoría de matrices #algebra
+- [ ] Entrega de Trabajo Práctico #redes 📅 2026-10-12 🍅 2/4
+
+## Ideas
+- [ ] Investigar algoritmo Raft para distribuidos #sistemas
+`;
+
+  const tasks = extractAllTasksFromContent(markdown, 'StudyFlow/Inbox.md');
+  assert.equal(tasks.length, 4);
+
+  // Check algebra task with subtasks
+  const algebraTask = tasks.find((t) => t.text.includes('guía práctica 4'));
+  assert.ok(algebraTask);
+  assert.equal(algebraTask.completed, false);
+  assert.equal(algebraTask.priority, 'high');
+  assert.equal(algebraTask.estimatedPomodoros, 3);
+  assert.equal(algebraTask.completedPomodoros, 0);
+  assert.equal(algebraTask.dueDate, '2026-10-15');
+  assert.deepEqual(algebraTask.tags, ['#algebra']);
+  assert.ok(algebraTask.subtasks);
+  assert.equal(algebraTask.subtasks.length, 2);
+  assert.equal(algebraTask.subtasks[0].text, 'Ejercicios 1 a 5');
+  assert.equal(algebraTask.subtasks[0].completed, true);
+  assert.equal(algebraTask.subtasks[1].text, 'Ejercicios 6 a 10');
+  assert.equal(algebraTask.subtasks[1].completed, false);
+
+  // Check idea task
+  const ideaTask = tasks.find((t) => t.text.includes('algoritmo Raft'));
+  assert.ok(ideaTask);
+  assert.equal(ideaTask.isIdea, true);
+
+  // Check completed task
+  const doneTask = tasks.find((t) => t.text.includes('teoría de matrices'));
+  assert.ok(doneTask);
+  assert.equal(doneTask.completed, true);
+});
+
+test('compareTasksByPriority prioritizes incomplete, imminent deadlines, and high priority', async () => {
+  const { compareTasksByPriority } = await import('../src/markdown-utils.ts');
+  const taskA = {
+    id: '1',
+    originalLine: '',
+    text: 'A',
+    sourceFile: 'f.md',
+    completed: false,
+    statusChar: ' ',
+    priority: 'low',
+    dueDate: '2026-10-12',
+    daysRemaining: 0,
+  };
+  const taskB = {
+    id: '2',
+    originalLine: '',
+    text: 'B',
+    sourceFile: 'f.md',
+    completed: false,
+    statusChar: ' ',
+    priority: 'high',
+    dueDate: '2026-10-20',
+    daysRemaining: 8,
+  };
+  const taskDone = {
+    id: '3',
+    originalLine: '',
+    text: 'Done',
+    sourceFile: 'f.md',
+    completed: true,
+    statusChar: 'x',
+    priority: 'high',
+  };
+
+  // Imminent deadline beats higher priority with later deadline
+  assert.ok(compareTasksByPriority(taskA, taskB) < 0);
+  // Uncompleted beats completed
+  assert.ok(compareTasksByPriority(taskA, taskDone) < 0);
+  assert.ok(compareTasksByPriority(taskDone, taskA) > 0);
+});
+
+
 
