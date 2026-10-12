@@ -8,6 +8,7 @@ export interface HabitItem {
   completedToday: boolean;
   streak: number;
   lastCompletedDate: string;
+  history: string[];
 }
 
 function getTodayString(): string {
@@ -40,13 +41,18 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Matches: - [ ] Name <!-- streak: N | last: YYYY-MM-DD -->
-    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>]*?)\s*-->)?$/);
+    // Matches: - [ ] Name <!-- streak: N | last: YYYY-MM-DD | history: YYYY-MM-DD,... -->
+    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>|]*?)(?:\s*\|\s*history:\s*([^>]*?))?\s*-->)?$/);
     if (match) {
       const statusChar = match[1];
       const name = match[2].trim();
       const streak = parseInt(match[3] || '0', 10) || 0;
       const lastCompletedDate = (match[4] || '').trim();
+      const historyRaw = (match[5] || '').trim();
+      const history = historyRaw
+        ? historyRaw.split(',').map((s) => s.trim()).filter(Boolean)
+        : (lastCompletedDate ? [lastCompletedDate] : []);
+
       const completedToday = statusChar.toLowerCase() === 'x' && lastCompletedDate === today;
 
       habits.push({
@@ -55,6 +61,7 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
         completedToday,
         streak,
         lastCompletedDate,
+        history,
       });
     }
   }
@@ -71,7 +78,8 @@ export async function saveHabitsToFile(app: App, filePath: string, habits: Habit
 
   for (const h of habits) {
     const check = h.completedToday ? 'x' : ' ';
-    lines.push(`- [${check}] ${h.name} <!-- streak: ${h.streak} | last: ${h.lastCompletedDate} -->`);
+    const histStr = (h.history || []).slice(-60).join(',');
+    lines.push(`- [${check}] ${h.name} <!-- streak: ${h.streak} | last: ${h.lastCompletedDate} | history: ${histStr} -->`);
   }
   lines.push('');
 
@@ -93,6 +101,7 @@ export async function toggleHabitStatus(
 
   const today = getTodayString();
   const yesterday = getYesterdayString();
+  if (!target.history) target.history = [];
 
   if (newCompleted) {
     target.completedToday = true;
@@ -105,12 +114,16 @@ export async function toggleHabitStatus(
       target.streak = 1;
     }
     target.lastCompletedDate = today;
+    if (!target.history.includes(today)) {
+      target.history.push(today);
+    }
   } else {
     target.completedToday = false;
     if (target.lastCompletedDate === today) {
       target.streak = Math.max(0, target.streak - 1);
       target.lastCompletedDate = '';
     }
+    target.history = target.history.filter((d) => d !== today);
   }
 
   await saveHabitsToFile(app, filePath, habits);
@@ -128,6 +141,7 @@ export async function addHabitToFile(app: App, filePath: string, name: string): 
     completedToday: false,
     streak: 0,
     lastCompletedDate: '',
+    history: [],
   });
 
   await saveHabitsToFile(app, filePath, habits);
@@ -142,6 +156,81 @@ export async function deleteHabitFromFile(app: App, filePath: string, habitId: s
   habits = habits.filter((h) => h.id !== habitId);
   await saveHabitsToFile(app, filePath, habits);
   return habits;
+}
+
+export interface HeatmapDay {
+  date: string;
+  dayOfWeek: number;
+  completedCount: number;
+  totalHabits: number;
+  intensity: number; // 0, 1, 2, 3, 4
+}
+
+/**
+ * Computes habit consistency over the last N days (default 35 days: 5 full weeks).
+ */
+export function computeHabitHeatmap(habits: HabitItem[], numDays: number = 35): HeatmapDay[] {
+  const days: HeatmapDay[] = [];
+  const today = new Date();
+  const total = habits.length;
+
+  for (let i = numDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const completedCount = habits.filter((h) => h.history && h.history.includes(dateStr)).length;
+    const ratio = total > 0 ? completedCount / total : 0;
+
+    let intensity = 0;
+    if (completedCount > 0) {
+      if (ratio >= 0.99) intensity = 4;
+      else if (ratio >= 0.66) intensity = 3;
+      else if (ratio >= 0.33) intensity = 2;
+      else intensity = 1;
+    }
+
+    days.push({
+      date: dateStr,
+      dayOfWeek: d.getDay(),
+      completedCount,
+      totalHabits: total,
+      intensity,
+    });
+  }
+
+  return days;
+}
+
+/**
+ * Renders a GitHub-style habit activity heatmap in the target container.
+ */
+export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]): HTMLElement {
+  const card = container.createDiv({ cls: 'study-flow-heatmap-card' });
+  const header = card.createDiv({ cls: 'study-flow-heatmap-header' });
+  const title = header.createSpan({ cls: 'study-flow-heatmap-title' });
+  const iconSpan = title.createSpan();
+  setIcon(iconSpan, 'flame');
+  title.createSpan({ text: 'Consistencia de Hábitos (Últimas 5 semanas)' });
+
+  const grid = card.createDiv({ cls: 'study-flow-heatmap-grid' });
+  const days = computeHabitHeatmap(habits, 35);
+
+  days.forEach((day) => {
+    const cell = grid.createDiv({
+      cls: `study-flow-heatmap-cell is-level-${day.intensity}`,
+    });
+    const pct = day.totalHabits > 0 ? Math.round((day.completedCount / day.totalHabits) * 100) : 0;
+    cell.setAttribute('title', `${day.date}: ${day.completedCount}/${day.totalHabits} hábitos (${pct}%)`);
+  });
+
+  const legend = card.createDiv({ cls: 'study-flow-heatmap-legend' });
+  legend.createSpan({ text: 'Menos', cls: 'study-flow-legend-label' });
+  for (let lvl = 0; lvl <= 4; lvl++) {
+    legend.createDiv({ cls: `study-flow-heatmap-cell is-level-${lvl}` });
+  }
+  legend.createSpan({ text: 'Más', cls: 'study-flow-legend-label' });
+
+  return card;
 }
 
 /**
@@ -274,6 +363,9 @@ export class HabitsModal extends Modal {
         });
       });
     }
+
+    // Heatmap Visualization
+    renderHabitHeatmap(contentEl, this.habits);
 
     // Modal Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });

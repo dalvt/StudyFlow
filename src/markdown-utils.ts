@@ -1,8 +1,42 @@
+export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
+
 export interface PendingTaskItem {
   id: string;
   originalLine: string;
   text: string;
   sourceFile: string;
+  priority?: TaskPriority;
+}
+
+/**
+ * Parses priority tag or emoji from task text.
+ * Compatible with Obsidian Tasks standard (⏫, 🔼, 🔽) and common tags (#p1, #alta, etc.)
+ */
+export function parseTaskPriority(text: string): { priority: TaskPriority; cleanTitle: string } {
+  if (/(?:⏫|#p1\b|#alta\b|#prioridad\/alta\b)/i.test(text)) {
+    const clean = text.replace(/(?:⏫|#p1\b|#alta\b|#prioridad\/alta\b)/gi, '').trim();
+    return { priority: 'high', cleanTitle: clean || text };
+  }
+  if (/(?:🔼|#p2\b|#media\b|#prioridad\/media\b)/i.test(text)) {
+    const clean = text.replace(/(?:🔼|#p2\b|#media\b|#prioridad\/media\b)/gi, '').trim();
+    return { priority: 'medium', cleanTitle: clean || text };
+  }
+  if (/(?:🔽|#p3\b|#baja\b|#prioridad\/baja\b)/i.test(text)) {
+    const clean = text.replace(/(?:🔽|#p3\b|#baja\b|#prioridad\/baja\b)/gi, '').trim();
+    return { priority: 'low', cleanTitle: clean || text };
+  }
+  return { priority: 'none', cleanTitle: text };
+}
+
+/**
+ * Formats a task with an explicit priority prefix.
+ */
+export function formatTaskWithPriority(text: string, priority: TaskPriority): string {
+  const { cleanTitle } = parseTaskPriority(text);
+  if (priority === 'high') return `⏫ ${cleanTitle}`;
+  if (priority === 'medium') return `🔼 ${cleanTitle}`;
+  if (priority === 'low') return `🔽 ${cleanTitle}`;
+  return cleanTitle;
 }
 
 /**
@@ -81,11 +115,13 @@ export function extractPendingTasksFromContent(
     const match = line.match(/^\s*-\s+\[\s\]\s+(.*)$/);
     if (match) {
       const taskText = match[1].trim();
+      const { priority } = parseTaskPriority(taskText);
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
         text: taskText,
         sourceFile,
+        priority,
       });
     }
   }

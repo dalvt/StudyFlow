@@ -12,6 +12,7 @@ export interface StudyBlock {
   startTime: string;
   endTime: string;
   title: string;
+  linkedNote?: string;
 }
 
 export class NextDayPlannerModal extends Modal {
@@ -20,8 +21,8 @@ export class NextDayPlannerModal extends Modal {
   private selectedTaskIds: Set<string> = new Set();
   private markMigratedInSource: boolean = false;
   private studyBlocks: StudyBlock[] = [
-    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino: Estudio Intenso' },
-    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico: Ejercicios' },
+    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino: Estudio Intenso', linkedNote: '' },
+    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico: Ejercicios', linkedNote: '' },
   ];
 
   constructor(app: App, plugin: StudyFlowPlugin) {
@@ -104,6 +105,7 @@ export class NextDayPlannerModal extends Modal {
         startTime: '14:00',
         endTime: '15:30',
         title: 'Bloque Vespertino',
+        linkedNote: '',
       });
       this.renderModalContent();
     });
@@ -150,6 +152,33 @@ export class NextDayPlannerModal extends Modal {
         block.title = titleInput.value.trim();
         this.updatePreview();
       });
+
+      const noteInput = inputsWrap.createEl('input', {
+        type: 'text',
+        value: block.linkedNote || '',
+        cls: 'study-flow-block-note-input',
+        placeholder: 'Material / [[Nota]]...',
+      });
+      noteInput.addEventListener('change', () => {
+        block.linkedNote = noteInput.value.trim();
+        this.updatePreview();
+      });
+
+      if (block.linkedNote) {
+        const openNoteBtn = inputsWrap.createEl('button', {
+          cls: 'study-flow-icon-action-btn-styled study-flow-open-note-btn',
+          attr: { 'aria-label': 'Abrir nota enlazada' },
+        });
+        const bookIcon = openNoteBtn.createSpan();
+        setIcon(bookIcon, 'book-open');
+        openNoteBtn.createSpan({ text: 'Abrir' });
+        openNoteBtn.addEventListener('click', () => {
+          const raw = block.linkedNote?.replace(/[\[\]]/g, '').trim();
+          if (raw) {
+            this.app.workspace.openLinkText(raw, '', false);
+          }
+        });
+      }
 
       const removeBtn = row.createEl('button', {
         cls: 'study-flow-icon-action-btn',
@@ -228,7 +257,12 @@ export class NextDayPlannerModal extends Modal {
 
   private generateTemplateString(): string {
     const blocksStr = this.studyBlocks
-      .map((b) => `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}`)
+      .map((b) => {
+        const noteSuffix = b.linkedNote?.trim()
+          ? ` 📖 [[${b.linkedNote.replace(/[\[\]]/g, '').trim()}]]`
+          : '';
+        return `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}${noteSuffix}`;
+      })
       .join('\n');
 
     const selected = this.pendingTasks.filter((t) => this.selectedTaskIds.has(t.id));
@@ -273,6 +307,14 @@ ${tasksBlock}`;
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event('change'));
       });
+
+      if (task.priority === 'high') {
+        itemEl.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+      } else if (task.priority === 'medium') {
+        itemEl.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+      } else if (task.priority === 'low') {
+        itemEl.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+      }
 
       itemEl.createSpan({
         text: task.sourceFile.endsWith('.md')

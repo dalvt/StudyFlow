@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type StudyFlowPlugin from './main';
+import { playPomodoroChime } from './audio';
 
 export interface StudyFlowSettings {
   pomodoroWorkDuration: number;
@@ -9,6 +10,8 @@ export interface StudyFlowSettings {
   inboxFilePath: string;
   habitsFilePath: string;
   logPomodoroToDailyNote: boolean;
+  enableChimeSound: boolean;
+  chimeVolume: number;
 }
 
 export const DEFAULT_SETTINGS: StudyFlowSettings = {
@@ -19,6 +22,8 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   inboxFilePath: 'Inbox.md',
   habitsFilePath: 'Habits.md',
   logPomodoroToDailyNote: true,
+  enableChimeSound: true,
+  chimeVolume: 0.7,
 };
 
 export class StudyFlowSettingTab extends PluginSettingTab {
@@ -81,6 +86,40 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.logPomodoroToDailyNote = value;
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Notificación sonora (Chime zen)')
+      .setDesc('Reproduce una campana armónica sintetizada con Web Audio API al completar cada sesión.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableChimeSound)
+          .onChange(async (value) => {
+            this.plugin.settings.enableChimeSound = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Volumen del timbre')
+      .setDesc('Ajusta el volumen de la campana acústica.')
+      .addSlider((slider) =>
+        slider
+          .setLimits(0.1, 1.0, 0.05)
+          .setValue(this.plugin.settings.chimeVolume)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.chimeVolume = value;
+            await this.plugin.saveSettings();
+          })
+      )
+      .addButton((btn) =>
+        btn
+          .setButtonText('Probar sonido')
+          .setIcon('bell')
+          .onClick(() => {
+            playPomodoroChime('work', this.plugin.settings.chimeVolume);
           })
       );
 

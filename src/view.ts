@@ -5,6 +5,7 @@ import {
   deleteHabitFromFile,
   HabitItem,
   loadHabitsFromFile,
+  renderHabitHeatmap,
   toggleHabitStatus,
 } from './habits';
 import {
@@ -16,9 +17,11 @@ import {
 import {
   appendTaskToMarkdownSection,
   extractPendingTasksFromContent,
+  formatTaskWithPriority,
   getDailyNotePath,
   getOrCreateFile,
   PendingTaskItem,
+  TaskPriority,
 } from './utils';
 
 export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
@@ -46,9 +49,9 @@ export class StudyFlowView extends ItemView {
   private pendingPlannerTasks: PendingTaskItem[] = [];
   private selectedPlannerTaskIds: Set<string> = new Set();
   private plannerDateOffset: number = 0; // 0 for today, 1 for tomorrow
-  private studyBlocks: Array<{ id: string; startTime: string; endTime: string; title: string }> = [
-    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino' },
-    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico' },
+  private studyBlocks: Array<{ id: string; startTime: string; endTime: string; title: string; linkedNote?: string }> = [
+    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino', linkedNote: '' },
+    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico', linkedNote: '' },
   ];
 
   constructor(leaf: WorkspaceLeaf, plugin: StudyFlowPlugin) {
@@ -596,6 +599,9 @@ export class StudyFlowView extends ItemView {
         });
       });
     }
+
+    // Heatmap consistency visualization
+    renderHabitHeatmap(container, this.habits);
   }
 
   // ===================== TASKS TAB =====================
@@ -619,6 +625,17 @@ export class StudyFlowView extends ItemView {
       placeholder: 'Escribe una tarea...',
       cls: 'study-flow-task-input',
     });
+
+    let addPriority: TaskPriority = 'none';
+    const prioritySelect = addBar.createEl('select', { cls: 'study-flow-priority-select' });
+    prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
+    prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
+    prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
+    prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
+    prioritySelect.addEventListener('change', () => {
+      addPriority = prioritySelect.value as TaskPriority;
+    });
+
     const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
     const aIcon = addBtn.createSpan();
     setIcon(aIcon, 'plus');
@@ -627,12 +644,17 @@ export class StudyFlowView extends ItemView {
     const handleAdd = async () => {
       const val = addInput.value.trim();
       if (!val) return;
+      const finalText = addPriority !== 'none'
+        ? formatTaskWithPriority(val, addPriority)
+        : val;
       const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
       const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n');
       const content = await this.app.vault.read(file);
-      const updated = appendTaskToMarkdownSection(content, val, '## Tareas');
+      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
       await this.app.vault.modify(file, updated);
       addInput.value = '';
+      prioritySelect.value = 'none';
+      addPriority = 'none';
       new Notice('Tarea añadida al Inbox');
       await this.renderTasksTab(container);
     };
@@ -712,6 +734,14 @@ export class StudyFlowView extends ItemView {
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change'));
         });
+
+        if (task.priority === 'high') {
+          itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+        } else if (task.priority === 'medium') {
+          itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+        } else if (task.priority === 'low') {
+          itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+        }
 
         // Quick action: Link to Pomodoro
         const linkPomodoroBtn = itemCard.createEl('button', {
@@ -817,6 +847,7 @@ export class StudyFlowView extends ItemView {
         startTime: '14:00',
         endTime: '15:30',
         title: 'Bloque Vespertino',
+        linkedNote: '',
       });
       container.empty();
       await this.renderPlannerTab(container);
@@ -858,11 +889,39 @@ export class StudyFlowView extends ItemView {
         type: 'text',
         value: block.title,
         cls: 'study-flow-block-title-input',
+        placeholder: 'Título o materia del bloque...',
       });
       titleInput.addEventListener('change', () => {
         block.title = titleInput.value.trim();
         this.updatePlannerPreviewBox();
       });
+
+      const noteInput = inputsWrap.createEl('input', {
+        type: 'text',
+        value: block.linkedNote || '',
+        cls: 'study-flow-block-note-input',
+        placeholder: 'Material / [[Nota]]...',
+      });
+      noteInput.addEventListener('change', () => {
+        block.linkedNote = noteInput.value.trim();
+        this.updatePlannerPreviewBox();
+      });
+
+      if (block.linkedNote) {
+        const openNoteBtn = inputsWrap.createEl('button', {
+          cls: 'study-flow-icon-action-btn-styled study-flow-open-note-btn',
+          attr: { 'aria-label': 'Abrir nota enlazada' },
+        });
+        const bookIcon = openNoteBtn.createSpan();
+        setIcon(bookIcon, 'book-open');
+        openNoteBtn.createSpan({ text: 'Abrir' });
+        openNoteBtn.addEventListener('click', () => {
+          const raw = block.linkedNote?.replace(/[\[\]]/g, '').trim();
+          if (raw) {
+            this.app.workspace.openLinkText(raw, '', false);
+          }
+        });
+      }
 
       const removeBtn = row.createEl('button', {
         cls: 'study-flow-icon-action-btn',
@@ -906,6 +965,14 @@ export class StudyFlowView extends ItemView {
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change'));
         });
+
+        if (task.priority === 'high') {
+          itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+        } else if (task.priority === 'medium') {
+          itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+        } else if (task.priority === 'low') {
+          itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+        }
       });
     }
 
@@ -942,7 +1009,12 @@ export class StudyFlowView extends ItemView {
 
   private buildPlannerTemplate(): string {
     const blocksStr = this.studyBlocks
-      .map((b) => `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}`)
+      .map((b) => {
+        const noteSuffix = b.linkedNote?.trim()
+          ? ` 📖 [[${b.linkedNote.replace(/[\[\]]/g, '').trim()}]]`
+          : '';
+        return `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}${noteSuffix}`;
+      })
       .join('\n');
 
     const selected = this.pendingPlannerTasks.filter((t) => this.selectedPlannerTaskIds.has(t.id));

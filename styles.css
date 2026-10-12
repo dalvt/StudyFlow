@@ -1089,3 +1089,180 @@
   overflow-y: auto;
   line-height: 1.45;
 }
+
+/* =========================================
+   7. Priority Badges & Selectors
+   ========================================= */
+.study-flow-priority-select {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px 10px;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--text-normal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.study-flow-priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-s);
+  line-height: 1.2;
+}
+
+.study-flow-priority-badge.is-high {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.study-flow-priority-badge.is-medium {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.study-flow-priority-badge.is-low {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+/* =========================================
+   8. Habit Activity Heatmap (GitHub Style)
+   ========================================= */
+.study-flow-heatmap-card {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-flow-heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.study-flow-heatmap-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.study-flow-heatmap-title svg {
+  width: 14px;
+  height: 14px;
+  color: #f59e0b;
+}
+
+.study-flow-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 6px 2px;
+}
+
+.study-flow-heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+  background-color: var(--background-modifier-hover);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.study-flow-heatmap-cell:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+  z-index: 2;
+}
+
+.study-flow-heatmap-cell.is-level-0 {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  opacity: 0.7;
+}
+
+.study-flow-heatmap-cell.is-level-1 {
+  background-color: rgba(16, 185, 129, 0.35);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.study-flow-heatmap-cell.is-level-2 {
+  background-color: rgba(16, 185, 129, 0.6);
+  border-color: rgba(16, 185, 129, 0.7);
+}
+
+.study-flow-heatmap-cell.is-level-3 {
+  background-color: rgba(16, 185, 129, 0.85);
+  border-color: #10b981;
+}
+
+.study-flow-heatmap-cell.is-level-4 {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  border-color: #34d399;
+}
+
+.study-flow-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.study-flow-legend-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.study-flow-heatmap-legend .study-flow-heatmap-cell {
+  width: 12px;
+  height: 12px;
+  aspect-ratio: 1;
+  cursor: default;
+}
+
+/* =========================================
+   9. Study Block Material Note Linking
+   ========================================= */
+.study-flow-block-note-input {
+  flex: 1;
+  min-width: 130px;
+  font-size: var(--font-ui-small);
+  padding: 4px 8px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  color: var(--text-accent);
+}
+
+.study-flow-open-note-btn {
+  background-color: var(--background-modifier-hover);
+  border: 1px solid var(--interactive-accent);
+  color: var(--interactive-accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-open-note-btn:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}

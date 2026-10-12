@@ -4,6 +4,8 @@ import {
   appendTaskToMarkdownSection,
   extractPendingTasksFromContent,
   formatDailyNoteFileName,
+  formatTaskWithPriority,
+  parseTaskPriority,
 } from '../src/markdown-utils.ts';
 
 test('appendTaskToMarkdownSection appends new section if it does not exist', () => {
@@ -56,4 +58,31 @@ test('formatDailyNoteFileName calculates dates with offset', () => {
   const tomorrow = formatDailyNoteFileName('YYYY-MM-DD', 1, base);
   assert.equal(today, '2026-10-11.md');
   assert.equal(tomorrow, '2026-10-12.md');
+});
+
+test('parseTaskPriority recognizes Obsidian Tasks emojis and tags', () => {
+  const high1 = parseTaskPriority('⏫ Estudiar para parcial de Álgebra');
+  assert.equal(high1.priority, 'high');
+  assert.equal(high1.cleanTitle, 'Estudiar para parcial de Álgebra');
+
+  const high2 = parseTaskPriority('Entregar trabajo #p1');
+  assert.equal(high2.priority, 'high');
+  assert.equal(high2.cleanTitle, 'Entregar trabajo');
+
+  const med = parseTaskPriority('🔼 Repasar apuntes');
+  assert.equal(med.priority, 'medium');
+
+  const low = parseTaskPriority('🔽 Comprar lapiceras');
+  assert.equal(low.priority, 'low');
+
+  const none = parseTaskPriority('Leer capítulo 1');
+  assert.equal(none.priority, 'none');
+  assert.equal(none.cleanTitle, 'Leer capítulo 1');
+});
+
+test('formatTaskWithPriority prefixes standard emojis', () => {
+  assert.equal(formatTaskWithPriority('Hacer ejercicio', 'high'), '⏫ Hacer ejercicio');
+  assert.equal(formatTaskWithPriority('Hacer ejercicio', 'medium'), '🔼 Hacer ejercicio');
+  assert.equal(formatTaskWithPriority('Hacer ejercicio', 'low'), '🔽 Hacer ejercicio');
+  assert.equal(formatTaskWithPriority('Hacer ejercicio', 'none'), 'Hacer ejercicio');
 });

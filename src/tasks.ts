@@ -2,13 +2,32 @@ import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   appendTaskToMarkdownSection,
+  formatTaskWithPriority,
   getOrCreateFile,
+  parseTaskPriority,
   PendingTaskItem,
+  TaskPriority,
 } from './utils';
 
 export interface TaskRecord extends PendingTaskItem {
   completed: boolean;
   statusChar: string;
+  priority: TaskPriority;
+}
+
+export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
+  const priorityWeight: Record<TaskPriority, number> = {
+    high: 3,
+    medium: 2,
+    none: 1,
+    low: 0,
+  };
+  if (a.completed !== b.completed) {
+    return a.completed ? 1 : -1;
+  }
+  const diff = priorityWeight[b.priority] - priorityWeight[a.priority];
+  if (diff !== 0) return diff;
+  return a.text.localeCompare(b.text);
 }
 
 export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
@@ -22,6 +41,7 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
       const statusChar = match[1];
       const taskText = match[2].trim();
       const completed = statusChar.toLowerCase() === 'x';
+      const { priority } = parseTaskPriority(taskText);
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
@@ -29,11 +49,12 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         sourceFile,
         completed,
         statusChar,
+        priority,
       });
     }
   }
 
-  return tasks;
+  return tasks.sort(compareTasksByPriority);
 }
 
 export async function toggleTaskCompletionInFile(
@@ -94,6 +115,7 @@ export class QuickCaptureModal extends Modal {
   private plugin: StudyFlowPlugin;
   private taskText: string = '';
   private targetDestination: 'inbox' | 'activeNote' = 'inbox';
+  private selectedPriority: TaskPriority = 'none';
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -127,6 +149,20 @@ export class QuickCaptureModal extends Modal {
         });
       });
 
+    new Setting(contentEl)
+      .setName('Prioridad')
+      .setDesc('Nivel de urgencia o impacto')
+      .addDropdown((drop) => {
+        drop.addOption('none', 'Normal / Sin prioridad');
+        drop.addOption('high', '⏫ Alta (Urgente / Impacto)');
+        drop.addOption('medium', '🔼 Media');
+        drop.addOption('low', '🔽 Baja');
+        drop.setValue('none');
+        drop.onChange((val) => {
+          this.selectedPriority = val as TaskPriority;
+        });
+      });
+
     const inputWrap = contentEl.createDiv({ cls: 'study-flow-input-wrap' });
     const inputEl = inputWrap.createEl('input', {
       type: 'text',
@@ -145,7 +181,7 @@ export class QuickCaptureModal extends Modal {
     });
 
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
-    const hint = footer.createEl('span', {
+    footer.createEl('span', {
       text: '↵ Enter para confirmar • Esc para cancelar',
       cls: 'study-flow-shortcut-hint',
     });
@@ -194,7 +230,10 @@ export class QuickCaptureModal extends Modal {
       }
 
       const content = await this.app.vault.read(targetFile);
-      const updated = appendTaskToMarkdownSection(content, this.taskText, '## Tareas');
+      const finalText = this.selectedPriority !== 'none'
+        ? formatTaskWithPriority(this.taskText, this.selectedPriority)
+        : this.taskText;
+      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
       await this.app.vault.modify(targetFile, updated);
 
       new Notice(`✓ Tarea agregada a ${targetName}`);
@@ -268,6 +307,17 @@ export class TasksManagerModal extends Modal {
       placeholder: 'Nueva tarea rápida... (Enter para añadir)',
       cls: 'study-flow-task-input',
     });
+
+    let addPriority: TaskPriority = 'none';
+    const prioritySelect = addSection.createEl('select', { cls: 'study-flow-priority-select' });
+    const optNone = prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
+    const optHigh = prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
+    const optMed = prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
+    const optLow = prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
+    prioritySelect.addEventListener('change', () => {
+      addPriority = prioritySelect.value as TaskPriority;
+    });
+
     const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
     const addIcon = addBtn.createSpan();
     setIcon(addIcon, 'plus');
@@ -276,12 +326,17 @@ export class TasksManagerModal extends Modal {
     const handleAdd = async () => {
       const text = addInput.value.trim();
       if (!text) return;
+      const finalText = addPriority !== 'none'
+        ? formatTaskWithPriority(text, addPriority)
+        : text;
       const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
       const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n');
       const content = await this.app.vault.read(file);
-      const updated = appendTaskToMarkdownSection(content, text, '## Tareas');
+      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
       await this.app.vault.modify(file, updated);
       addInput.value = '';
+      prioritySelect.value = 'none';
+      addPriority = 'none';
       new Notice('Tarea añadida al Inbox');
       await this.refreshTasks();
       this.renderUI();
@@ -360,6 +415,14 @@ export class TasksManagerModal extends Modal {
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change'));
         });
+
+        if (task.priority === 'high') {
+          itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+        } else if (task.priority === 'medium') {
+          itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+        } else if (task.priority === 'low') {
+          itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+        }
 
         const fileBadge = itemCard.createSpan({
           text: '#Inbox',

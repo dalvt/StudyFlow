@@ -1,6 +1,7 @@
 import { Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { getDailyNotePath, getOrCreateFile } from './utils';
+import { playPomodoroChime } from './audio';
+import { getDailyNotePath, getOrCreateFile, parseTaskPriority } from './utils';
 import { toggleTaskCompletionInFile, TaskRecord } from './tasks';
 
 export type PomodoroState = 'idle' | 'running' | 'paused';
@@ -105,6 +106,7 @@ export class PomodoroManager {
   public async completeActiveTask(): Promise<void> {
     if (!this.activeTask) return;
     try {
+      const { priority } = parseTaskPriority(this.activeTask.text);
       const taskRecord: TaskRecord = {
         id: this.activeTask.id,
         originalLine: `- [ ] ${this.activeTask.text}`,
@@ -112,6 +114,7 @@ export class PomodoroManager {
         sourceFile: this.activeTask.sourceFile,
         completed: false,
         statusChar: ' ',
+        priority,
       };
 
       await toggleTaskCompletionInFile(this.plugin.app, taskRecord, true);
@@ -292,6 +295,10 @@ export class PomodoroManager {
         : '¡Pomodoro completado!';
       new Notice(noticeMsg);
 
+      if (this.plugin.settings.enableChimeSound) {
+        playPomodoroChime('work', this.plugin.settings.chimeVolume);
+      }
+
       if (this.plugin.settings.logPomodoroToDailyNote) {
         await this.logSession();
       }
@@ -302,6 +309,11 @@ export class PomodoroManager {
       this.remainingSeconds = this.totalDurationSeconds;
     } else {
       new Notice('¡Descanso completado! Preparado para una nueva sesión.');
+
+      if (this.plugin.settings.enableChimeSound) {
+        playPomodoroChime('break', this.plugin.settings.chimeVolume);
+      }
+
       this.mode = 'work';
       this.state = 'idle';
       this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
