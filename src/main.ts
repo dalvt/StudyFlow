@@ -26,8 +26,8 @@ export default class StudyFlowPlugin extends Plugin {
     this.pomodoro.initStatusBar(statusBarEl);
 
     // Ribbon Icons
-    this.addRibbonIcon('clock', 'Study Flow: Abrir Panel Principal', () => {
-      this.activateView();
+    this.addRibbonIcon('clock', 'Study Flow: Abrir Interfaz Completa', () => {
+      this.activateView(true);
     });
 
     this.addRibbonIcon('check-square', 'Study Flow: Gestor de Tareas', () => {
@@ -45,9 +45,17 @@ export default class StudyFlowPlugin extends Plugin {
     // Commands
     this.addCommand({
       id: 'open-study-flow-hub',
-      name: 'Abrir panel principal (Hub)',
+      name: 'Abrir interfaz completa (Pestaña central)',
       callback: () => {
-        this.activateView();
+        this.activateView(true);
+      },
+    });
+
+    this.addCommand({
+      id: 'open-study-flow-hub-sidebar',
+      name: 'Abrir en panel lateral (Sidebar)',
+      callback: () => {
+        this.activateView(false);
       },
     });
 
@@ -133,23 +141,51 @@ export default class StudyFlowPlugin extends Plugin {
     }
   }
 
-  async activateView(): Promise<void> {
+  async activateView(inTab: boolean = true): Promise<void> {
     const { workspace } = this.app;
-    let leaf = workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW)[0];
+    const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW);
 
-    if (!leaf) {
-      const rightLeaf = workspace.getRightLeaf(false);
-      if (rightLeaf) {
-        await rightLeaf.setViewState({
+    let targetLeaf: WorkspaceLeaf | null = null;
+
+    if (inTab) {
+      // Find if already open in the center workspace (rootSplit)
+      const tabLeaf = existingLeaves.find((l) => l.getRoot() === workspace.rootSplit);
+      if (tabLeaf) {
+        targetLeaf = tabLeaf;
+      } else {
+        // Detach existing sidebar leaves to transition smoothly to a full tab
+        if (existingLeaves.length > 0) {
+          existingLeaves.forEach((l) => l.detach());
+        }
+        targetLeaf = workspace.getLeaf('tab');
+        await targetLeaf.setViewState({
           type: VIEW_TYPE_STUDY_FLOW,
           active: true,
         });
-        leaf = rightLeaf;
+      }
+    } else {
+      // Open or reveal in sidebar
+      const sideLeaf = existingLeaves.find((l) => l.getRoot() !== workspace.rootSplit);
+      if (sideLeaf) {
+        targetLeaf = sideLeaf;
+      } else {
+        if (existingLeaves.length > 0) {
+          existingLeaves.forEach((l) => l.detach());
+        }
+        const rightLeaf = workspace.getRightLeaf(false);
+        if (rightLeaf) {
+          await rightLeaf.setViewState({
+            type: VIEW_TYPE_STUDY_FLOW,
+            active: true,
+          });
+          targetLeaf = rightLeaf;
+        }
       }
     }
 
-    if (leaf) {
-      workspace.revealLeaf(leaf);
+    if (targetLeaf) {
+      workspace.setActiveLeaf(targetLeaf, { focus: true });
+      workspace.revealLeaf(targetLeaf);
     }
   }
 

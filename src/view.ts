@@ -94,15 +94,51 @@ export class StudyFlowView extends ItemView {
     const { containerEl } = this;
     containerEl.empty();
 
+    const rootWrapper = containerEl.createDiv({ cls: 'study-flow-container' });
+
     // Top Brand Header
-    const brandRow = containerEl.createDiv({ cls: 'study-flow-brand-header' });
+    const brandRow = rootWrapper.createDiv({ cls: 'study-flow-brand-header' });
     const brandTitle = brandRow.createDiv({ cls: 'study-flow-brand-title' });
     const brandIcon = brandTitle.createSpan();
     setIcon(brandIcon, 'sparkles');
     brandTitle.createSpan({ text: 'Study Flow Hub' });
 
+    // Header Action Buttons
+    const headerActions = brandRow.createDiv({ cls: 'study-flow-header-actions' });
+    const isMainTab = this.leaf.getRoot() === this.app.workspace.rootSplit;
+
+    if (!isMainTab) {
+      const expandBtn = headerActions.createEl('button', {
+        cls: 'study-flow-expand-tab-btn',
+      });
+      const expIcon = expandBtn.createSpan();
+      setIcon(expIcon, 'maximize-2');
+      expandBtn.createSpan({ text: 'Pestaña completa' });
+      expandBtn.addEventListener('click', async () => {
+        await this.plugin.activateView(true);
+      });
+    } else {
+      const dockBtn = headerActions.createEl('button', {
+        cls: 'study-flow-header-icon-btn',
+        attr: { 'aria-label': 'Mover a la barra lateral' },
+      });
+      setIcon(dockBtn, 'panel-right');
+      dockBtn.addEventListener('click', async () => {
+        await this.plugin.activateView(false);
+      });
+    }
+
+    const refreshBtn = headerActions.createEl('button', {
+      cls: 'study-flow-header-icon-btn',
+      attr: { 'aria-label': 'Recargar vista' },
+    });
+    setIcon(refreshBtn, 'rotate-cw');
+    refreshBtn.addEventListener('click', async () => {
+      await this.renderView();
+    });
+
     // Navigation Tab Bar with 4 tabs
-    const navBar = containerEl.createDiv({ cls: 'study-flow-segmented-nav' });
+    const navBar = rootWrapper.createDiv({ cls: 'study-flow-segmented-nav' });
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: string }> = [
       { id: 'pomodoro', label: 'Pomodoro', icon: 'timer' },
@@ -126,7 +162,7 @@ export class StudyFlowView extends ItemView {
     });
 
     // Content Body
-    const contentBody = containerEl.createDiv({ cls: 'study-flow-tab-body' });
+    const contentBody = rootWrapper.createDiv({ cls: 'study-flow-tab-body' });
 
     if (this.activeTab === 'pomodoro') {
       await this.renderPomodoroTab(contentBody);
@@ -460,6 +496,7 @@ export class StudyFlowView extends ItemView {
 
   // ===================== HABITS TAB =====================
   private async renderHabitsTab(container: HTMLElement): Promise<void> {
+    container.empty();
     const path = this.plugin.settings.habitsFilePath || 'Habits.md';
     this.habits = await loadHabitsFromFile(this.app, path);
 
@@ -477,7 +514,7 @@ export class StudyFlowView extends ItemView {
     const addSection = card.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
-      placeholder: 'Nuevo hábito (ej. 📚 20m lectura)...',
+      placeholder: 'Nuevo hábito (ej. 📚 Lectura)...',
       cls: 'study-flow-task-input',
     });
     const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
@@ -563,6 +600,7 @@ export class StudyFlowView extends ItemView {
 
   // ===================== TASKS TAB =====================
   private async renderTasksTab(container: HTMLElement): Promise<void> {
+    container.empty();
     await this.reloadTasks();
 
     const card = container.createDiv({ cls: 'study-flow-card' });
@@ -578,7 +616,7 @@ export class StudyFlowView extends ItemView {
     const addBar = card.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addBar.createEl('input', {
       type: 'text',
-      placeholder: 'Escribe una tarea y presiona Enter...',
+      placeholder: 'Escribe una tarea...',
       cls: 'study-flow-task-input',
     });
     const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
@@ -732,6 +770,7 @@ export class StudyFlowView extends ItemView {
 
   // ===================== PLANNER TAB =====================
   private async renderPlannerTab(container: HTMLElement): Promise<void> {
+    container.empty();
     await this.reloadPlannerTasks();
 
     const card = container.createDiv({ cls: 'study-flow-card' });
