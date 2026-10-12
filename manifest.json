@@ -1,0 +1,10 @@
+{
+  "id": "study-flow-assistant",
+  "name": "Study Flow Assistant",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Pomodoro timer, lightweight task management, and daily planning assistant.",
+  "author": "Antigravity",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,29 @@
+{
+  "name": "study-flow-assistant",
+  "version": "1.0.0",
+  "description": "Pomodoro timer, lightweight task management, and daily planner for Obsidian.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "check-types": "tsc --noEmit",
+    "test": "node --test tests/utils.test.mjs",
+    "deploy": "node -e 'const fs = require(\"fs\"); const paths = [\"../Obsidian Vault/.obsidian/plugins/study-flow-assistant\", \"../Obsidian Vault/System/System/.obsidian/plugins/study-flow-assistant\"]; paths.forEach(p => { fs.mkdirSync(p, { recursive: true }); [\"main.js\", \"manifest.json\", \"styles.css\"].forEach(f => fs.copyFileSync(f, p + \"/\" + f)); }); console.log(\"Deployed to all vaults!\");'"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "pomodoro",
+    "tasks",
+    "daily-planner"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "tslib": "^2.8.1",
+    "typescript": "^7.0.2"
+  }
+}

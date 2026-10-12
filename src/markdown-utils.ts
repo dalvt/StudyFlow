@@ -1,0 +1,118 @@
+export interface PendingTaskItem {
+  id: string;
+  originalLine: string;
+  text: string;
+  sourceFile: string;
+}
+
+/**
+ * Pure Markdown helper:
+ * Appends a task to a given markdown section (default '## Tareas').
+ * If the section does not exist, it appends the section at the bottom.
+ */
+export function appendTaskToMarkdownSection(
+  fileContent: string,
+  taskText: string,
+  sectionHeader: string = '## Tareas'
+): string {
+  const taskLine = `- [ ] ${taskText.trim()}`;
+  const lines = fileContent.split(/\r?\n/);
+
+  // Find target section header (case-insensitive search for header title)
+  const headerClean = sectionHeader.replace(/^#+\s*/, '').trim().toLowerCase();
+  let headerIndex = -1;
+  let headerLevel = 2;
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+(.*)$/);
+    if (match) {
+      const level = match[1].length;
+      const title = match[2].trim().toLowerCase();
+      if (title === headerClean) {
+        headerIndex = i;
+        headerLevel = level;
+        break;
+      }
+    }
+  }
+
+  if (headerIndex === -1) {
+    // Header does not exist: append at the end
+    const trimmed = fileContent.trimEnd();
+    if (trimmed.length === 0) {
+      return `${sectionHeader}\n${taskLine}\n`;
+    }
+    return `${trimmed}\n\n${sectionHeader}\n${taskLine}\n`;
+  }
+
+  // Header found: locate end of section (next header with level <= headerLevel, or EOF)
+  let insertIndex = lines.length;
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+/);
+    if (match && match[1].length <= headerLevel) {
+      insertIndex = i;
+      break;
+    }
+  }
+
+  // Insert before insertIndex
+  let targetIndex = insertIndex;
+  while (targetIndex > headerIndex + 1 && lines[targetIndex - 1].trim() === '') {
+    targetIndex--;
+  }
+
+  lines.splice(targetIndex, 0, taskLine);
+  return lines.join('\n');
+}
+
+/**
+ * Pure Markdown helper:
+ * Extracts uncompleted tasks (- [ ]) from markdown content.
+ */
+export function extractPendingTasksFromContent(
+  content: string,
+  sourceFile: string
+): PendingTaskItem[] {
+  const tasks: PendingTaskItem[] = [];
+  const lines = content.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^\s*-\s+\[\s\]\s+(.*)$/);
+    if (match) {
+      const taskText = match[1].trim();
+      tasks.push({
+        id: `${sourceFile}#L${i + 1}:${taskText}`,
+        originalLine: line,
+        text: taskText,
+        sourceFile,
+      });
+    }
+  }
+
+  return tasks;
+}
+
+/**
+ * Formats daily note file name using given offset.
+ */
+export function formatDailyNoteFileName(
+  dateFormat: string,
+  offsetDays: number = 0,
+  referenceDate: Date = new Date()
+): string {
+  const targetDate = new Date(referenceDate);
+  targetDate.setDate(targetDate.getDate() + offsetDays);
+
+  const yyyy = String(targetDate.getFullYear());
+  const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(targetDate.getDate()).padStart(2, '0');
+
+  // Simple replacement for standard formats
+  let formatted = dateFormat
+    .replace('YYYY', yyyy)
+    .replace('MM', mm)
+    .replace('DD', dd);
+
+  return formatted.endsWith('.md') ? formatted : `${formatted}.md`;
+}

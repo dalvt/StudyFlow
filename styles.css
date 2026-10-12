@@ -1,0 +1,157 @@
+/* Study Flow Assistant - Styles */
+
+/* Status bar Pomodoro indicator */
+.status-bar-item.study-flow-pomodoro {
+  cursor: pointer;
+  padding: 0 8px;
+  border-radius: var(--radius-s);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-monospace);
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.status-bar-item.study-flow-pomodoro:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-accent);
+}
+
+.status-bar-item.study-flow-pomodoro.is-running {
+  color: var(--text-accent);
+}
+
+.status-bar-item.study-flow-pomodoro.is-break {
+  color: var(--text-success, #48bb78);
+}
+
+.status-bar-item.study-flow-pomodoro.is-paused {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* Modals */
+.study-flow-modal {
+  padding: 12px;
+}
+
+.study-flow-modal h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+}
+
+.study-flow-modal-desc {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: 16px;
+}
+
+/* Quick Task Capture Modal */
+.study-flow-task-input {
+  width: 100%;
+  margin-bottom: 16px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px 12px;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+}
+
+.study-flow-task-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* Next Day Planner Modal */
+.study-flow-planner-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.study-flow-task-list {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-task-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: var(--radius-s);
+  transition: background-color 0.1s ease;
+}
+
+.study-flow-task-item:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.study-flow-task-item input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.study-flow-task-item label {
+  cursor: pointer;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  word-break: break-word;
+  flex: 1;
+}
+
+.study-flow-empty-tasks {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: var(--font-ui-small);
+  padding: 8px 0;
+  text-align: center;
+}
+
+.study-flow-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-preview-label {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.study-flow-preview-box {
+  background-color: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 10px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  white-space: pre-wrap;
+  color: var(--text-muted);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.study-flow-button-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
