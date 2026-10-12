@@ -14,13 +14,16 @@ import {
   TaskRecord,
   toggleTaskCompletionInFile,
   promoteIdeaToTaskInFile,
+  incrementTaskPomodoroInFile,
 } from './tasks';
 import {
   appendTaskToMarkdownSection,
   extractPendingTasksFromContent,
+  formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
   getDailyNotePath,
   getOrCreateFile,
+  parseTaskPomodoroEstimate,
   PendingTaskItem,
   TaskPriority,
 } from './utils';
@@ -374,6 +377,14 @@ export class StudyFlowView extends ItemView {
       textWrap.createSpan({ text: 'Enfocado en: ', cls: 'study-flow-task-banner-label' });
       textWrap.createSpan({ text: status.activeTask.text, cls: 'study-flow-task-banner-name' });
 
+      const { estimated, completed } = parseTaskPomodoroEstimate(status.activeTask.text);
+      if (estimated || (completed && completed > 0)) {
+        const estText = (completed && completed > 0 && estimated)
+          ? ` • 🍅 ${completed}/${estimated}`
+          : (estimated ? ` • 🍅 ${estimated} est.` : ` • 🍅 ${completed}`);
+        textWrap.createSpan({ text: estText, cls: 'study-flow-active-task-pomo-hint' });
+      }
+
       const completeBtn = banner.createEl('button', {
         cls: 'study-flow-task-complete-btn',
         attr: { 'aria-label': 'Marcar como completada' },
@@ -661,9 +672,23 @@ export class StudyFlowView extends ItemView {
       addPriority = prioritySelect.value as TaskPriority;
     });
 
+    let addEstimate: number = 0;
+    const estimateSelect = addBar.createEl('select', { cls: 'study-flow-estimate-select' });
+    estimateSelect.createEl('option', { value: '0', text: '🍅 -' });
+    estimateSelect.createEl('option', { value: '1', text: '🍅 1 (25m)' });
+    estimateSelect.createEl('option', { value: '2', text: '🍅 2 (50m)' });
+    estimateSelect.createEl('option', { value: '3', text: '🍅 3 (1h15m)' });
+    estimateSelect.createEl('option', { value: '4', text: '🍅 4 (1h40m)' });
+    estimateSelect.createEl('option', { value: '5', text: '🍅 5 (2h05m)' });
+    estimateSelect.createEl('option', { value: '6', text: '🍅 6 (2h30m)' });
+    estimateSelect.addEventListener('change', () => {
+      addEstimate = parseInt(estimateSelect.value, 10) || 0;
+    });
+
     typeSelect.addEventListener('change', () => {
       addType = typeSelect.value as 'task' | 'idea';
       prioritySelect.style.display = addType === 'idea' ? 'none' : '';
+      estimateSelect.style.display = addType === 'idea' ? 'none' : '';
     });
 
     const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
@@ -685,9 +710,12 @@ export class StudyFlowView extends ItemView {
         await this.app.vault.modify(file, updated);
         new Notice('💡 Idea añadida a tu banco');
       } else {
-        const finalText = addPriority !== 'none'
+        let finalText = addPriority !== 'none'
           ? formatTaskWithPriority(val, addPriority)
           : val;
+        if (addEstimate > 0) {
+          finalText = formatTaskWithPomodoroEstimate(finalText, addEstimate);
+        }
         const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
         await this.app.vault.modify(file, updated);
         new Notice('✓ Tarea añadida al Inbox');
@@ -695,7 +723,9 @@ export class StudyFlowView extends ItemView {
 
       addInput.value = '';
       prioritySelect.value = 'none';
+      estimateSelect.value = '0';
       addPriority = 'none';
+      addEstimate = 0;
       await this.renderTasksTab(container);
     };
 
@@ -804,6 +834,38 @@ export class StudyFlowView extends ItemView {
           } else if (task.priority === 'low') {
             itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
           }
+
+          const estCount = task.estimatedPomodoros || 0;
+          const compCount = task.completedPomodoros || 0;
+          if (estCount > 0 || compCount > 0) {
+            let badgeLabel = '';
+            let badgeCls = 'study-flow-estimate-badge';
+            if (compCount > 0 && estCount > 0) {
+              badgeLabel = `🍅 ${compCount}/${estCount}`;
+              if (compCount >= estCount) badgeCls += ' is-met';
+            } else if (estCount > 0) {
+              badgeLabel = `🍅 ${estCount}`;
+            } else if (compCount > 0) {
+              badgeLabel = `🍅 ${compCount}`;
+            }
+            itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
+          }
+
+          // Quick step: log +1 Pomodoro directly
+          const addPomoBtn = itemCard.createEl('button', {
+            cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
+            attr: { 'aria-label': 'Registrar pomodoro a esta tarea (+1 🍅)' },
+          });
+          addPomoBtn.createSpan({ text: '+🍅' });
+          addPomoBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const res = await incrementTaskPomodoroInFile(this.app, task);
+            if (res) {
+              new Notice(`🍅 Pomodoro registrado para "${task.text}"`);
+              container.empty();
+              await this.renderTasksTab(container);
+            }
+          });
 
           // Quick action: Link to Pomodoro
           const linkPomodoroBtn = itemCard.createEl('button', {

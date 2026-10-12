@@ -170,8 +170,11 @@ export async function renderAnalyticsDashboard(
     text: `${summary.tasks.completionRate}%`,
     cls: 'study-flow-kpi-value',
   });
+  const pomoSubtext = summary.tasks.totalEstimatedPomodoros > 0
+    ? ` • 🍅 ${summary.tasks.totalCompletedPomodoros}/${summary.tasks.totalEstimatedPomodoros} pomodoros`
+    : '';
   kpiTasks.createDiv({
-    text: `${summary.tasks.totalCompleted} resueltas / ${summary.tasks.totalPending} pendientes`,
+    text: `${summary.tasks.totalCompleted} resueltas / ${summary.tasks.totalPending} pendientes${pomoSubtext}`,
     cls: 'study-flow-kpi-subtext',
   });
 
@@ -295,6 +298,12 @@ export async function renderAnalyticsDashboard(
   const pNone = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-none' });
   pNone.createSpan({ text: 'Normal: ' });
   pNone.createEl('strong', { text: String(summary.tasks.byPriority.none) });
+
+  if (summary.tasks.totalEstimatedPomodoros > 0) {
+    const pPomo = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-pomo' });
+    pPomo.createSpan({ text: '🍅 Pomodoros: ' });
+    pPomo.createEl('strong', { text: `${summary.tasks.totalCompletedPomodoros}/${summary.tasks.totalEstimatedPomodoros}` });
+  }
 
   // Habit consistency list
   const habitSection = healthCard.createDiv({ cls: 'study-flow-health-section' });

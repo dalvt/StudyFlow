@@ -2,7 +2,7 @@ import { Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority } from './utils';
-import { toggleTaskCompletionInFile, TaskRecord } from './tasks';
+import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, TaskRecord } from './tasks';
 import { extractTagsFromText, getLocalDateString, FocusSessionRecord } from './analytics';
 
 export type PomodoroState = 'idle' | 'running' | 'paused';
@@ -307,6 +307,17 @@ export class PomodoroManager {
 
       if (this.plugin.settings.enableChimeSound) {
         playPomodoroChime('work', this.plugin.settings.chimeVolume);
+      }
+
+      if (this.activeTask) {
+        try {
+          const res = await incrementTaskPomodoroInFile(this.plugin.app, this.activeTask);
+          if (res) {
+            this.activeTask.text = res.updatedText;
+          }
+        } catch (e) {
+          console.error('Error incrementing pomodoro count on task:', e);
+        }
       }
 
       // Record to analytics history

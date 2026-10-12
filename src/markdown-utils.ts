@@ -7,6 +7,64 @@ export interface PendingTaskItem {
   sourceFile: string;
   priority?: TaskPriority;
   isIdea?: boolean;
+  estimatedPomodoros?: number;
+  completedPomodoros?: number;
+}
+
+export interface TaskPomodoroEstimate {
+  estimated?: number;
+  completed?: number;
+  cleanTitle: string;
+}
+
+/**
+ * Parses pomodoro estimate and completion count from task text (e.g. 🍅 2 or 🍅 1/3).
+ */
+export function parseTaskPomodoroEstimate(text: string): TaskPomodoroEstimate {
+  const match = text.match(/(?:🍅|:tomato:)\s*(\d+)(?:\s*\/\s*(\d+))?/i);
+  if (!match) {
+    return { cleanTitle: text, completed: 0 };
+  }
+
+  let completed = 0;
+  let estimated = 0;
+  if (match[2] !== undefined) {
+    completed = parseInt(match[1], 10);
+    estimated = parseInt(match[2], 10);
+  } else {
+    estimated = parseInt(match[1], 10);
+  }
+
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return {
+    estimated: isNaN(estimated) || estimated <= 0 ? undefined : estimated,
+    completed: isNaN(completed) || completed < 0 ? 0 : completed,
+    cleanTitle: cleanTitle || text,
+  };
+}
+
+/**
+ * Formats task text with an explicit pomodoro estimate and optional completed count.
+ */
+export function formatTaskWithPomodoroEstimate(
+  text: string,
+  estimated?: number,
+  completed?: number
+): string {
+  const { cleanTitle } = parseTaskPomodoroEstimate(text);
+  if (!estimated && !completed) {
+    return cleanTitle;
+  }
+  if (completed !== undefined && completed > 0 && estimated !== undefined && estimated > 0) {
+    return `${cleanTitle} 🍅 ${completed}/${estimated}`;
+  }
+  if (estimated !== undefined && estimated > 0) {
+    return `${cleanTitle} 🍅 ${estimated}`;
+  }
+  if (completed !== undefined && completed > 0) {
+    return `${cleanTitle} 🍅 ${completed}`;
+  }
+  return cleanTitle;
 }
 
 /**
@@ -123,6 +181,7 @@ export function extractPendingTasksFromContent(
     if (match) {
       const taskText = match[1].trim();
       const { priority } = parseTaskPriority(taskText);
+      const { estimated, completed } = parseTaskPomodoroEstimate(taskText);
       const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
@@ -131,6 +190,8 @@ export function extractPendingTasksFromContent(
         sourceFile,
         priority,
         isIdea,
+        estimatedPomodoros: estimated,
+        completedPomodoros: completed,
       });
     }
   }

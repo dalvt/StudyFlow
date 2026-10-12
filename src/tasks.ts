@@ -2,8 +2,10 @@ import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   appendTaskToMarkdownSection,
+  formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
   getOrCreateFile,
+  parseTaskPomodoroEstimate,
   parseTaskPriority,
   PendingTaskItem,
   TaskPriority,
@@ -13,6 +15,8 @@ export interface TaskRecord extends PendingTaskItem {
   completed: boolean;
   statusChar: string;
   priority: TaskPriority;
+  estimatedPomodoros?: number;
+  completedPomodoros?: number;
 }
 
 export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
@@ -48,6 +52,7 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
       const taskText = match[2].trim();
       const completed = statusChar.toLowerCase() === 'x';
       const { priority } = parseTaskPriority(taskText);
+      const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
       const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
@@ -58,11 +63,54 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         statusChar,
         priority,
         isIdea,
+        estimatedPomodoros: estimated,
+        completedPomodoros: pomodoroCompleted,
       });
     }
   }
 
   return tasks.sort(compareTasksByPriority);
+}
+
+export async function incrementTaskPomodoroInFile(
+  app: App,
+  task: { sourceFile: string; text: string }
+): Promise<{ updatedText: string } | null> {
+  const file = app.vault.getAbstractFileByPath(task.sourceFile);
+  if (!(file instanceof TFile)) return null;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+
+  let targetIndex = -1;
+  let currentLine = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
+      targetIndex = i;
+      currentLine = line;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) return null;
+
+  const match = currentLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const oldText = match[2].trim();
+
+  const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
+  const newCompleted = (completed || 0) + 1;
+  const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
+
+  lines[targetIndex] = `${prefix}${newText}`;
+  await app.vault.modify(file, lines.join('\n'));
+
+  return { updatedText: newText };
 }
 
 export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promise<boolean> {
@@ -155,6 +203,7 @@ export class QuickCaptureModal extends Modal {
   private itemType: 'task' | 'idea' = 'task';
   private targetDestination: 'inbox' | 'activeNote' = 'inbox';
   private selectedPriority: TaskPriority = 'none';
+  private selectedEstimate: number = 0;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -175,6 +224,7 @@ export class QuickCaptureModal extends Modal {
     const canUseActiveFile = activeFile !== null && activeFile.extension === 'md';
 
     let prioritySetting: Setting | null = null;
+    let estimateSetting: Setting | null = null;
 
     new Setting(contentEl)
       .setName('Tipo de entrada')
@@ -187,6 +237,9 @@ export class QuickCaptureModal extends Modal {
           this.itemType = val as 'task' | 'idea';
           if (prioritySetting) {
             prioritySetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+          }
+          if (estimateSetting) {
+            estimateSetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
           }
         });
       });
@@ -216,6 +269,23 @@ export class QuickCaptureModal extends Modal {
         drop.setValue('none');
         drop.onChange((val) => {
           this.selectedPriority = val as TaskPriority;
+        });
+      });
+
+    estimateSetting = new Setting(contentEl)
+      .setName('Estimación (Pomodoros)')
+      .setDesc('Bloques de estudio previstos (ej. 🍅 2 = 50m)')
+      .addDropdown((drop) => {
+        drop.addOption('0', 'Sin estimar');
+        drop.addOption('1', '🍅 1 pomodoro (~25m)');
+        drop.addOption('2', '🍅 2 pomodoros (~50m)');
+        drop.addOption('3', '🍅 3 pomodoros (~1h 15m)');
+        drop.addOption('4', '🍅 4 pomodoros (~1h 40m)');
+        drop.addOption('5', '🍅 5 pomodoros (~2h 05m)');
+        drop.addOption('6', '🍅 6 pomodoros (~2h 30m)');
+        drop.setValue(String(this.selectedEstimate));
+        drop.onChange((val) => {
+          this.selectedEstimate = parseInt(val, 10) || 0;
         });
       });
 
@@ -293,9 +363,12 @@ export class QuickCaptureModal extends Modal {
         await this.app.vault.modify(targetFile, updated);
         new Notice(`💡 Idea guardada en ${targetName}`);
       } else {
-        const finalText = this.selectedPriority !== 'none'
+        let finalText = this.selectedPriority !== 'none'
           ? formatTaskWithPriority(this.taskText, this.selectedPriority)
           : this.taskText;
+        if (this.selectedEstimate > 0) {
+          finalText = formatTaskWithPomodoroEstimate(finalText, this.selectedEstimate);
+        }
         const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
         await this.app.vault.modify(targetFile, updated);
         new Notice(`✓ Tarea agregada a ${targetName}`);
@@ -389,9 +462,23 @@ export class TasksManagerModal extends Modal {
       addPriority = prioritySelect.value as TaskPriority;
     });
 
+    let addEstimate: number = 0;
+    const estimateSelect = addSection.createEl('select', { cls: 'study-flow-estimate-select' });
+    estimateSelect.createEl('option', { value: '0', text: '🍅 -' });
+    estimateSelect.createEl('option', { value: '1', text: '🍅 1 (25m)' });
+    estimateSelect.createEl('option', { value: '2', text: '🍅 2 (50m)' });
+    estimateSelect.createEl('option', { value: '3', text: '🍅 3 (1h15m)' });
+    estimateSelect.createEl('option', { value: '4', text: '🍅 4 (1h40m)' });
+    estimateSelect.createEl('option', { value: '5', text: '🍅 5 (2h05m)' });
+    estimateSelect.createEl('option', { value: '6', text: '🍅 6 (2h30m)' });
+    estimateSelect.addEventListener('change', () => {
+      addEstimate = parseInt(estimateSelect.value, 10) || 0;
+    });
+
     typeSelect.addEventListener('change', () => {
       addType = typeSelect.value as 'task' | 'idea';
       prioritySelect.style.display = addType === 'idea' ? 'none' : '';
+      estimateSelect.style.display = addType === 'idea' ? 'none' : '';
     });
 
     const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
@@ -413,9 +500,12 @@ export class TasksManagerModal extends Modal {
         await this.app.vault.modify(file, updated);
         new Notice('💡 Idea añadida a tu banco');
       } else {
-        const finalText = addPriority !== 'none'
+        let finalText = addPriority !== 'none'
           ? formatTaskWithPriority(text, addPriority)
           : text;
+        if (addEstimate > 0) {
+          finalText = formatTaskWithPomodoroEstimate(finalText, addEstimate);
+        }
         const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
         await this.app.vault.modify(file, updated);
         new Notice('✓ Tarea añadida al Inbox');
@@ -423,7 +513,9 @@ export class TasksManagerModal extends Modal {
 
       addInput.value = '';
       prioritySelect.value = 'none';
+      estimateSelect.value = '0';
       addPriority = 'none';
+      addEstimate = 0;
       await this.refreshTasks();
       this.renderUI();
     };
@@ -531,6 +623,37 @@ export class TasksManagerModal extends Modal {
           } else if (task.priority === 'low') {
             itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
           }
+
+          const estCount = task.estimatedPomodoros || 0;
+          const compCount = task.completedPomodoros || 0;
+          if (estCount > 0 || compCount > 0) {
+            let badgeLabel = '';
+            let badgeCls = 'study-flow-estimate-badge';
+            if (compCount > 0 && estCount > 0) {
+              badgeLabel = `🍅 ${compCount}/${estCount}`;
+              if (compCount >= estCount) badgeCls += ' is-met';
+            } else if (estCount > 0) {
+              badgeLabel = `🍅 ${estCount}`;
+            } else if (compCount > 0) {
+              badgeLabel = `🍅 ${compCount}`;
+            }
+            itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
+          }
+
+          const addPomoBtn = itemCard.createEl('button', {
+            cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
+            attr: { 'aria-label': 'Registrar pomodoro a esta tarea (+1 🍅)' },
+          });
+          addPomoBtn.createSpan({ text: '+🍅' });
+          addPomoBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const res = await incrementTaskPomodoroInFile(this.app, task);
+            if (res) {
+              new Notice(`🍅 Pomodoro registrado para "${task.text}"`);
+              await this.refreshTasks();
+              this.renderUI();
+            }
+          });
         }
 
         const fileBadge = itemCard.createSpan({

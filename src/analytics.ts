@@ -41,6 +41,8 @@ export interface TasksOverviewStat {
   totalCompleted: number;
   totalAll: number;
   completionRate: number; // 0 - 100
+  totalEstimatedPomodoros: number;
+  totalCompletedPomodoros: number;
   byPriority: {
     high: number;
     medium: number;
@@ -280,6 +282,8 @@ export function computeTasksOverview(tasks: TaskRecord[]): TasksOverviewStat {
   const totalAll = tasks.length;
   let totalCompleted = 0;
   let totalPending = 0;
+  let totalEstimatedPomodoros = 0;
+  let totalCompletedPomodoros = 0;
 
   const byPriority = {
     high: 0,
@@ -289,6 +293,13 @@ export function computeTasksOverview(tasks: TaskRecord[]): TasksOverviewStat {
   };
 
   for (const t of tasks) {
+    if (t.estimatedPomodoros) {
+      totalEstimatedPomodoros += t.estimatedPomodoros;
+    }
+    if (t.completedPomodoros) {
+      totalCompletedPomodoros += t.completedPomodoros;
+    }
+
     if (t.completed) {
       totalCompleted++;
     } else {
@@ -311,6 +322,8 @@ export function computeTasksOverview(tasks: TaskRecord[]): TasksOverviewStat {
     totalCompleted,
     totalAll,
     completionRate,
+    totalEstimatedPomodoros,
+    totalCompletedPomodoros,
     byPriority,
   };
 }

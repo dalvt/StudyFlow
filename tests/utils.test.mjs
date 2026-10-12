@@ -5,7 +5,9 @@ import {
   extractPendingTasksFromContent,
   formatDailyNoteFileName,
   formatTaskWithPriority,
+  formatTaskWithPomodoroEstimate,
   parseTaskPriority,
+  parseTaskPomodoroEstimate,
 } from '../src/markdown-utils.ts';
 
 test('appendTaskToMarkdownSection appends new section if it does not exist', () => {
@@ -191,4 +193,59 @@ test('extractPendingTasksFromContent differentiates tasks from ideas', () => {
   assert.equal(items[3].isIdea, true);
 });
 
+test('parseTaskPomodoroEstimate extracts estimated and completed pomodoros', () => {
+  const estOnly = parseTaskPomodoroEstimate('Estudiar cálculo 🍅 3');
+  assert.equal(estOnly.estimated, 3);
+  assert.equal(estOnly.completed, 0);
+  assert.equal(estOnly.cleanTitle, 'Estudiar cálculo');
 
+  const completedAndEst = parseTaskPomodoroEstimate('Resumen de historia 🍅 2/4');
+  assert.equal(completedAndEst.estimated, 4);
+  assert.equal(completedAndEst.completed, 2);
+  assert.equal(completedAndEst.cleanTitle, 'Resumen de historia');
+
+  const noEstimate = parseTaskPomodoroEstimate('Hacer compras');
+  assert.equal(noEstimate.estimated, undefined);
+  assert.equal(noEstimate.completed, 0);
+  assert.equal(noEstimate.cleanTitle, 'Hacer compras');
+});
+
+test('formatTaskWithPomodoroEstimate formats estimated and completed counts cleanly', () => {
+  assert.equal(formatTaskWithPomodoroEstimate('Estudiar cálculo', 3), 'Estudiar cálculo 🍅 3');
+  assert.equal(formatTaskWithPomodoroEstimate('Estudiar cálculo 🍅 3', 3, 1), 'Estudiar cálculo 🍅 1/3');
+  assert.equal(formatTaskWithPomodoroEstimate('Estudiar cálculo 🍅 1/3', 3, 3), 'Estudiar cálculo 🍅 3/3');
+  assert.equal(formatTaskWithPomodoroEstimate('Estudiar cálculo', undefined), 'Estudiar cálculo');
+});
+
+test('extractPendingTasksFromContent parses pomodoro estimates from markdown lines', () => {
+  const content = `# Inbox
+
+## Tareas
+- [ ] ⏫ Estudiar para final 🍅 4
+- [ ] Resolver guía práctica 🍅 1/3
+- [ ] Comprar cuaderno
+`;
+  const items = extractPendingTasksFromContent(content, 'Inbox.md');
+  assert.equal(items.length, 3);
+  assert.equal(items[0].estimatedPomodoros, 4);
+  assert.equal(items[0].completedPomodoros, 0);
+
+  assert.equal(items[1].estimatedPomodoros, 3);
+  assert.equal(items[1].completedPomodoros, 1);
+
+  assert.equal(items[2].estimatedPomodoros, undefined);
+  assert.equal(items[2].completedPomodoros, 0);
+});
+
+test('computeTasksOverview includes pomodoro estimates and completions', async () => {
+  const { computeTasksOverview } = await import('../src/analytics.ts');
+  const tasks = [
+    { id: '1', originalLine: '', text: 'T1', sourceFile: '', completed: false, statusChar: ' ', priority: 'high', estimatedPomodoros: 2, completedPomodoros: 1 },
+    { id: '2', originalLine: '', text: 'T2', sourceFile: '', completed: false, statusChar: ' ', priority: 'medium', estimatedPomodoros: 3, completedPomodoros: 0 },
+    { id: '3', originalLine: '', text: 'T3', sourceFile: '', completed: true, statusChar: 'x', priority: 'none', estimatedPomodoros: 2, completedPomodoros: 2 },
+  ];
+
+  const stat = computeTasksOverview(tasks);
+  assert.equal(stat.totalEstimatedPomodoros, 7);
+  assert.equal(stat.totalCompletedPomodoros, 3);
+});
