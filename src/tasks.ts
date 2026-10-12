@@ -120,8 +120,8 @@ export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promi
   let foundIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/^\s*-\s+\[.\]\s+(.*)$/);
-    if (match && match[1].trim() === task.text) {
+    const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
       foundIndex = i;
       break;
     }
@@ -131,8 +131,8 @@ export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promi
   lines.splice(foundIndex, 1);
   const withoutIdea = lines.join('\n');
 
-  // Strip idea markers and keep clean task title with standard priority
-  let cleanTitle = task.text.replace(/#ideas?\b/gi, '').replace(/^💡\s*/, '').trim();
+  // Strip icebox/idea markers and keep clean task title with standard priority
+  let cleanTitle = task.text.replace(/#(?:ideas?|icebox)\b/gi, '').replace(/^[💡🧊]\s*/, '').trim();
   cleanTitle = formatTaskWithPriority(cleanTitle, task.priority !== 'none' ? task.priority : 'none');
 
   const updatedContent = appendTaskToMarkdownSection(withoutIdea, cleanTitle, '## Tareas');
@@ -184,8 +184,8 @@ export async function updateTaskTextInFile(
   let targetIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
-    if (match && match[2].trim() === task.text) {
+    const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
       targetIndex = i;
       lines[i] = `${match[1]}${newText.trim()}`;
       break;
@@ -273,8 +273,8 @@ export async function deleteTaskFromFile(
 
   let foundIndex = -1;
   for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^\s*-\s+\[.\]\s+(.*)$/);
-    if (match && match[1].trim() === task.text) {
+    const match = lines[i].match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+    if (match && (match[2].trim() === task.text || lines[i].includes(task.text))) {
       foundIndex = i;
       break;
     }

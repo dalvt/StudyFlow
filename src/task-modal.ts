@@ -1,6 +1,7 @@
 import { App, Modal, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
+  appendIceboxItemToMarkdownSection,
   appendTaskToMarkdownSection,
   formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
@@ -62,7 +63,7 @@ export class TaskCreateModal extends Modal {
     });
     const ideaBtn = typeSwitch.createEl('button', {
       cls: 'study-flow-cloud-type-btn',
-      text: '💡 Idea',
+      text: '🧊 Icebox',
     });
 
     // 2. Body
@@ -196,29 +197,6 @@ export class TaskCreateModal extends Modal {
       priorityBtns.push(btn);
     });
 
-    // Sync Type Switch
-    const syncItemType = (type: 'task' | 'idea') => {
-      this.itemType = type;
-      if (type === 'idea') {
-        taskBtn.removeClass('is-active');
-        ideaBtn.addClass('is-active');
-        deadlineField.style.display = 'none';
-        estimateField.style.display = 'none';
-        priorityField.style.display = 'none';
-        metaGrid.addClass('is-idea-mode');
-      } else {
-        ideaBtn.removeClass('is-active');
-        taskBtn.addClass('is-active');
-        deadlineField.style.display = '';
-        estimateField.style.display = '';
-        priorityField.style.display = '';
-        metaGrid.removeClass('is-idea-mode');
-      }
-    };
-
-    taskBtn.addEventListener('click', () => syncItemType('task'));
-    ideaBtn.addEventListener('click', () => syncItemType('idea'));
-
     // 4. Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-cloud-modal-footer' });
     const hint = footer.createEl('span', {
@@ -233,7 +211,34 @@ export class TaskCreateModal extends Modal {
     const submitBtn = btnRow.createEl('button', { cls: 'mod-cta study-flow-cloud-submit-btn' });
     const sIcon = submitBtn.createSpan();
     setIcon(sIcon, 'plus');
-    submitBtn.createSpan({ text: 'Añadir Tarea' });
+    const submitTextSpan = submitBtn.createSpan({ text: 'Añadir Tarea' });
+
+    // Sync Type Switch
+    const syncItemType = (type: 'task' | 'idea') => {
+      this.itemType = type;
+      if (type === 'idea') {
+        taskBtn.removeClass('is-active');
+        ideaBtn.addClass('is-active');
+        deadlineField.style.display = 'none';
+        estimateField.style.display = 'none';
+        priorityField.style.display = 'none';
+        metaGrid.addClass('is-idea-mode');
+        titleInput.placeholder = '¿Qué tema o recurso querés guardar sin fecha? (ej: Libro recomendado, tema a investigar...)';
+        submitTextSpan.setText('Guardar en Icebox');
+      } else {
+        ideaBtn.removeClass('is-active');
+        taskBtn.addClass('is-active');
+        deadlineField.style.display = '';
+        estimateField.style.display = '';
+        priorityField.style.display = '';
+        metaGrid.removeClass('is-idea-mode');
+        titleInput.placeholder = '¿Qué necesitás hacer o estudiar? (ej: Resolver guía de álgebra...)';
+        submitTextSpan.setText('Añadir Tarea');
+      }
+    };
+
+    taskBtn.addEventListener('click', () => syncItemType('task'));
+    ideaBtn.addEventListener('click', () => syncItemType('idea'));
 
     const doSubmit = async () => {
       const text = titleInput.value.trim();
@@ -264,7 +269,7 @@ export class TaskCreateModal extends Modal {
   private async saveAndClose(): Promise<void> {
     try {
       const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
+      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Icebox\n\n');
       const content = await this.app.vault.read(file);
 
       let finalLine = this.taskTitle;
@@ -278,10 +283,10 @@ export class TaskCreateModal extends Modal {
       }
 
       if (this.itemType === 'idea') {
-        const ideaLine = finalLine.startsWith('💡') ? finalLine : `💡 ${finalLine}`;
-        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
+        const iceboxLine = finalLine.startsWith('🧊') ? finalLine : `🧊 ${finalLine}`;
+        const updated = appendIceboxItemToMarkdownSection(content, iceboxLine, '## Icebox');
         await this.app.vault.modify(file, updated);
-        new Notice(`💡 Idea guardada en Inbox`);
+        new Notice(`🧊 Guardado en Icebox`);
       } else {
         if (this.selectedPriority !== 'none') {
           finalLine = formatTaskWithPriority(finalLine, this.selectedPriority);

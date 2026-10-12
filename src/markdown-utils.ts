@@ -169,7 +169,7 @@ export function getCleanTaskDisplayTitle(text: string): string {
   clean = clean.replace(/(?:🍅|:tomato:)\s*\d+(?:\s*\/\s*\d+)?/gi, '');
   clean = clean.replace(/📅\s*\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?/gi, '');
   clean = clean.replace(/#[\w\u00C0-\u017F-]+/g, '');
-  clean = clean.replace(/^(?:💡|#ideas?\b)\s*/i, '');
+  clean = clean.replace(/^(?:💡|🧊|#ideas?\b|#icebox\b)\s*/i, '');
   clean = clean.replace(/\s{2,}/g, ' ').trim();
   return clean || text;
 }
@@ -262,6 +262,62 @@ export function appendTaskToMarkdownSection(
   }
 
   lines.splice(targetIndex, 0, taskLine);
+  return lines.join('\n');
+}
+
+/**
+ * Pure Markdown helper:
+ * Appends a passive bullet item to ## Icebox (default) without adding task checkbox syntax.
+ */
+export function appendIceboxItemToMarkdownSection(
+  fileContent: string,
+  itemText: string,
+  sectionHeader: string = '## Icebox'
+): string {
+  const cleanItem = itemText.trim().replace(/^[-*]\s+/, '');
+  const bulletLine = `- ${cleanItem}`;
+  const lines = fileContent.split(/\r?\n/);
+
+  const headerClean = sectionHeader.replace(/^#+\s*/, '').trim().toLowerCase();
+  let headerIndex = -1;
+  let headerLevel = 2;
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+(.*)$/);
+    if (match) {
+      const level = match[1].length;
+      const title = match[2].trim().toLowerCase();
+      if (title === headerClean || (headerClean === 'icebox' && title === 'ideas')) {
+        headerIndex = i;
+        headerLevel = level;
+        break;
+      }
+    }
+  }
+
+  if (headerIndex === -1) {
+    const trimmed = fileContent.trimEnd();
+    if (trimmed.length === 0) {
+      return `${sectionHeader}\n${bulletLine}\n`;
+    }
+    return `${trimmed}\n\n${sectionHeader}\n${bulletLine}\n`;
+  }
+
+  let insertIndex = lines.length;
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+/);
+    if (match && match[1].length <= headerLevel) {
+      insertIndex = i;
+      break;
+    }
+  }
+
+  let targetIndex = insertIndex;
+  while (targetIndex > headerIndex + 1 && lines[targetIndex - 1].trim() === '') {
+    targetIndex--;
+  }
+
+  lines.splice(targetIndex, 0, bulletLine);
   return lines.join('\n');
 }
 
@@ -413,7 +469,12 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
       const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
       const { dueDate, dueTime } = parseTaskDeadline(taskText);
       const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
-      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
+      const isIdea =
+        currentSection.includes('icebox') ||
+        currentSection.includes('idea') ||
+        /#(?:ideas?|icebox)\b/i.test(taskText) ||
+        taskText.startsWith('💡') ||
+        taskText.startsWith('🧊');
       const tags = extractTagsFromText(taskText);
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
@@ -431,6 +492,27 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         daysRemaining,
         tags,
       });
+      continue;
+    }
+
+    // Passive bullet under Icebox / Ideas section (- bullet)
+    const bulletMatch = line.match(/^\s*-\s+(?!\[[ xX]\])(.*)$/);
+    if (bulletMatch && (currentSection.includes('icebox') || currentSection.includes('idea'))) {
+      const itemText = bulletMatch[1].trim();
+      if (itemText) {
+        const tags = extractTagsFromText(itemText);
+        tasks.push({
+          id: `${sourceFile}#L${i + 1}:${itemText}`,
+          originalLine: line,
+          text: itemText,
+          sourceFile,
+          completed: false,
+          statusChar: ' ',
+          priority: 'none',
+          isIdea: true,
+          tags,
+        });
+      }
     }
   }
 

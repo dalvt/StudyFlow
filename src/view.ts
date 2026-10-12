@@ -75,7 +75,7 @@ export class StudyFlowView extends ItemView {
 
   // Tasks state
   private tasks: TaskRecord[] = [];
-  private taskFilter: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all' = 'inbox';
+  private taskFilter: 'inbox' | 'today' | 'subjects' | 'icebox' | 'completed' | 'all' = 'inbox';
   private taskSearchQuery: string = '';
   private taskSortBy: 'urgency' | 'priority' | 'estimate' | 'alpha' = 'urgency';
   private editingTaskId: string | null = null;
@@ -787,13 +787,14 @@ export class StudyFlowView extends ItemView {
     const todayTasks = pendingTasks.filter(
       (t) => (t.daysRemaining !== undefined && t.daysRemaining <= 0) || t.dueDate === formatDateKey(new Date())
     );
-    const ideasTasks = this.tasks.filter((t) => !t.completed && t.isIdea);
-    const completedTasks = this.tasks.filter((t) => t.completed);
+    const iceboxTasks = this.tasks.filter((t) => !t.completed && t.isIdea);
+    const completedTasks = this.tasks.filter((t) => t.completed && !t.isIdea);
+    const totalActionableTasks = this.tasks.filter((t) => !t.isIdea).length;
 
     // 1. Segmented Views Tabs (At top, replaces redundant stats bar)
     const filterRow = card.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
     const filters: Array<{
-      id: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all';
+      id: 'inbox' | 'today' | 'subjects' | 'icebox' | 'completed' | 'all';
       label: string;
       count: number;
       icon: string;
@@ -801,9 +802,9 @@ export class StudyFlowView extends ItemView {
       { id: 'inbox', label: 'Inbox', count: inboxTasks.length, icon: 'inbox' },
       { id: 'today', label: 'Hoy', count: todayTasks.length, icon: 'calendar-check' },
       { id: 'subjects', label: 'Materias', count: subjectTasks.length, icon: 'book-open' },
-      { id: 'ideas', label: 'Ideas', count: ideasTasks.length, icon: 'sparkles' },
+      { id: 'icebox', label: 'Icebox', count: iceboxTasks.length, icon: 'snowflake' },
       { id: 'completed', label: 'Hechas', count: completedTasks.length, icon: 'check-circle' },
-      { id: 'all', label: 'Todas', count: this.tasks.length, icon: 'layers' },
+      { id: 'all', label: 'Todas', count: totalActionableTasks, icon: 'layers' },
     ];
 
     filters.forEach((f) => {
@@ -868,7 +869,7 @@ export class StudyFlowView extends ItemView {
       new Set(
         this.tasks
           .flatMap((t) => t.tags || [])
-          .filter((tag) => tag && !['#idea', '#alta', '#media', '#baja'].includes(tag.toLowerCase()))
+          .filter((tag) => tag && !['#idea', '#icebox', '#alta', '#media', '#baja'].includes(tag.toLowerCase()))
       )
     );
 
@@ -877,7 +878,7 @@ export class StudyFlowView extends ItemView {
     const plusSpan = triggerLeft.createSpan({ cls: 'study-flow-trigger-plus' });
     setIcon(plusSpan, 'plus');
     triggerLeft.createSpan({
-      text: '+ Nueva tarea o idea académica...',
+      text: '+ Nueva tarea o elemento para Icebox...',
       cls: 'study-flow-trigger-label',
     });
 
@@ -928,9 +929,9 @@ export class StudyFlowView extends ItemView {
         return isOverdueOrToday || isTodayDate;
       }
       if (this.taskFilter === 'subjects') return !t.completed && !t.isIdea && Boolean(t.tags && t.tags.length > 0);
-      if (this.taskFilter === 'ideas') return !t.completed && t.isIdea;
-      if (this.taskFilter === 'completed') return t.completed;
-      return true; // 'all'
+      if (this.taskFilter === 'icebox') return !t.completed && t.isIdea;
+      if (this.taskFilter === 'completed') return t.completed && !t.isIdea;
+      return !t.isIdea; // 'all' only includes actionable tasks
     });
 
     // 2. Search query filter
@@ -979,10 +980,10 @@ export class StudyFlowView extends ItemView {
     if (filtered.length === 0) {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      if (this.taskFilter === 'ideas') {
-        setIcon(emptyIcon, 'sparkles');
-        emptyState.createEl('h4', { text: 'No hay ideas en el banco' });
-        emptyState.createEl('p', { text: 'Anotá tus ideas sin presión de fechas ni foco para no olvidarlas.' });
+      if (this.taskFilter === 'icebox') {
+        setIcon(emptyIcon, 'snowflake');
+        emptyState.createEl('h4', { text: 'Icebox vacío' });
+        emptyState.createEl('p', { text: 'Guardá ideas, recursos o lecturas pasivas para investigar más adelante.' });
       } else if (this.taskFilter === 'today') {
         setIcon(emptyIcon, 'calendar-check');
         emptyState.createEl('h4', { text: '¡Nada pendiente para hoy!' });
@@ -1083,17 +1084,23 @@ export class StudyFlowView extends ItemView {
       cls: `study-flow-task-card ${task.completed ? 'is-done' : ''} ${isEditing ? 'is-editing' : ''}`,
     });
 
-    // Checkbox
+    // Checkbox or Icebox bullet
     const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
-    const cb = cbWrapper.createEl('input', { type: 'checkbox' });
-    cb.checked = task.completed;
-    cb.addEventListener('change', async () => {
-      await toggleTaskCompletionInFile(this.app, task, cb.checked);
-      task.completed = cb.checked;
-      new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
-      rootContainer.empty();
-      await this.renderTasksTab(rootContainer);
-    });
+    let cb: HTMLInputElement | null = null;
+    if (task.isIdea) {
+      const iceboxBullet = cbWrapper.createSpan({ cls: 'study-flow-icebox-bullet' });
+      setIcon(iceboxBullet, 'snowflake');
+    } else {
+      cb = cbWrapper.createEl('input', { type: 'checkbox' });
+      cb.checked = task.completed;
+      cb.addEventListener('change', async () => {
+        await toggleTaskCompletionInFile(this.app, task, cb!.checked);
+        task.completed = cb!.checked;
+        new Notice(cb!.checked ? '✓ Marcado como completado' : 'Desmarcado');
+        rootContainer.empty();
+        await this.renderTasksTab(rootContainer);
+      });
+    }
 
     // Main column
     const mainCol = itemCard.createDiv({ cls: 'study-flow-task-main-col' });
@@ -1154,8 +1161,10 @@ export class StudyFlowView extends ItemView {
         cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
       });
       textSpan.addEventListener('click', () => {
-        cb.checked = !cb.checked;
-        cb.dispatchEvent(new Event('change'));
+        if (cb) {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
+        }
       });
 
       // Tags & Badges Row
@@ -1179,7 +1188,7 @@ export class StudyFlowView extends ItemView {
       }
 
       if (task.isIdea) {
-        badgesRow.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
+        badgesRow.createSpan({ text: '🧊 Icebox', cls: 'study-flow-priority-badge is-icebox' });
       } else {
         const estCount = task.estimatedPomodoros || 0;
         const compCount = task.completedPomodoros || 0;
@@ -1335,15 +1344,15 @@ export class StudyFlowView extends ItemView {
     if (task.isIdea) {
       const promoteBtn = actionsToolbar.createEl('button', {
         cls: 'study-flow-promote-btn',
-        attr: { 'aria-label': 'Promover a tarea accionable' },
+        attr: { 'aria-label': 'Promover a tarea accionable (⚡)' },
       });
       const pIcon = promoteBtn.createSpan();
-      setIcon(pIcon, 'arrow-up-right');
-      promoteBtn.createSpan({ text: 'A Tarea' });
+      setIcon(pIcon, 'zap');
+      promoteBtn.createSpan({ text: '⚡ A Tarea' });
       promoteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         await promoteIdeaToTaskInFile(this.app, task);
-        new Notice(`✓ "${task.text}" promovida a tarea`);
+        new Notice(`⚡ "${task.text}" promovida a tarea`);
         rootContainer.empty();
         await this.renderTasksTab(rootContainer);
       });

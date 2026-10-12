@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  appendIceboxItemToMarkdownSection,
   appendTaskToMarkdownSection,
   calculateDaysRemaining,
   extractPendingTasksFromContent,
@@ -444,7 +445,45 @@ test('getCleanTaskDisplayTitle strips metadata tags and leaves human title', asy
 
   const input3 = '💡 Estudiar para parcial #quimica 📅 2026-10-20';
   assert.equal(getCleanTaskDisplayTitle(input3), 'Estudiar para parcial');
+
+  const input4 = '🧊 Investigar compiladores JIT #cs';
+  assert.equal(getCleanTaskDisplayTitle(input4), 'Investigar compiladores JIT');
 });
+
+test('appendIceboxItemToMarkdownSection appends plain bullet without checkbox syntax', () => {
+  const initial = `# Inbox\n\n## Tareas\n- [ ] Estudiar parcial\n\n## Icebox\n- Proyecto Rust\n`;
+  const updated = appendIceboxItemToMarkdownSection(initial, 'Leer libro de Clean Code #arquitectura');
+
+  assert.ok(updated.includes('- Leer libro de Clean Code #arquitectura'));
+  assert.ok(!updated.includes('- [ ] Leer libro de Clean Code'));
+  assert.ok(updated.includes('## Tareas\n- [ ] Estudiar parcial'));
+});
+
+test('extractAllTasksFromContent parses plain bullets in Icebox as isIdea: true without checkboxes', async () => {
+  const { extractAllTasksFromContent } = await import('../src/markdown-utils.ts');
+  const content = `# Inbox
+
+## Tareas
+- [ ] Hacer ejercicio 1 #algebra 🍅 1/2
+- [x] Tarea vieja
+
+## Icebox
+- Investigar algoritmos A* #ia
+- 🧊 Leer tutorial de WebGL #graficos
+`;
+
+  const all = extractAllTasksFromContent(content, 'Inbox.md');
+  assert.equal(all.length, 4);
+
+  const iceboxItems = all.filter((t) => t.isIdea);
+  assert.equal(iceboxItems.length, 2);
+  assert.ok(iceboxItems.some((t) => t.text === 'Investigar algoritmos A* #ia' && !t.completed));
+  assert.ok(iceboxItems.some((t) => t.text === '🧊 Leer tutorial de WebGL #graficos' && !t.completed));
+
+  const actionableTasks = all.filter((t) => !t.isIdea);
+  assert.equal(actionableTasks.length, 2);
+});
+
 
 
 
