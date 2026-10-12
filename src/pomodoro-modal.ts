@@ -262,7 +262,7 @@ export class PomodoroModal extends Modal {
         const linkBtn = taskSection.createEl('button', { cls: 'study-flow-link-task-btn' });
         const tIcon = linkBtn.createSpan();
         setIcon(tIcon, 'target');
-        linkBtn.createSpan({ text: '🎯 Vincular tarea para este Pomodoro' });
+        linkBtn.createSpan({ text: 'Vincular tarea a este Pomodoro' });
         linkBtn.addEventListener('click', async () => {
           this.isSelectingTask = true;
           await this.loadPendingTasks();

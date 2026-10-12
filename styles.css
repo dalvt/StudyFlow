@@ -107,9 +107,9 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 14px;
+  padding: 12px;
   overflow-y: auto;
-  gap: 14px;
+  gap: 12px;
   background-color: var(--background-primary);
 }
 
@@ -117,6 +117,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 2px 4px;
 }
 
 .study-flow-brand-title {
@@ -135,27 +136,29 @@
   color: var(--interactive-accent);
 }
 
+/* Responsive 4-Column Grid Navigation */
 .study-flow-segmented-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-l);
-  padding: 4px;
+  border-radius: var(--radius-m);
+  padding: 3px;
   gap: 3px;
 }
 
 .study-flow-nav-pill {
-  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 7px 6px;
-  border-radius: var(--radius-m);
+  gap: 3px;
+  padding: 6px 2px;
+  border-radius: var(--radius-s);
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
@@ -170,28 +173,28 @@
 .study-flow-nav-pill.is-active {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 .study-flow-nav-pill svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 .study-flow-tab-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .study-flow-card {
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-l);
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -210,13 +213,14 @@
   justify-content: center;
   gap: 6px;
   flex-wrap: wrap;
+  margin-bottom: 2px;
 }
 
 .study-flow-preset-chip {
-  padding: 4px 10px;
-  font-size: var(--font-ui-smaller);
+  padding: 5px 12px;
+  font-size: 12px;
   font-weight: 600;
-  border-radius: 9999px;
+  border-radius: var(--radius-m);
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   color: var(--text-muted);
@@ -226,7 +230,8 @@
 
 .study-flow-preset-chip:hover {
   border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
   transform: translateY(-1px);
 }
 
@@ -235,7 +240,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 4px 0;
+  margin: 2px 0 6px 0;
 }
 
 .study-flow-active-task-banner {
@@ -275,7 +280,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  padding: 4px 9px;
   font-size: 11px;
   font-weight: 700;
   border-radius: var(--radius-s);
@@ -297,18 +302,19 @@
 }
 
 .study-flow-link-task-btn {
-  background: transparent;
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--background-primary);
   border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: var(--radius-m);
-  cursor: pointer;
-  display: inline-flex;
+  font-weight: 600;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
@@ -316,6 +322,11 @@
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
   background-color: var(--background-modifier-hover);
+}
+
+.study-flow-link-task-btn svg {
+  width: 15px;
+  height: 15px;
 }
 
 .study-flow-task-picker-box {
@@ -357,7 +368,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 10px auto;
+  margin: 6px auto;
   width: 210px;
   height: 210px;
 }
@@ -409,9 +420,9 @@
 
 .study-flow-dial-bg {
   fill: none;
-  stroke: var(--background-modifier-border);
-  stroke-width: 8;
-  opacity: 0.55;
+  stroke: var(--background-modifier-border-hover, rgba(255, 255, 255, 0.1));
+  stroke-width: 9;
+  opacity: 0.7;
 }
 
 .study-flow-dial-tick {
@@ -422,25 +433,19 @@
 
 .study-flow-dial-progress {
   fill: none;
-  stroke-width: 8.5;
+  stroke-width: 9;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: url(#pomodoro-grad-work);
+  stroke: #ff4d4f;
+  filter: drop-shadow(0 0 6px rgba(255, 77, 79, 0.6));
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: url(#pomodoro-grad-break);
-}
-
-.study-flow-view-root .study-flow-dial-progress.is-work {
-  stroke: url(#view-pomodoro-grad-work);
-}
-
-.study-flow-view-root .study-flow-dial-progress.is-break {
-  stroke: url(#view-pomodoro-grad-break);
+  stroke: #10b981;
+  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
 }
 
 .study-flow-dial-center {
@@ -476,18 +481,20 @@
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
+/* Modern Clean Sans-Serif Numbers (No Dotted-Zero Eyes) */
 .study-flow-dial-time-hero {
-  font-size: 2.7rem;
-  font-family: var(--font-monospace);
-  font-weight: 800;
+  font-family: var(--font-interface), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  font-size: 2.85rem;
+  font-weight: 700;
   color: var(--text-normal);
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 1.5px;
-  margin: 3px 0;
+  letter-spacing: -0.5px;
+  margin: 4px 0;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
+/* Streak Micro Dots */
 .study-flow-streak-dots {
   display: flex;
   align-items: center;
@@ -523,7 +530,7 @@
   align-items: center;
   justify-content: center;
   gap: 14px;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .study-flow-deck-btn {

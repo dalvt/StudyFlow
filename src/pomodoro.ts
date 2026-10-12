@@ -72,9 +72,8 @@ export class PomodoroManager {
   }
 
   public getStatus(): PomodoroStatus {
-    const elapsed = Math.max(0, this.totalDurationSeconds - this.remainingSeconds);
     const progressPercent = this.totalDurationSeconds > 0
-      ? Math.min(100, Math.max(0, (elapsed / this.totalDurationSeconds) * 100))
+      ? Math.min(100, Math.max(0, (this.remainingSeconds / this.totalDurationSeconds) * 100))
       : 0;
 
     const streak = this.completedSessionsToday % 4;

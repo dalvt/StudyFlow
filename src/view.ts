@@ -346,7 +346,7 @@ export class StudyFlowView extends ItemView {
         const linkBtn = taskSection.createEl('button', { cls: 'study-flow-link-task-btn' });
         const tIcon = linkBtn.createSpan();
         setIcon(tIcon, 'target');
-        linkBtn.createSpan({ text: '🎯 Vincular tarea para este Pomodoro' });
+        linkBtn.createSpan({ text: 'Vincular tarea a este Pomodoro' });
         linkBtn.addEventListener('click', async () => {
           this.isSelectingTaskForPomodoro = true;
           await this.loadPendingInboxTasks();
