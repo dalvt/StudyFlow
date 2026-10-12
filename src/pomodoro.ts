@@ -1,9 +1,16 @@
 import { Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { getDailyNotePath, getOrCreateFile } from './utils';
+import { toggleTaskCompletionInFile, TaskRecord } from './tasks';
 
 export type PomodoroState = 'idle' | 'running' | 'paused';
 export type PomodoroMode = 'work' | 'break';
+
+export interface ActivePomodoroTask {
+  id: string;
+  text: string;
+  sourceFile: string;
+}
 
 export interface PomodoroStatus {
   state: PomodoroState;
@@ -13,6 +20,7 @@ export interface PomodoroStatus {
   completedSessionsToday: number;
   progressPercent: number;
   streak: number; // 0 to 4 within current cycle
+  activeTask: ActivePomodoroTask | null;
 }
 
 export type PomodoroListener = (status: PomodoroStatus) => void;
@@ -28,6 +36,7 @@ export class PomodoroManager {
   private totalDurationSeconds: number = 25 * 60;
   private endTime: number = 0;
   private completedSessionsToday: number = 0;
+  private activeTask: ActivePomodoroTask | null = null;
   private listeners: Set<PomodoroListener> = new Set();
 
   constructor(plugin: StudyFlowPlugin) {
@@ -78,7 +87,42 @@ export class PomodoroManager {
       completedSessionsToday: this.completedSessionsToday,
       progressPercent,
       streak,
+      activeTask: this.activeTask,
     };
+  }
+
+  public setActiveTask(task: ActivePomodoroTask | null): void {
+    this.activeTask = task;
+    this.notifyListeners();
+    if (task) {
+      new Notice(`Enfocado en: ${task.text}`);
+    }
+  }
+
+  public getActiveTask(): ActivePomodoroTask | null {
+    return this.activeTask;
+  }
+
+  public async completeActiveTask(): Promise<void> {
+    if (!this.activeTask) return;
+    try {
+      const taskRecord: TaskRecord = {
+        id: this.activeTask.id,
+        originalLine: `- [ ] ${this.activeTask.text}`,
+        text: this.activeTask.text,
+        sourceFile: this.activeTask.sourceFile,
+        completed: false,
+        statusChar: ' ',
+      };
+
+      await toggleTaskCompletionInFile(this.plugin.app, taskRecord, true);
+      new Notice(`✓ Tarea completada: ${this.activeTask.text}`);
+      this.activeTask = null;
+      this.notifyListeners();
+    } catch (err) {
+      console.error('Error completando tarea activa de pomodoro:', err);
+      new Notice('Error al marcar la tarea como completada');
+    }
   }
 
   private notifyListeners(): void {
@@ -244,7 +288,11 @@ export class PomodoroManager {
 
     if (this.mode === 'work') {
       this.completedSessionsToday++;
-      new Notice('¡Pomodoro completado!');
+      const noticeMsg = this.activeTask
+        ? `¡Pomodoro completado! Tarea: ${this.activeTask.text}`
+        : '¡Pomodoro completado!';
+      new Notice(noticeMsg);
+
       if (this.plugin.settings.logPomodoroToDailyNote) {
         await this.logSession();
       }
@@ -270,7 +318,8 @@ export class PomodoroManager {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
-      const logLine = `- [x] Pomodoro completado a las ${hh}:${mm}`;
+      const taskSuffix = this.activeTask ? ` — *${this.activeTask.text}*` : '';
+      const logLine = `- [x] Pomodoro completado a las ${hh}:${mm}${taskSuffix}`;
 
       const dailyPath = getDailyNotePath(this.plugin.settings, 0);
       const file = await getOrCreateFile(this.plugin.app, dailyPath, `# ${now.toISOString().slice(0, 10)}\n\n`);
@@ -299,7 +348,8 @@ export class PomodoroManager {
 
     const icon = this.mode === 'work' ? '🍅' : '☕';
     const formatted = this.formatTime(this.remainingSeconds);
-    let label = `[${icon} ${formatted}]`;
+    const taskTag = this.activeTask ? ` [${this.activeTask.text.slice(0, 10)}...]` : '';
+    let label = `[${icon} ${formatted}]${taskTag}`;
 
     this.statusBarEl.removeClass('is-running', 'is-break', 'is-paused');
 
@@ -311,16 +361,14 @@ export class PomodoroManager {
       }
     } else if (this.state === 'paused') {
       this.statusBarEl.addClass('is-paused');
-      label = `[${icon} ${formatted} ⏸]`;
+      label = `[${icon} ${formatted} ⏸]${taskTag}`;
     }
 
     this.statusBarEl.setText(label);
 
     let tooltip = 'Clic: Iniciar/Pausar | Clic derecho: Reiniciar';
-    if (this.state === 'running') {
-      tooltip = `En curso (${this.mode === 'work' ? 'Trabajo' : 'Descanso'}). Clic para pausar.`;
-    } else if (this.state === 'paused') {
-      tooltip = 'Pausado. Clic para reanudar | Clic derecho: Reiniciar.';
+    if (this.activeTask) {
+      tooltip = `Enfocado en: "${this.activeTask.text}". ${tooltip}`;
     }
     setTooltip(this.statusBarEl, tooltip);
   }

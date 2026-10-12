@@ -1,4 +1,5 @@
 import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { HabitsModal } from './habits';
 import { NextDayPlannerModal } from './planner';
 import { PomodoroManager } from './pomodoro';
 import { PomodoroModal } from './pomodoro-modal';
@@ -33,6 +34,10 @@ export default class StudyFlowPlugin extends Plugin {
       new TasksManagerModal(this.app, this).open();
     });
 
+    this.addRibbonIcon('flame', 'Study Flow: Hábitos y Rutinas', () => {
+      new HabitsModal(this.app, this).open();
+    });
+
     this.addRibbonIcon('calendar-check', 'Study Flow: Planificar el día siguiente', () => {
       new NextDayPlannerModal(this.app, this).open();
     });
@@ -63,10 +68,26 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'open-habits-tracker',
+      name: 'Abrir registro de hábitos diarios',
+      callback: () => {
+        new HabitsModal(this.app, this).open();
+      },
+    });
+
+    this.addCommand({
       id: 'capture-quick-task',
       name: 'Capturar tarea rápida',
       callback: () => {
         new QuickCaptureModal(this.app, this).open();
+      },
+    });
+
+    this.addCommand({
+      id: 'complete-pomodoro-active-task',
+      name: 'Pomodoro: Completar tarea activa actual',
+      callback: async () => {
+        await this.pomodoro.completeActiveTask();
       },
     });
 

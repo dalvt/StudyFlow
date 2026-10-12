@@ -7,6 +7,7 @@ export interface StudyFlowSettings {
   dailyNotesFolder: string;
   dailyNoteDateFormat: string;
   inboxFilePath: string;
+  habitsFilePath: string;
   logPomodoroToDailyNote: boolean;
 }
 
@@ -16,6 +17,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   dailyNotesFolder: 'Daily',
   dailyNoteDateFormat: 'YYYY-MM-DD',
   inboxFilePath: 'Inbox.md',
+  habitsFilePath: 'Habits.md',
   logPomodoroToDailyNote: true,
 };
 
@@ -82,8 +84,8 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           })
       );
 
-    // Daily Notes & Inbox section
-    containerEl.createEl('h3', { text: 'Notas Diarias e Inbox' });
+    // Daily Notes, Inbox & Habits section
+    containerEl.createEl('h3', { text: 'Notas Diarias, Inbox y Hábitos' });
 
     new Setting(containerEl)
       .setName('Carpeta de Notas Diarias')
@@ -120,6 +122,19 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.inboxFilePath)
           .onChange(async (value) => {
             this.plugin.settings.inboxFilePath = value.trim() || 'Inbox.md';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Ruta de archivo de Hábitos')
+      .setDesc('Ruta del archivo Markdown donde se registran los hábitos y rachas (por defecto: Habits.md).')
+      .addText((text) =>
+        text
+          .setPlaceholder('Habits.md')
+          .setValue(this.plugin.settings.habitsFilePath)
+          .onChange(async (value) => {
+            this.plugin.settings.habitsFilePath = value.trim() || 'Habits.md';
             await this.plugin.saveSettings();
           })
       );

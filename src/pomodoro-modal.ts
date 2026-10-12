@@ -1,6 +1,7 @@
-import { App, Modal, setIcon } from 'obsidian';
+import { App, Modal, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { PomodoroStatus } from './pomodoro';
+import { extractPendingTasksFromContent, PendingTaskItem } from './utils';
 
 const CIRCLE_RADIUS = 82;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
@@ -8,6 +9,8 @@ const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 export class PomodoroModal extends Modal {
   private plugin: StudyFlowPlugin;
   private unsubscribe: (() => void) | null = null;
+  private isSelectingTask: boolean = false;
+  private pendingTasks: PendingTaskItem[] = [];
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -24,6 +27,16 @@ export class PomodoroModal extends Modal {
     this.unsubscribe = this.plugin.pomodoro.subscribe(() => {
       this.updateClock();
     });
+  }
+
+  private async loadPendingTasks(): Promise<void> {
+    this.pendingTasks = [];
+    const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
+    const file = this.app.vault.getAbstractFileByPath(inboxPath);
+    if (file instanceof TFile) {
+      const content = await this.app.vault.read(file);
+      this.pendingTasks = extractPendingTasksFromContent(content, file.path);
+    }
   }
 
   private renderUI(): void {
@@ -57,6 +70,9 @@ export class PomodoroModal extends Modal {
       });
     });
 
+    // Active Task Bar
+    this.renderActiveTaskSection(contentEl, status);
+
     // Luxury Dial Container with Ambient Aura
     const dialWrapper = contentEl.createDiv({ cls: 'study-flow-dial-wrapper' });
     dialWrapper.createDiv({
@@ -72,33 +88,16 @@ export class PomodoroModal extends Modal {
 
     // Defs for gradients
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-
-    // Work gradient
-    const gradWork = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-    gradWork.setAttribute('id', 'pomodoro-grad-work');
-    gradWork.setAttribute('x1', '0%');
-    gradWork.setAttribute('y1', '0%');
-    gradWork.setAttribute('x2', '100%');
-    gradWork.setAttribute('y2', '100%');
-    gradWork.innerHTML = `
-      <stop offset="0%" stop-color="#ff4d4f" />
-      <stop offset="100%" stop-color="#fa8c16" />
+    defs.innerHTML = `
+      <linearGradient id="pomodoro-grad-work" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff4d4f" />
+        <stop offset="100%" stop-color="#fa8c16" />
+      </linearGradient>
+      <linearGradient id="pomodoro-grad-break" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#10b981" />
+        <stop offset="100%" stop-color="#06b6d4" />
+      </linearGradient>
     `;
-    defs.appendChild(gradWork);
-
-    // Break gradient
-    const gradBreak = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
-    gradBreak.setAttribute('id', 'pomodoro-grad-break');
-    gradBreak.setAttribute('x1', '0%');
-    gradBreak.setAttribute('y1', '0%');
-    gradBreak.setAttribute('x2', '100%');
-    gradBreak.setAttribute('y2', '100%');
-    gradBreak.innerHTML = `
-      <stop offset="0%" stop-color="#10b981" />
-      <stop offset="100%" stop-color="#06b6d4" />
-    `;
-    defs.appendChild(gradBreak);
-
     svgEl.appendChild(defs);
 
     // 12 Chronograph tick marks
@@ -143,7 +142,7 @@ export class PomodoroModal extends Modal {
     // Center Display
     const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
 
-    const modePill = centerInfo.createDiv({
+    centerInfo.createDiv({
       text: status.mode === 'work' ? '• ENFOQUE •' : '• DESCANSO •',
       cls: `study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
     });
@@ -221,6 +220,83 @@ export class PomodoroModal extends Modal {
     closeBtn.addEventListener('click', () => this.close());
 
     this.updateProgressRing(status);
+  }
+
+  private renderActiveTaskSection(container: HTMLElement, status: PomodoroStatus): void {
+    const taskSection = container.createDiv({ cls: 'study-flow-active-task-container' });
+
+    if (status.activeTask) {
+      const banner = taskSection.createDiv({ cls: 'study-flow-active-task-banner' });
+      const targetIcon = banner.createSpan({ cls: 'study-flow-task-target-icon' });
+      setIcon(targetIcon, 'target');
+
+      const textWrap = banner.createDiv({ cls: 'study-flow-task-banner-text' });
+      textWrap.createSpan({ text: 'Enfocado en: ', cls: 'study-flow-task-banner-label' });
+      textWrap.createSpan({ text: status.activeTask.text, cls: 'study-flow-task-banner-name' });
+
+      // Action: Complete task
+      const completeBtn = banner.createEl('button', {
+        cls: 'study-flow-task-complete-btn',
+        attr: { 'aria-label': 'Marcar como completada' },
+      });
+      const cIcon = completeBtn.createSpan();
+      setIcon(cIcon, 'check');
+      completeBtn.createSpan({ text: 'Completar' });
+      completeBtn.addEventListener('click', async () => {
+        await this.plugin.pomodoro.completeActiveTask();
+        this.renderUI();
+      });
+
+      // Action: Unlink task
+      const unlinkBtn = banner.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Desvincular tarea' },
+      });
+      setIcon(unlinkBtn, 'x');
+      unlinkBtn.addEventListener('click', () => {
+        this.plugin.pomodoro.setActiveTask(null);
+        this.renderUI();
+      });
+    } else {
+      if (!this.isSelectingTask) {
+        const linkBtn = taskSection.createEl('button', { cls: 'study-flow-link-task-btn' });
+        const tIcon = linkBtn.createSpan();
+        setIcon(tIcon, 'target');
+        linkBtn.createSpan({ text: '🎯 Vincular tarea para este Pomodoro' });
+        linkBtn.addEventListener('click', async () => {
+          this.isSelectingTask = true;
+          await this.loadPendingTasks();
+          this.renderUI();
+        });
+      } else {
+        const pickerBox = taskSection.createDiv({ cls: 'study-flow-task-picker-box' });
+        pickerBox.createEl('div', { text: 'Selecciona una tarea de tu Inbox:', cls: 'study-flow-picker-title' });
+
+        if (this.pendingTasks.length === 0) {
+          pickerBox.createDiv({ cls: 'study-flow-empty-tasks', text: 'No hay tareas pendientes en el Inbox.' });
+        } else {
+          this.pendingTasks.forEach((t) => {
+            const item = pickerBox.createDiv({ cls: 'study-flow-picker-item' });
+            item.createSpan({ text: t.text });
+            item.addEventListener('click', () => {
+              this.plugin.pomodoro.setActiveTask({
+                id: t.id,
+                text: t.text,
+                sourceFile: t.sourceFile,
+              });
+              this.isSelectingTask = false;
+              this.renderUI();
+            });
+          });
+        }
+
+        const cancelPicker = pickerBox.createEl('button', { text: 'Cancelar selección', cls: 'study-flow-mini-btn' });
+        cancelPicker.addEventListener('click', () => {
+          this.isSelectingTask = false;
+          this.renderUI();
+        });
+      }
+    }
   }
 
   private updateClock(): void {

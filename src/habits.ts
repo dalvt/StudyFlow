@@ -1,0 +1,288 @@
+import { App, Modal, Notice, setIcon, TFile } from 'obsidian';
+import type StudyFlowPlugin from './main';
+import { getOrCreateFile } from './utils';
+
+export interface HabitItem {
+  id: string;
+  name: string;
+  completedToday: boolean;
+  streak: number;
+  lastCompletedDate: string;
+}
+
+function getTodayString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getYesterdayString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Loads habits from Habits.md file. If file does not exist, initializes it.
+ */
+export async function loadHabitsFromFile(app: App, filePath: string): Promise<HabitItem[]> {
+  const defaultHabitsContent = `# Registro de Hábitos
+
+- [ ] 📚 Lectura 20 min <!-- streak: 0 | last:  -->
+- [ ] 💧 Tomar 2L de agua <!-- streak: 0 | last:  -->
+- [ ] 🏃‍♂️ Ejercicio / Estiramiento <!-- streak: 0 | last:  -->
+- [ ] 🧘 Meditación o Desconexión <!-- streak: 0 | last:  -->
+`;
+
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHabitsContent);
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+  const habits: HabitItem[] = [];
+  const today = getTodayString();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Matches: - [ ] Name <!-- streak: N | last: YYYY-MM-DD -->
+    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>]*?)\s*-->)?$/);
+    if (match) {
+      const statusChar = match[1];
+      const name = match[2].trim();
+      const streak = parseInt(match[3] || '0', 10) || 0;
+      const lastCompletedDate = (match[4] || '').trim();
+      const completedToday = statusChar.toLowerCase() === 'x' && lastCompletedDate === today;
+
+      habits.push({
+        id: `habit-${i}-${name}`,
+        name,
+        completedToday,
+        streak,
+        lastCompletedDate,
+      });
+    }
+  }
+
+  return habits;
+}
+
+/**
+ * Saves habits array back to Habits.md
+ */
+export async function saveHabitsToFile(app: App, filePath: string, habits: HabitItem[]): Promise<void> {
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', '# Registro de Hábitos\n\n');
+  const lines: string[] = ['# Registro de Hábitos', ''];
+
+  for (const h of habits) {
+    const check = h.completedToday ? 'x' : ' ';
+    lines.push(`- [${check}] ${h.name} <!-- streak: ${h.streak} | last: ${h.lastCompletedDate} -->`);
+  }
+  lines.push('');
+
+  await app.vault.modify(file, lines.join('\n'));
+}
+
+/**
+ * Toggles a habit's status for today and updates streak calculation.
+ */
+export async function toggleHabitStatus(
+  app: App,
+  filePath: string,
+  habitId: string,
+  newCompleted: boolean
+): Promise<HabitItem[]> {
+  const habits = await loadHabitsFromFile(app, filePath);
+  const target = habits.find((h) => h.id === habitId);
+  if (!target) return habits;
+
+  const today = getTodayString();
+  const yesterday = getYesterdayString();
+
+  if (newCompleted) {
+    target.completedToday = true;
+    if (target.lastCompletedDate === yesterday) {
+      target.streak += 1;
+    } else if (target.lastCompletedDate === today) {
+      // Already today, keep
+    } else {
+      // Broken streak or first time
+      target.streak = 1;
+    }
+    target.lastCompletedDate = today;
+  } else {
+    target.completedToday = false;
+    if (target.lastCompletedDate === today) {
+      target.streak = Math.max(0, target.streak - 1);
+      target.lastCompletedDate = '';
+    }
+  }
+
+  await saveHabitsToFile(app, filePath, habits);
+  return habits;
+}
+
+/**
+ * Adds a new habit to the list.
+ */
+export async function addHabitToFile(app: App, filePath: string, name: string): Promise<HabitItem[]> {
+  const habits = await loadHabitsFromFile(app, filePath);
+  habits.push({
+    id: `habit-${Date.now()}-${name}`,
+    name: name.trim(),
+    completedToday: false,
+    streak: 0,
+    lastCompletedDate: '',
+  });
+
+  await saveHabitsToFile(app, filePath, habits);
+  return habits;
+}
+
+/**
+ * Deletes a habit from the list.
+ */
+export async function deleteHabitFromFile(app: App, filePath: string, habitId: string): Promise<HabitItem[]> {
+  let habits = await loadHabitsFromFile(app, filePath);
+  habits = habits.filter((h) => h.id !== habitId);
+  await saveHabitsToFile(app, filePath, habits);
+  return habits;
+}
+
+/**
+ * Dedicated Habits Modal
+ */
+export class HabitsModal extends Modal {
+  private plugin: StudyFlowPlugin;
+  private habits: HabitItem[] = [];
+
+  constructor(app: App, plugin: StudyFlowPlugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+
+  async onOpen(): Promise<void> {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('study-flow-modal', 'study-flow-habits-modal');
+
+    await this.refresh();
+    this.renderUI();
+  }
+
+  private async refresh(): Promise<void> {
+    const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+    this.habits = await loadHabitsFromFile(this.app, path);
+  }
+
+  private renderUI(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+
+    // Header
+    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
+    const title = header.createEl('h2', { text: 'Hábitos y Rutinas Diarias' });
+    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
+    setIcon(iconSpan, 'sparkles');
+
+    // Stats bar
+    const completedCount = this.habits.filter((h) => h.completedToday).length;
+    const statsBar = contentEl.createDiv({ cls: 'study-flow-stats-bar' });
+    statsBar.createSpan({
+      text: `${completedCount}/${this.habits.length} completados hoy`,
+      cls: 'study-flow-badge-stat is-pending',
+    });
+
+    // Add new habit bar
+    const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
+    const addInput = addSection.createEl('input', {
+      type: 'text',
+      placeholder: 'Nuevo hábito diario (ej. 🏃‍♂️ 15 min ejercicio)...',
+      cls: 'study-flow-task-input',
+    });
+    const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
+    const aIcon = addBtn.createSpan();
+    setIcon(aIcon, 'plus');
+    addBtn.createSpan({ text: 'Añadir' });
+
+    const handleAdd = async () => {
+      const val = addInput.value.trim();
+      if (!val) return;
+      const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+      this.habits = await addHabitToFile(this.app, path, val);
+      addInput.value = '';
+      new Notice(`Hábito añadido: ${val}`);
+      this.renderUI();
+    };
+
+    addBtn.addEventListener('click', handleAdd);
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAdd();
+      }
+    });
+
+    // Habits List Cards
+    const listContainer = contentEl.createDiv({ cls: 'study-flow-task-list-cards' });
+
+    if (this.habits.length === 0) {
+      const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
+      const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
+      setIcon(emptyIcon, 'flame');
+      emptyState.createEl('h4', { text: 'No tienes hábitos registrados' });
+      emptyState.createEl('p', { text: 'Crea tu primer hábito arriba para construir tu racha.' });
+    } else {
+      this.habits.forEach((habit) => {
+        const card = listContainer.createDiv({
+          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''}`,
+        });
+
+        const cbWrapper = card.createDiv({ cls: 'study-flow-cb-wrapper' });
+        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
+        cb.checked = habit.completedToday;
+
+        cb.addEventListener('change', async () => {
+          const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+          this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
+          new Notice(cb.checked ? `🔥 ¡Hábito cumplido! Racha: ${habit.streak + 1}` : 'Hábito desmarcado');
+          this.renderUI();
+        });
+
+        const textSpan = card.createEl('span', {
+          text: habit.name,
+          cls: `study-flow-task-text ${habit.completedToday ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
+        });
+
+        // Streak Flame Badge
+        const streakBadge = card.createDiv({ cls: 'study-flow-streak-badge' });
+        const fIcon = streakBadge.createSpan({ cls: 'study-flow-flame-icon' });
+        setIcon(fIcon, 'flame');
+        streakBadge.createSpan({ text: `${habit.streak} d` });
+
+        // Delete button
+        const delBtn = card.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Eliminar hábito' },
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+          this.habits = await deleteHabitFromFile(this.app, path, habit.id);
+          new Notice('Hábito eliminado');
+          this.renderUI();
+        });
+      });
+    }
+
+    // Modal Footer
+    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
+    const closeBtn = footer.createEl('button', { text: 'Cerrar' });
+    closeBtn.addEventListener('click', () => this.close());
+  }
+
+  onClose(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+}

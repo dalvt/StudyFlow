@@ -1,6 +1,13 @@
 import { ItemView, Notice, setIcon, WorkspaceLeaf, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
+  addHabitToFile,
+  deleteHabitFromFile,
+  HabitItem,
+  loadHabitsFromFile,
+  toggleHabitStatus,
+} from './habits';
+import {
   deleteTaskFromFile,
   extractAllTasksFromContent,
   TaskRecord,
@@ -16,7 +23,7 @@ import {
 
 export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
 
-type ActiveTab = 'pomodoro' | 'tasks' | 'planner';
+type ActiveTab = 'pomodoro' | 'tasks' | 'habits' | 'planner';
 
 const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
@@ -25,10 +32,15 @@ export class StudyFlowView extends ItemView {
   private plugin: StudyFlowPlugin;
   private activeTab: ActiveTab = 'pomodoro';
   private unsubscribePomodoro: (() => void) | null = null;
+  private isSelectingTaskForPomodoro: boolean = false;
+  private pendingInboxTasks: PendingTaskItem[] = [];
 
   // Tasks state
   private tasks: TaskRecord[] = [];
   private taskFilter: 'pending' | 'completed' | 'all' = 'pending';
+
+  // Habits state
+  private habits: HabitItem[] = [];
 
   // Planner state
   private pendingPlannerTasks: PendingTaskItem[] = [];
@@ -89,13 +101,14 @@ export class StudyFlowView extends ItemView {
     setIcon(brandIcon, 'sparkles');
     brandTitle.createSpan({ text: 'Study Flow Hub' });
 
-    // Navigation Tab Bar
+    // Navigation Tab Bar with 4 tabs
     const navBar = containerEl.createDiv({ cls: 'study-flow-segmented-nav' });
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: string }> = [
       { id: 'pomodoro', label: 'Pomodoro', icon: 'timer' },
       { id: 'tasks', label: 'Tareas', icon: 'check-square' },
-      { id: 'planner', label: 'Planificador', icon: 'calendar-days' },
+      { id: 'habits', label: 'Hábitos', icon: 'flame' },
+      { id: 'planner', label: 'Plan', icon: 'calendar-days' },
     ];
 
     tabs.forEach((tab) => {
@@ -116,16 +129,18 @@ export class StudyFlowView extends ItemView {
     const contentBody = containerEl.createDiv({ cls: 'study-flow-tab-body' });
 
     if (this.activeTab === 'pomodoro') {
-      this.renderPomodoroTab(contentBody);
+      await this.renderPomodoroTab(contentBody);
     } else if (this.activeTab === 'tasks') {
       await this.renderTasksTab(contentBody);
+    } else if (this.activeTab === 'habits') {
+      await this.renderHabitsTab(contentBody);
     } else if (this.activeTab === 'planner') {
       await this.renderPlannerTab(contentBody);
     }
   }
 
   // ===================== POMODORO TAB =====================
-  private renderPomodoroTab(container: HTMLElement): void {
+  private async renderPomodoroTab(container: HTMLElement): Promise<void> {
     const status = this.plugin.pomodoro.getStatus();
 
     const card = container.createDiv({ cls: 'study-flow-card study-flow-pomodoro-luxury-card' });
@@ -148,6 +163,9 @@ export class StudyFlowView extends ItemView {
         this.plugin.pomodoro.setCustomMinutes(p.mins, p.mode);
       });
     });
+
+    // Active Task Linking Section
+    await this.renderActiveTaskBannerInView(card, status);
 
     // Luxury Dial Wrapper
     const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
@@ -288,6 +306,96 @@ export class StudyFlowView extends ItemView {
     this.updateProgressRing(status);
   }
 
+  private async renderActiveTaskBannerInView(container: HTMLElement, status: any): Promise<void> {
+    const taskSection = container.createDiv({ cls: 'study-flow-active-task-container' });
+
+    if (status.activeTask) {
+      const banner = taskSection.createDiv({ cls: 'study-flow-active-task-banner' });
+      const targetIcon = banner.createSpan({ cls: 'study-flow-task-target-icon' });
+      setIcon(targetIcon, 'target');
+
+      const textWrap = banner.createDiv({ cls: 'study-flow-task-banner-text' });
+      textWrap.createSpan({ text: 'Enfocado en: ', cls: 'study-flow-task-banner-label' });
+      textWrap.createSpan({ text: status.activeTask.text, cls: 'study-flow-task-banner-name' });
+
+      const completeBtn = banner.createEl('button', {
+        cls: 'study-flow-task-complete-btn',
+        attr: { 'aria-label': 'Marcar como completada' },
+      });
+      const cIcon = completeBtn.createSpan();
+      setIcon(cIcon, 'check');
+      completeBtn.createSpan({ text: 'Completar' });
+      completeBtn.addEventListener('click', async () => {
+        await this.plugin.pomodoro.completeActiveTask();
+        this.containerEl.empty();
+        await this.renderView();
+      });
+
+      const unlinkBtn = banner.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Desvincular tarea' },
+      });
+      setIcon(unlinkBtn, 'x');
+      unlinkBtn.addEventListener('click', async () => {
+        this.plugin.pomodoro.setActiveTask(null);
+        this.containerEl.empty();
+        await this.renderView();
+      });
+    } else {
+      if (!this.isSelectingTaskForPomodoro) {
+        const linkBtn = taskSection.createEl('button', { cls: 'study-flow-link-task-btn' });
+        const tIcon = linkBtn.createSpan();
+        setIcon(tIcon, 'target');
+        linkBtn.createSpan({ text: '🎯 Vincular tarea para este Pomodoro' });
+        linkBtn.addEventListener('click', async () => {
+          this.isSelectingTaskForPomodoro = true;
+          await this.loadPendingInboxTasks();
+          this.containerEl.empty();
+          await this.renderView();
+        });
+      } else {
+        const pickerBox = taskSection.createDiv({ cls: 'study-flow-task-picker-box' });
+        pickerBox.createEl('div', { text: 'Selecciona una tarea de tu Inbox:', cls: 'study-flow-picker-title' });
+
+        if (this.pendingInboxTasks.length === 0) {
+          pickerBox.createDiv({ cls: 'study-flow-empty-tasks', text: 'No hay tareas pendientes en el Inbox.' });
+        } else {
+          this.pendingInboxTasks.forEach((t) => {
+            const item = pickerBox.createDiv({ cls: 'study-flow-picker-item' });
+            item.createSpan({ text: t.text });
+            item.addEventListener('click', async () => {
+              this.plugin.pomodoro.setActiveTask({
+                id: t.id,
+                text: t.text,
+                sourceFile: t.sourceFile,
+              });
+              this.isSelectingTaskForPomodoro = false;
+              this.containerEl.empty();
+              await this.renderView();
+            });
+          });
+        }
+
+        const cancelPicker = pickerBox.createEl('button', { text: 'Cancelar', cls: 'study-flow-mini-btn' });
+        cancelPicker.addEventListener('click', async () => {
+          this.isSelectingTaskForPomodoro = false;
+          this.containerEl.empty();
+          await this.renderView();
+        });
+      }
+    }
+  }
+
+  private async loadPendingInboxTasks(): Promise<void> {
+    this.pendingInboxTasks = [];
+    const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
+    const file = this.app.vault.getAbstractFileByPath(inboxPath);
+    if (file instanceof TFile) {
+      const content = await this.app.vault.read(file);
+      this.pendingInboxTasks = extractPendingTasksFromContent(content, file.path);
+    }
+  }
+
   private updatePomodoroClock(): void {
     const status = this.plugin.pomodoro.getStatus();
 
@@ -347,6 +455,109 @@ export class StudyFlowView extends ItemView {
         'class',
         `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}`
       );
+    }
+  }
+
+  // ===================== HABITS TAB =====================
+  private async renderHabitsTab(container: HTMLElement): Promise<void> {
+    const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+    this.habits = await loadHabitsFromFile(this.app, path);
+
+    const card = container.createDiv({ cls: 'study-flow-card' });
+
+    // Stats bar
+    const completedCount = this.habits.filter((h) => h.completedToday).length;
+    const statsBar = card.createDiv({ cls: 'study-flow-stats-bar' });
+    statsBar.createSpan({
+      text: `${completedCount}/${this.habits.length} completados hoy`,
+      cls: 'study-flow-badge-stat is-pending',
+    });
+
+    // Add new habit bar
+    const addSection = card.createDiv({ cls: 'study-flow-search-bar' });
+    const addInput = addSection.createEl('input', {
+      type: 'text',
+      placeholder: 'Nuevo hábito (ej. 📚 20m lectura)...',
+      cls: 'study-flow-task-input',
+    });
+    const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
+    const aIcon = addBtn.createSpan();
+    setIcon(aIcon, 'plus');
+    addBtn.createSpan({ text: 'Añadir' });
+
+    const handleAdd = async () => {
+      const val = addInput.value.trim();
+      if (!val) return;
+      this.habits = await addHabitToFile(this.app, path, val);
+      addInput.value = '';
+      new Notice(`Hábito añadido: ${val}`);
+      container.empty();
+      await this.renderHabitsTab(container);
+    };
+
+    addBtn.addEventListener('click', handleAdd);
+    addInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAdd();
+      }
+    });
+
+    // Habits List
+    const listContainer = card.createDiv({ cls: 'study-flow-task-list-cards' });
+
+    if (this.habits.length === 0) {
+      const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
+      const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
+      setIcon(emptyIcon, 'flame');
+      emptyState.createEl('h4', { text: 'Sin hábitos activos' });
+      emptyState.createEl('p', { text: 'Añade tu primer hábito diario arriba.' });
+    } else {
+      this.habits.forEach((habit) => {
+        const hCard = listContainer.createDiv({
+          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''}`,
+        });
+
+        const cbWrapper = hCard.createDiv({ cls: 'study-flow-cb-wrapper' });
+        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
+        cb.checked = habit.completedToday;
+
+        cb.addEventListener('change', async () => {
+          this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
+          new Notice(cb.checked ? `🔥 ¡Racha aumentada! Racha: ${habit.streak + 1}` : 'Hábito desmarcado');
+          container.empty();
+          await this.renderHabitsTab(container);
+        });
+
+        const textSpan = hCard.createEl('span', {
+          text: habit.name,
+          cls: `study-flow-task-text ${habit.completedToday ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
+        });
+
+        // Flame Streak Badge
+        const streakBadge = hCard.createDiv({ cls: 'study-flow-streak-badge' });
+        const fIcon = streakBadge.createSpan({ cls: 'study-flow-flame-icon' });
+        setIcon(fIcon, 'flame');
+        streakBadge.createSpan({ text: `${habit.streak} d` });
+
+        // Delete button
+        const delBtn = hCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Eliminar hábito' },
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.habits = await deleteHabitFromFile(this.app, path, habit.id);
+          new Notice('Hábito eliminado');
+          container.empty();
+          await this.renderHabitsTab(container);
+        });
+      });
     }
   }
 
@@ -462,6 +673,24 @@ export class StudyFlowView extends ItemView {
         textSpan.addEventListener('click', () => {
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change'));
+        });
+
+        // Quick action: Link to Pomodoro
+        const linkPomodoroBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Enfocar con Pomodoro' },
+        });
+        setIcon(linkPomodoroBtn, 'timer');
+        linkPomodoroBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.plugin.pomodoro.setActiveTask({
+            id: task.id,
+            text: task.text,
+            sourceFile: task.sourceFile,
+          });
+          this.activeTab = 'pomodoro';
+          this.containerEl.empty();
+          await this.renderView();
         });
 
         itemCard.createSpan({

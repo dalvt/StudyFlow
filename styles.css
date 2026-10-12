@@ -141,7 +141,7 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-l);
   padding: 4px;
-  gap: 4px;
+  gap: 3px;
 }
 
 .study-flow-nav-pill {
@@ -149,16 +149,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 7px 10px;
+  gap: 5px;
+  padding: 7px 6px;
   border-radius: var(--radius-m);
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
 .study-flow-nav-pill:hover {
@@ -173,8 +174,8 @@
 }
 
 .study-flow-nav-pill svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .study-flow-tab-body {
@@ -227,6 +228,127 @@
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
   transform: translateY(-1px);
+}
+
+/* Active Task Banner in Pomodoro */
+.study-flow-active-task-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.study-flow-active-task-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background-color: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.study-flow-task-target-icon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--interactive-accent);
+}
+
+.study-flow-task-banner-text {
+  flex: 1;
+  font-size: var(--font-ui-smaller);
+  word-break: break-word;
+}
+
+.study-flow-task-banner-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.study-flow-task-banner-name {
+  color: var(--text-normal);
+  font-weight: 700;
+}
+
+.study-flow-task-complete-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-s);
+  background-color: rgba(72, 187, 120, 0.15);
+  border: 1px solid rgba(72, 187, 120, 0.35);
+  color: var(--text-success, #48bb78);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-task-complete-btn:hover {
+  background-color: var(--text-success, #48bb78);
+  color: #fff;
+}
+
+.study-flow-task-complete-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.study-flow-link-task-btn {
+  background: transparent;
+  border: 1px dashed var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.study-flow-link-task-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  background-color: var(--background-modifier-hover);
+}
+
+.study-flow-task-picker-box {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.study-flow-picker-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.study-flow-picker-item {
+  padding: 5px 8px;
+  font-size: var(--font-ui-smaller);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.study-flow-picker-item:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent);
 }
 
 /* Dial Aura & Glow */
@@ -313,7 +435,6 @@
   stroke: url(#pomodoro-grad-break);
 }
 
-/* Fallback strokes if gradient def id varies */
 .study-flow-view-root .study-flow-dial-progress.is-work {
   stroke: url(#view-pomodoro-grad-work);
 }
@@ -367,7 +488,6 @@
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
-/* Streak Micro Dots */
 .study-flow-streak-dots {
   display: flex;
   align-items: center;
@@ -487,7 +607,7 @@
 }
 
 /* =========================================
-   5. Tasks & Inbox Components
+   5. Tasks & Habits Components
    ========================================= */
 .study-flow-stats-bar {
   display: flex;
@@ -634,6 +754,26 @@
 .study-flow-task-text.is-strikethrough {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+/* Habit Streak Badge */
+.study-flow-streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  background: rgba(250, 140, 22, 0.15);
+  border: 1px solid rgba(250, 140, 22, 0.35);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fa8c16;
+}
+
+.study-flow-flame-icon svg {
+  width: 12px;
+  height: 12px;
+  color: #fa8c16;
 }
 
 .study-flow-source-chip {
