@@ -2791,6 +2791,38 @@ body.is-study-flow-zen .workspace-split {
   flex: 1;
 }
 
+.study-flow-options-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.study-flow-options-toggle-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.study-flow-options-toggle-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-options-toggle-btn.is-active {
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
 .study-flow-create-btn {
   display: inline-flex;
   align-items: center;
@@ -3051,6 +3083,13 @@ body.is-study-flow-zen .workspace-split {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  opacity: 0.35;
+  transition: opacity 0.18s ease;
+}
+
+.study-flow-task-card:hover .study-flow-task-actions-toolbar,
+.study-flow-task-card:focus-within .study-flow-task-actions-toolbar {
+  opacity: 1;
 }
 
 .study-flow-pomo-step-btn {

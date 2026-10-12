@@ -28,6 +28,7 @@ import {
   formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
+  getCleanTaskDisplayTitle,
   getDailyNotePath,
   getOrCreateFile,
   parseTaskPomodoroEstimate,
@@ -78,6 +79,7 @@ export class StudyFlowView extends ItemView {
   private taskSortBy: 'urgency' | 'priority' | 'estimate' | 'alpha' = 'urgency';
   private editingTaskId: string | null = null;
   private selectedSubjectTag: string | null = null;
+  private isShowingTaskCreateOptions: boolean = false;
 
   // Habits state
   private habits: HabitItem[] = [];
@@ -778,7 +780,6 @@ export class StudyFlowView extends ItemView {
 
     const card = container.createDiv({ cls: 'study-flow-card study-flow-tasks-main-card' });
 
-    // 1. Stats Bar
     const pendingTasks = this.tasks.filter((t) => !t.completed && !t.isIdea);
     const todayTasks = pendingTasks.filter(
       (t) => (t.daysRemaining !== undefined && t.daysRemaining <= 0) || t.dueDate === formatDateKey(new Date())
@@ -786,24 +787,37 @@ export class StudyFlowView extends ItemView {
     const ideasTasks = this.tasks.filter((t) => !t.completed && t.isIdea);
     const completedTasks = this.tasks.filter((t) => t.completed);
 
-    const statsBar = card.createDiv({ cls: 'study-flow-tasks-stats-bar' });
-    const statPending = statsBar.createDiv({ cls: 'study-flow-stat-pill is-pending' });
-    statPending.createSpan({ text: '📋' });
-    statPending.createSpan({ text: `${pendingTasks.length} pendientes` });
+    // 1. Segmented Views Tabs (At top, replaces redundant stats bar)
+    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
+    const filters: Array<{
+      id: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all';
+      label: string;
+      count: number;
+      icon: string;
+    }> = [
+      { id: 'inbox', label: 'Inbox', count: pendingTasks.length, icon: 'inbox' },
+      { id: 'today', label: 'Hoy', count: todayTasks.length, icon: 'calendar-check' },
+      { id: 'subjects', label: 'Materias', count: pendingTasks.length, icon: 'book-open' },
+      { id: 'ideas', label: 'Ideas', count: ideasTasks.length, icon: 'sparkles' },
+      { id: 'completed', label: 'Hechas', count: completedTasks.length, icon: 'check-circle' },
+      { id: 'all', label: 'Todas', count: this.tasks.length, icon: 'layers' },
+    ];
 
-    const statToday = statsBar.createDiv({
-      cls: `study-flow-stat-pill ${todayTasks.length > 0 ? 'is-today-urgent' : 'is-today'}`,
+    filters.forEach((f) => {
+      const btn = filterRow.createEl('button', {
+        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
+      });
+      const iconSpan = btn.createSpan({ cls: 'study-flow-tab-icon' });
+      setIcon(iconSpan, f.icon);
+      btn.createSpan({ text: f.label });
+      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
+      btn.addEventListener('click', async () => {
+        this.taskFilter = f.id;
+        this.selectedSubjectTag = null;
+        container.empty();
+        await this.renderTasksTab(container);
+      });
     });
-    statToday.createSpan({ text: '📅' });
-    statToday.createSpan({ text: `${todayTasks.length} para hoy` });
-
-    const statIdeas = statsBar.createDiv({ cls: 'study-flow-stat-pill is-idea' });
-    statIdeas.createSpan({ text: '💡' });
-    statIdeas.createSpan({ text: `${ideasTasks.length} ideas` });
-
-    const statDone = statsBar.createDiv({ cls: 'study-flow-stat-pill is-completed' });
-    statDone.createSpan({ text: '✅' });
-    statDone.createSpan({ text: `${completedTasks.length} hechas` });
 
     // 2. Search & Sort Bar
     const searchRow = card.createDiv({ cls: 'study-flow-tasks-search-row' });
@@ -836,56 +850,24 @@ export class StudyFlowView extends ItemView {
     }
 
     const sortSelect = searchRow.createEl('select', { cls: 'study-flow-tasks-sort-select' });
-    sortSelect.createEl('option', { value: 'urgency', text: '⚡ Urgencia / Vencimiento' });
+    sortSelect.createEl('option', { value: 'urgency', text: '⚡ Urgencia' });
     sortSelect.createEl('option', { value: 'priority', text: '⏫ Prioridad' });
-    sortSelect.createEl('option', { value: 'estimate', text: '🍅 Estimación Pomodoro' });
-    sortSelect.createEl('option', { value: 'alpha', text: '🔤 Alfabético (A-Z)' });
+    sortSelect.createEl('option', { value: 'estimate', text: '🍅 Estimación' });
+    sortSelect.createEl('option', { value: 'alpha', text: '🔤 Alfabético' });
     sortSelect.value = this.taskSortBy;
     sortSelect.addEventListener('change', () => {
       this.taskSortBy = sortSelect.value as any;
       renderList();
     });
 
-    // 3. Segmented Views Pills
-    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
-    const filters: Array<{
-      id: 'inbox' | 'today' | 'subjects' | 'ideas' | 'completed' | 'all';
-      label: string;
-      count: number;
-      icon: string;
-    }> = [
-      { id: 'inbox', label: 'Inbox', count: pendingTasks.length, icon: 'inbox' },
-      { id: 'today', label: 'Hoy', count: todayTasks.length, icon: 'calendar-check' },
-      { id: 'subjects', label: 'Materias', count: pendingTasks.length, icon: 'book-open' },
-      { id: 'ideas', label: 'Ideas', count: ideasTasks.length, icon: 'sparkles' },
-      { id: 'completed', label: 'Hechas', count: completedTasks.length, icon: 'check-circle' },
-      { id: 'all', label: 'Todas', count: this.tasks.length, icon: 'layers' },
-    ];
-
-    filters.forEach((f) => {
-      const btn = filterRow.createEl('button', {
-        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
-      });
-      const iconSpan = btn.createSpan({ cls: 'study-flow-tab-icon' });
-      setIcon(iconSpan, f.icon);
-      btn.createSpan({ text: f.label });
-      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
-      btn.addEventListener('click', async () => {
-        this.taskFilter = f.id;
-        this.selectedSubjectTag = null;
-        container.empty();
-        await this.renderTasksTab(container);
-      });
-    });
-
-    // 4. Quick Add Card (Centralized Academic Capture)
+    // 3. Quick Add Bar (Sleek Single-Line Minimalist)
     const createBox = card.createDiv({ cls: 'study-flow-task-create-box' });
 
-    // Main line: Title input & type toggle & submit
+    // Main line: Title input & type toggle & options toggle & submit
     const mainInputRow = createBox.createDiv({ cls: 'study-flow-create-main-row' });
     const taskInput = mainInputRow.createEl('input', {
       type: 'text',
-      placeholder: 'Nueva tarea o idea... (ej: Resolver guía práctica #algebra)',
+      placeholder: '+ Nueva tarea o idea... [Enter]',
       cls: 'study-flow-task-input study-flow-create-input',
     });
 
@@ -894,13 +876,27 @@ export class StudyFlowView extends ItemView {
     typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
     typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
 
+    const optionsToggleBtn = mainInputRow.createEl('button', {
+      cls: `study-flow-options-toggle-btn ${this.isShowingTaskCreateOptions ? 'is-active' : ''}`,
+      attr: { 'aria-label': 'Mostrar opciones adicionales (fecha, materia, prioridad)' },
+    });
+    const optIcon = optionsToggleBtn.createSpan();
+    setIcon(optIcon, 'sliders-horizontal');
+
     const addBtn = mainInputRow.createEl('button', { cls: 'mod-cta study-flow-create-btn' });
     const aIcon = addBtn.createSpan();
     setIcon(aIcon, 'plus');
     addBtn.createSpan({ text: 'Añadir' });
 
-    // Meta controls row (deadline, subject tag, priority, estimate)
+    // Collapsible Meta Controls Row
     const metaControlsRow = createBox.createDiv({ cls: 'study-flow-create-meta-row' });
+    metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
+
+    optionsToggleBtn.addEventListener('click', () => {
+      this.isShowingTaskCreateOptions = !this.isShowingTaskCreateOptions;
+      optionsToggleBtn.classList.toggle('is-active', this.isShowingTaskCreateOptions);
+      metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
+    });
 
     // Deadline picker
     const deadlineCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
@@ -912,7 +908,7 @@ export class StudyFlowView extends ItemView {
 
     // Subject/Tag input
     const subjectCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
-    subjectCol.createSpan({ text: '📚 Materia / Tag:', cls: 'study-flow-meta-label' });
+    subjectCol.createSpan({ text: '📚 Materia:', cls: 'study-flow-meta-label' });
     const subjectInput = subjectCol.createEl('input', {
       type: 'text',
       placeholder: '#materia',
@@ -949,7 +945,8 @@ export class StudyFlowView extends ItemView {
 
     typeSelect.addEventListener('change', () => {
       addType = typeSelect.value as 'task' | 'idea';
-      metaControlsRow.style.display = addType === 'idea' ? 'none' : 'flex';
+      optionsToggleBtn.style.display = addType === 'idea' ? 'none' : 'flex';
+      metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
     });
 
     const handleCreateTask = async () => {
@@ -1249,8 +1246,9 @@ export class StudyFlowView extends ItemView {
     } else {
       // Normal Display Row
       const titleRow = mainCol.createDiv({ cls: 'study-flow-task-title-row' });
+      const displayTitle = getCleanTaskDisplayTitle(task.text);
       const textSpan = titleRow.createEl('span', {
-        text: task.text,
+        text: displayTitle,
         cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
       });
       textSpan.addEventListener('click', () => {

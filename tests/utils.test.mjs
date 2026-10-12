@@ -434,5 +434,18 @@ test('compareTasksByPriority prioritizes incomplete, imminent deadlines, and hig
   assert.ok(compareTasksByPriority(taskDone, taskA) > 0);
 });
 
+test('getCleanTaskDisplayTitle strips metadata tags and leaves human title', async () => {
+  const { getCleanTaskDisplayTitle } = await import('../src/markdown-utils.ts');
+  const input = 'Resolver guía práctica 4 #algebra 📅 2026-10-15 🍅 0/3 ⏫';
+  assert.equal(getCleanTaskDisplayTitle(input), 'Resolver guía práctica 4');
+
+  const input2 = 'nose 🍅 1';
+  assert.equal(getCleanTaskDisplayTitle(input2), 'nose');
+
+  const input3 = '💡 Estudiar para parcial #quimica 📅 2026-10-20';
+  assert.equal(getCleanTaskDisplayTitle(input3), 'Estudiar para parcial');
+});
+
+
 
 

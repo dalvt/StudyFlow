@@ -160,6 +160,21 @@ export function formatTaskWithPomodoroEstimate(
 }
 
 /**
+ * Strips metadata badges (deadlines, pomodoros, priorities, tags, idea markers)
+ * from task text for clean visual rendering in the UI.
+ */
+export function getCleanTaskDisplayTitle(text: string): string {
+  let clean = text;
+  clean = clean.replace(/(?:⏫|🔼|🔽|#p[1-3]\b|#alta\b|#media\b|#baja\b)/gi, '');
+  clean = clean.replace(/(?:🍅|:tomato:)\s*\d+(?:\s*\/\s*\d+)?/gi, '');
+  clean = clean.replace(/📅\s*\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?/gi, '');
+  clean = clean.replace(/#[\w\u00C0-\u017F-]+/g, '');
+  clean = clean.replace(/^(?:💡|#ideas?\b)\s*/i, '');
+  clean = clean.replace(/\s{2,}/g, ' ').trim();
+  return clean || text;
+}
+
+/**
  * Parses priority tag or emoji from task text.
  * Compatible with Obsidian Tasks standard (⏫, 🔼, 🔽) and common tags (#p1, #alta, etc.)
  */
