@@ -7,11 +7,22 @@ import {
   PendingTaskItem,
 } from './utils';
 
+export interface StudyBlock {
+  id: string;
+  startTime: string;
+  endTime: string;
+  title: string;
+}
+
 export class NextDayPlannerModal extends Modal {
   private plugin: StudyFlowPlugin;
   private pendingTasks: PendingTaskItem[] = [];
   private selectedTaskIds: Set<string> = new Set();
   private markMigratedInSource: boolean = false;
+  private studyBlocks: StudyBlock[] = [
+    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque de Estudio 1' },
+    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque de Estudio 2' },
+  ];
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -21,16 +32,15 @@ export class NextDayPlannerModal extends Modal {
   async onOpen(): Promise<void> {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('study-flow-modal');
+    contentEl.addClass('study-flow-modal', 'study-flow-planner-modal');
 
-    contentEl.createEl('h2', { text: 'Planificar el día siguiente' });
+    contentEl.createEl('h2', { text: 'Planificador del día siguiente' });
     contentEl.createEl('p', {
-      text: 'Revisa las tareas pendientes de hoy y del Inbox para planificar tu jornada de mañana.',
+      text: 'Revisa tareas pendientes, organiza tus bloques de tiempo y prepara tu jornada.',
       cls: 'study-flow-modal-desc',
     });
 
     const loadingEl = contentEl.createEl('div', { text: 'Buscando tareas pendientes...' });
-
     await this.loadTasks();
     loadingEl.remove();
 
@@ -41,7 +51,6 @@ export class NextDayPlannerModal extends Modal {
     this.pendingTasks = [];
     this.selectedTaskIds.clear();
 
-    // 1. Check Today's Daily Note
     const todayPath = getDailyNotePath(this.plugin.settings, 0);
     const todayFile = this.app.vault.getAbstractFileByPath(todayPath);
     if (todayFile instanceof TFile) {
@@ -54,7 +63,6 @@ export class NextDayPlannerModal extends Modal {
       }
     }
 
-    // 2. Check Inbox.md
     const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
     const inboxFile = this.app.vault.getAbstractFileByPath(inboxPath);
     if (inboxFile instanceof TFile && inboxFile.path !== todayPath) {
@@ -70,15 +78,79 @@ export class NextDayPlannerModal extends Modal {
 
   private renderModalContent(): void {
     const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl('h2', { text: 'Planificador del día siguiente' });
 
     const container = contentEl.createDiv({ cls: 'study-flow-planner-container' });
 
-    // Section header with bulk toggle buttons
+    // Section 1: Study Blocks Editor
+    const blocksSection = container.createDiv({ cls: 'study-flow-blocks-section' });
+    const blocksHeader = blocksSection.createDiv({
+      attr: { style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;' },
+    });
+    blocksHeader.createEl('h3', { text: 'Bloques de Estudio', attr: { style: 'margin: 0;' } });
+
+    const addBlockBtn = blocksHeader.createEl('button', { text: '+ Añadir Bloque' });
+    addBlockBtn.addEventListener('click', () => {
+      this.studyBlocks.push({
+        id: String(Date.now()),
+        startTime: '14:00',
+        endTime: '15:30',
+        title: 'Nuevo Bloque',
+      });
+      this.renderModalContent();
+    });
+
+    const blocksListEl = blocksSection.createDiv({ cls: 'study-flow-blocks-list' });
+    this.studyBlocks.forEach((block, index) => {
+      const row = blocksListEl.createDiv({ cls: 'study-flow-block-row' });
+
+      const startInput = row.createEl('input', {
+        type: 'text',
+        value: block.startTime,
+        cls: 'study-flow-time-input',
+      });
+      startInput.addEventListener('change', () => {
+        block.startTime = startInput.value.trim();
+        this.updatePreview();
+      });
+
+      row.createSpan({ text: '—' });
+
+      const endInput = row.createEl('input', {
+        type: 'text',
+        value: block.endTime,
+        cls: 'study-flow-time-input',
+      });
+      endInput.addEventListener('change', () => {
+        block.endTime = endInput.value.trim();
+        this.updatePreview();
+      });
+
+      const titleInput = row.createEl('input', {
+        type: 'text',
+        value: block.title,
+        cls: 'study-flow-block-title-input',
+      });
+      titleInput.addEventListener('change', () => {
+        block.title = titleInput.value.trim();
+        this.updatePreview();
+      });
+
+      const removeBtn = row.createEl('button', { text: '✕', cls: 'study-flow-delete-btn' });
+      removeBtn.addEventListener('click', () => {
+        this.studyBlocks.splice(index, 1);
+        this.renderModalContent();
+      });
+    });
+
+    // Section 2: Tasks Selection
     const tasksHeader = container.createDiv({
-      attr: { style: 'display: flex; justify-content: space-between; align-items: center;' },
+      attr: { style: 'display: flex; justify-content: space-between; align-items: center; margin-top: 12px;' },
     });
     tasksHeader.createEl('h3', {
-      text: `Tareas pendientes encontradas (${this.pendingTasks.length})`,
+      text: `Tareas pendientes (${this.pendingTasks.length})`,
       attr: { style: 'margin: 0;' },
     });
 
@@ -87,21 +159,20 @@ export class NextDayPlannerModal extends Modal {
       const selectAllBtn = bulkActions.createEl('button', { text: 'Todas' });
       selectAllBtn.addEventListener('click', () => {
         this.pendingTasks.forEach((t) => this.selectedTaskIds.add(t.id));
-        this.refreshTaskList();
+        this.renderModalContent();
       });
 
       const deselectAllBtn = bulkActions.createEl('button', { text: 'Ninguna' });
       deselectAllBtn.addEventListener('click', () => {
         this.selectedTaskIds.clear();
-        this.refreshTaskList();
+        this.renderModalContent();
       });
     }
 
-    // Task list container
     const taskListEl = container.createDiv({ cls: 'study-flow-task-list' });
     this.populateTaskList(taskListEl);
 
-    // Options
+    // Option: Mark migrated
     new Setting(container)
       .setName('Marcar como migradas en origen')
       .setDesc('Marca las tareas seleccionadas como [>] en el archivo original.')
@@ -111,16 +182,16 @@ export class NextDayPlannerModal extends Modal {
         })
       );
 
-    // Preview
+    // Section 3: Live Preview
     const previewSection = container.createDiv({ cls: 'study-flow-preview-section' });
     previewSection.createDiv({
-      text: 'Vista previa de la plantilla para mañana:',
+      text: 'Vista previa de la plantilla generada:',
       cls: 'study-flow-preview-label',
     });
     const previewBox = previewSection.createDiv({ cls: 'study-flow-preview-box' });
-    this.updatePreviewBox(previewBox);
+    previewBox.setText(this.generateTemplateString());
 
-    // Button row
+    // Action buttons
     const btnRow = contentEl.createDiv({ cls: 'study-flow-button-row' });
     const cancelBtn = btnRow.createEl('button', { text: 'Cancelar' });
     cancelBtn.addEventListener('click', () => this.close());
@@ -134,16 +205,29 @@ export class NextDayPlannerModal extends Modal {
     });
   }
 
-  private refreshTaskList(): void {
-    const listEl = this.contentEl.querySelector('.study-flow-task-list') as HTMLElement | null;
-    if (listEl) {
-      listEl.empty();
-      this.populateTaskList(listEl);
-    }
+  private updatePreview(): void {
     const previewBox = this.contentEl.querySelector('.study-flow-preview-box') as HTMLElement | null;
     if (previewBox) {
-      this.updatePreviewBox(previewBox);
+      previewBox.setText(this.generateTemplateString());
     }
+  }
+
+  private generateTemplateString(): string {
+    const blocksStr = this.studyBlocks
+      .map((b) => `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}`)
+      .join('\n');
+
+    const selected = this.pendingTasks.filter((t) => this.selectedTaskIds.has(t.id));
+    const tasksBlock =
+      selected.length > 0
+        ? selected.map((t) => `- [ ] ${t.text}`).join('\n')
+        : '- [ ] (Sin tareas prioritarias seleccionadas)';
+
+    return `## Bloques de Estudio
+${blocksStr || '- [ ] 08:00 - 09:30 | \n- [ ] 10:00 - 11:30 | '}
+
+## Tareas Prioritarias
+${tasksBlock}`;
   }
 
   private populateTaskList(container: HTMLElement): void {
@@ -166,12 +250,7 @@ export class NextDayPlannerModal extends Modal {
         } else {
           this.selectedTaskIds.delete(task.id);
         }
-        const previewBox = this.contentEl.querySelector(
-          '.study-flow-preview-box'
-        ) as HTMLElement | null;
-        if (previewBox) {
-          this.updatePreviewBox(previewBox);
-        }
+        this.updatePreview();
       });
 
       const label = itemEl.createEl('label', { text: task.text });
@@ -192,40 +271,11 @@ export class NextDayPlannerModal extends Modal {
     });
   }
 
-  private updatePreviewBox(previewBox: HTMLElement): void {
-    const selected = this.pendingTasks.filter((t) => this.selectedTaskIds.has(t.id));
-    const tasksBlock =
-      selected.length > 0
-        ? selected.map((t) => `- [ ] ${t.text}`).join('\n')
-        : '- [ ] (Sin tareas prioritarias seleccionadas)';
-
-    const preview = `## Bloques de Estudio
-- [ ] 08:00 - 09:30 | 
-- [ ] 10:00 - 11:30 | 
-
-## Tareas Prioritarias
-${tasksBlock}`;
-
-    previewBox.setText(preview);
-  }
-
   private async generateTomorrowPlan(): Promise<void> {
     try {
       const tomorrowPath = getDailyNotePath(this.plugin.settings, 1);
       const selected = this.pendingTasks.filter((t) => this.selectedTaskIds.has(t.id));
-
-      const tasksBlock =
-        selected.length > 0
-          ? selected.map((t) => `- [ ] ${t.text}`).join('\n')
-          : '- [ ] ';
-
-      const plannerTemplate = `## Bloques de Estudio
-- [ ] 08:00 - 09:30 | 
-- [ ] 10:00 - 11:30 | 
-
-## Tareas Prioritarias
-${tasksBlock}
-`;
+      const plannerTemplate = `${this.generateTemplateString()}\n`;
 
       const tomorrowFile = await getOrCreateFile(
         this.app,
@@ -239,20 +289,16 @@ ${tasksBlock}
       if (existingContent.trim().length === 0) {
         finalContent = plannerTemplate;
       } else {
-        // Append cleanly to existing file
         finalContent = `${existingContent.trimEnd()}\n\n${plannerTemplate}`;
       }
 
       await this.app.vault.modify(tomorrowFile, finalContent);
 
-      // If requested, mark selected tasks as migrated in origin files
       if (this.markMigratedInSource && selected.length > 0) {
         await this.markTasksAsMigrated(selected);
       }
 
-      // Open tomorrow's note in active leaf
       await this.app.workspace.getLeaf(false).openFile(tomorrowFile);
-
       new Notice(`Plan generado en ${tomorrowFile.basename}`);
       this.close();
     } catch (err) {
@@ -274,7 +320,6 @@ ${tasksBlock}
       if (file instanceof TFile) {
         let content = await this.app.vault.read(file);
         for (const task of tasks) {
-          // Replace '- [ ] task' with '- [>] task'
           const escapedText = task.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const regex = new RegExp(`^(\\s*)-\\s+\\[\\s\\]\\s+${escapedText}`, 'm');
           content = content.replace(regex, `$1- [>] ${task.text}`);

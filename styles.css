@@ -1,4 +1,4 @@
-/* Study Flow Assistant - Styles */
+/* Study Flow Assistant - Professional UI Styles */
 
 /* Status bar Pomodoro indicator */
 .status-bar-item.study-flow-pomodoro {
@@ -32,16 +32,18 @@
   opacity: 0.85;
 }
 
-/* Modals */
+/* Modals base */
 .study-flow-modal {
-  padding: 12px;
+  padding: 16px;
+  max-width: 600px;
 }
 
 .study-flow-modal h2 {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: var(--text-normal);
-  font-size: var(--font-ui-medium);
+  font-size: var(--font-ui-large);
+  font-weight: 600;
 }
 
 .study-flow-modal-desc {
@@ -50,16 +52,165 @@
   margin-bottom: 16px;
 }
 
-/* Quick Task Capture Modal */
-.study-flow-task-input {
+/* Sidebar View Layout */
+.study-flow-view-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  overflow-y: auto;
+  gap: 12px;
+}
+
+.study-flow-nav-tabs {
+  display: flex;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-m);
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-nav-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.study-flow-nav-btn:hover {
+  color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+}
+
+.study-flow-nav-btn.is-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.study-flow-tab-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.study-flow-card {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Pomodoro Visual Component */
+.study-flow-mode-pill-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.study-flow-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.study-flow-mode-pill.is-work {
+  background-color: rgba(229, 62, 62, 0.15);
+  color: var(--text-error, #e53e3e);
+  border: 1px solid rgba(229, 62, 62, 0.3);
+}
+
+.study-flow-mode-pill.is-break {
+  background-color: rgba(72, 187, 120, 0.15);
+  color: var(--text-success, #48bb78);
+  border: 1px solid rgba(72, 187, 120, 0.3);
+}
+
+.study-flow-big-timer-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.study-flow-big-clock {
+  font-size: 3rem;
+  font-family: var(--font-monospace);
+  font-weight: 700;
+  color: var(--text-normal);
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.study-flow-progress-track {
   width: 100%;
-  margin-bottom: 16px;
+  height: 8px;
+  background-color: var(--background-modifier-border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.study-flow-progress-fill {
+  height: 100%;
+  background-color: var(--interactive-accent);
+  transition: width 0.3s ease;
+  border-radius: 9999px;
+}
+
+.study-flow-session-counter {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.study-flow-pomodoro-controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-adjust-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Tasks UI */
+.study-flow-add-task-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.study-flow-task-input {
+  flex: 1;
   background-color: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: 8px 12px;
   color: var(--text-normal);
-  font-size: var(--font-ui-medium);
+  font-size: var(--font-ui-small);
 }
 
 .study-flow-task-input:focus {
@@ -67,7 +218,112 @@
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-/* Next Day Planner Modal */
+.study-flow-filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.study-flow-filter-row button {
+  font-size: var(--font-ui-smaller);
+  padding: 4px 10px;
+}
+
+.study-flow-task-list-full {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px;
+  background-color: var(--background-primary);
+}
+
+.study-flow-task-row-interactive {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  transition: background-color 0.12s ease;
+}
+
+.study-flow-task-row-interactive:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.study-flow-task-row-interactive input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+}
+
+.study-flow-task-row-interactive span {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  word-break: break-word;
+}
+
+.study-flow-task-row-interactive span.is-completed {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.study-flow-delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+}
+
+.study-flow-delete-btn:hover {
+  color: var(--text-error, #e53e3e);
+  background-color: var(--background-modifier-hover);
+}
+
+/* Study Blocks Planner UI */
+.study-flow-blocks-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-block-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--background-primary);
+  padding: 6px 8px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-time-input {
+  width: 65px;
+  text-align: center;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  padding: 4px;
+}
+
+.study-flow-block-title-input {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  padding: 4px 8px;
+}
+
+/* Common Planner Styles */
 .study-flow-planner-container {
   display: flex;
   flex-direction: column;
@@ -80,12 +336,12 @@
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
-  padding: 12px;
-  max-height: 220px;
+  padding: 10px;
+  max-height: 200px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .study-flow-task-item {
@@ -94,23 +350,16 @@
   gap: 10px;
   padding: 4px 6px;
   border-radius: var(--radius-s);
-  transition: background-color 0.1s ease;
 }
 
 .study-flow-task-item:hover {
   background-color: var(--background-modifier-hover);
 }
 
-.study-flow-task-item input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--interactive-accent);
-}
-
 .study-flow-task-item label {
   cursor: pointer;
   color: var(--text-normal);
   font-size: var(--font-ui-small);
-  word-break: break-word;
   flex: 1;
 }
 
@@ -120,12 +369,6 @@
   font-size: var(--font-ui-small);
   padding: 8px 0;
   text-align: center;
-}
-
-.study-flow-preview-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .study-flow-preview-label {
@@ -145,7 +388,7 @@
   font-size: var(--font-ui-smaller);
   white-space: pre-wrap;
   color: var(--text-muted);
-  max-height: 140px;
+  max-height: 120px;
   overflow-y: auto;
 }
 
@@ -153,5 +396,5 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 12px;
 }

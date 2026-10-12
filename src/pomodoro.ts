@@ -1,9 +1,19 @@
-import { Notice, TFile, setTooltip } from 'obsidian';
+import { Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { getDailyNotePath, getOrCreateFile } from './utils';
 
 export type PomodoroState = 'idle' | 'running' | 'paused';
 export type PomodoroMode = 'work' | 'break';
+
+export interface PomodoroStatus {
+  state: PomodoroState;
+  mode: PomodoroMode;
+  remainingSeconds: number;
+  totalDurationSeconds: number;
+  completedSessionsToday: number;
+}
+
+export type PomodoroListener = (status: PomodoroStatus) => void;
 
 export class PomodoroManager {
   private plugin: StudyFlowPlugin;
@@ -13,11 +23,15 @@ export class PomodoroManager {
   private state: PomodoroState = 'idle';
   private mode: PomodoroMode = 'work';
   private remainingSeconds: number = 25 * 60;
+  private totalDurationSeconds: number = 25 * 60;
   private endTime: number = 0;
+  private completedSessionsToday: number = 0;
+  private listeners: Set<PomodoroListener> = new Set();
 
   constructor(plugin: StudyFlowPlugin) {
     this.plugin = plugin;
-    this.remainingSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    this.remainingSeconds = this.totalDurationSeconds;
   }
 
   public initStatusBar(statusBarEl: HTMLElement): void {
@@ -38,14 +52,45 @@ export class PomodoroManager {
     this.updateDisplay();
   }
 
+  public subscribe(listener: PomodoroListener): () => void {
+    this.listeners.add(listener);
+    listener(this.getStatus());
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  public getStatus(): PomodoroStatus {
+    return {
+      state: this.state,
+      mode: this.mode,
+      remainingSeconds: this.remainingSeconds,
+      totalDurationSeconds: this.totalDurationSeconds,
+      completedSessionsToday: this.completedSessionsToday,
+    };
+  }
+
+  private notifyListeners(): void {
+    const status = this.getStatus();
+    this.listeners.forEach((listener) => {
+      try {
+        listener(status);
+      } catch (err) {
+        console.error('Error in pomodoro listener:', err);
+      }
+    });
+  }
+
   public onSettingsUpdated(): void {
     if (this.state === 'idle') {
       const durationMin =
         this.mode === 'work'
           ? this.plugin.settings.pomodoroWorkDuration
           : this.plugin.settings.pomodoroBreakDuration;
-      this.remainingSeconds = durationMin * 60;
+      this.totalDurationSeconds = durationMin * 60;
+      this.remainingSeconds = this.totalDurationSeconds;
       this.updateDisplay();
+      this.notifyListeners();
     }
   }
 
@@ -74,6 +119,7 @@ export class PomodoroManager {
     }, 1000);
 
     this.updateDisplay();
+    this.notifyListeners();
   }
 
   public pause(): void {
@@ -87,6 +133,7 @@ export class PomodoroManager {
 
     this.remainingSeconds = Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000));
     this.updateDisplay();
+    this.notifyListeners();
   }
 
   public reset(): void {
@@ -97,8 +144,39 @@ export class PomodoroManager {
 
     this.state = 'idle';
     this.mode = 'work';
-    this.remainingSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    this.remainingSeconds = this.totalDurationSeconds;
     this.updateDisplay();
+    this.notifyListeners();
+  }
+
+  public addMinutes(minutes: number): void {
+    const additionalSeconds = minutes * 60;
+    this.remainingSeconds = Math.max(10, this.remainingSeconds + additionalSeconds);
+    this.totalDurationSeconds = Math.max(this.remainingSeconds, this.totalDurationSeconds + additionalSeconds);
+    if (this.state === 'running') {
+      this.endTime += additionalSeconds * 1000;
+    }
+    this.updateDisplay();
+    this.notifyListeners();
+  }
+
+  public skipCycle(): void {
+    if (this.mode === 'work') {
+      this.mode = 'break';
+      this.totalDurationSeconds = this.plugin.settings.pomodoroBreakDuration * 60;
+    } else {
+      this.mode = 'work';
+      this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    }
+    this.state = 'idle';
+    this.remainingSeconds = this.totalDurationSeconds;
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.updateDisplay();
+    this.notifyListeners();
   }
 
   public switchMode(newMode?: PomodoroMode): void {
@@ -113,8 +191,10 @@ export class PomodoroManager {
       this.mode === 'work'
         ? this.plugin.settings.pomodoroWorkDuration
         : this.plugin.settings.pomodoroBreakDuration;
-    this.remainingSeconds = durationMin * 60;
+    this.totalDurationSeconds = durationMin * 60;
+    this.remainingSeconds = this.totalDurationSeconds;
     this.updateDisplay();
+    this.notifyListeners();
   }
 
   private tick(): void {
@@ -125,6 +205,7 @@ export class PomodoroManager {
       this.onCycleComplete();
     } else {
       this.updateDisplay();
+      this.notifyListeners();
     }
   }
 
@@ -135,24 +216,26 @@ export class PomodoroManager {
     }
 
     if (this.mode === 'work') {
+      this.completedSessionsToday++;
       new Notice('¡Pomodoro completado!');
       if (this.plugin.settings.logPomodoroToDailyNote) {
         await this.logSession();
       }
 
-      // Switch to break
       this.mode = 'break';
       this.state = 'idle';
-      this.remainingSeconds = this.plugin.settings.pomodoroBreakDuration * 60;
+      this.totalDurationSeconds = this.plugin.settings.pomodoroBreakDuration * 60;
+      this.remainingSeconds = this.totalDurationSeconds;
     } else {
       new Notice('¡Descanso completado! Preparado para una nueva sesión.');
-      // Switch back to work
       this.mode = 'work';
       this.state = 'idle';
-      this.remainingSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+      this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+      this.remainingSeconds = this.totalDurationSeconds;
     }
 
     this.updateDisplay();
+    this.notifyListeners();
   }
 
   private async logSession(): Promise<void> {
@@ -178,7 +261,7 @@ export class PomodoroManager {
     }
   }
 
-  private formatTime(totalSeconds: number): string {
+  public formatTime(totalSeconds: number): string {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
@@ -220,5 +303,6 @@ export class PomodoroManager {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.listeners.clear();
   }
 }
