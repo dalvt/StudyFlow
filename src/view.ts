@@ -1,5 +1,6 @@
 import { ItemView, Notice, setIcon, WorkspaceLeaf, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
+import { TaskCreateModal } from './task-modal';
 import {
   addHabitToFile,
   deleteHabitFromFile,
@@ -781,6 +782,8 @@ export class StudyFlowView extends ItemView {
     const card = container.createDiv({ cls: 'study-flow-card study-flow-tasks-main-card' });
 
     const pendingTasks = this.tasks.filter((t) => !t.completed && !t.isIdea);
+    const inboxTasks = this.tasks.filter((t) => !t.completed && !t.isIdea && (!t.tags || t.tags.length === 0));
+    const subjectTasks = this.tasks.filter((t) => !t.completed && !t.isIdea && t.tags && t.tags.length > 0);
     const todayTasks = pendingTasks.filter(
       (t) => (t.daysRemaining !== undefined && t.daysRemaining <= 0) || t.dueDate === formatDateKey(new Date())
     );
@@ -795,9 +798,9 @@ export class StudyFlowView extends ItemView {
       count: number;
       icon: string;
     }> = [
-      { id: 'inbox', label: 'Inbox', count: pendingTasks.length, icon: 'inbox' },
+      { id: 'inbox', label: 'Inbox', count: inboxTasks.length, icon: 'inbox' },
       { id: 'today', label: 'Hoy', count: todayTasks.length, icon: 'calendar-check' },
-      { id: 'subjects', label: 'Materias', count: pendingTasks.length, icon: 'book-open' },
+      { id: 'subjects', label: 'Materias', count: subjectTasks.length, icon: 'book-open' },
       { id: 'ideas', label: 'Ideas', count: ideasTasks.length, icon: 'sparkles' },
       { id: 'completed', label: 'Hechas', count: completedTasks.length, icon: 'check-circle' },
       { id: 'all', label: 'Todas', count: this.tasks.length, icon: 'layers' },
@@ -860,152 +863,47 @@ export class StudyFlowView extends ItemView {
       renderList();
     });
 
-    // 3. Quick Add Bar (Sleek Single-Line Minimalist)
-    const createBox = card.createDiv({ cls: 'study-flow-task-create-box' });
+    // 3. Quick Add Trigger Bar (Opens floating cloud modal)
+    const knownSubjects = Array.from(
+      new Set(
+        this.tasks
+          .flatMap((t) => t.tags || [])
+          .filter((tag) => tag && !['#idea', '#alta', '#media', '#baja'].includes(tag.toLowerCase()))
+      )
+    );
 
-    // Main line: Title input & type toggle & options toggle & submit
-    const mainInputRow = createBox.createDiv({ cls: 'study-flow-create-main-row' });
-    const taskInput = mainInputRow.createEl('input', {
-      type: 'text',
-      placeholder: '+ Nueva tarea o idea... [Enter]',
-      cls: 'study-flow-task-input study-flow-create-input',
+    const triggerBox = card.createDiv({ cls: 'study-flow-cloud-trigger-bar' });
+    const triggerLeft = triggerBox.createDiv({ cls: 'study-flow-trigger-left' });
+    const plusSpan = triggerLeft.createSpan({ cls: 'study-flow-trigger-plus' });
+    setIcon(plusSpan, 'plus');
+    triggerLeft.createSpan({
+      text: '+ Nueva tarea o idea académica...',
+      cls: 'study-flow-trigger-label',
     });
 
-    let addType: 'task' | 'idea' = 'task';
-    const typeSelect = mainInputRow.createEl('select', { cls: 'study-flow-type-select' });
-    typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
-    typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
-
-    const optionsToggleBtn = mainInputRow.createEl('button', {
-      cls: `study-flow-options-toggle-btn ${this.isShowingTaskCreateOptions ? 'is-active' : ''}`,
-      attr: { 'aria-label': 'Mostrar opciones adicionales (fecha, materia, prioridad)' },
-    });
-    const optIcon = optionsToggleBtn.createSpan();
-    setIcon(optIcon, 'sliders-horizontal');
-
-    const addBtn = mainInputRow.createEl('button', { cls: 'mod-cta study-flow-create-btn' });
-    const aIcon = addBtn.createSpan();
-    setIcon(aIcon, 'plus');
-    addBtn.createSpan({ text: 'Añadir' });
-
-    // Collapsible Meta Controls Row
-    const metaControlsRow = createBox.createDiv({ cls: 'study-flow-create-meta-row' });
-    metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
-
-    optionsToggleBtn.addEventListener('click', () => {
-      this.isShowingTaskCreateOptions = !this.isShowingTaskCreateOptions;
-      optionsToggleBtn.classList.toggle('is-active', this.isShowingTaskCreateOptions);
-      metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
+    const triggerRight = triggerBox.createDiv({ cls: 'study-flow-trigger-right' });
+    const cloudBtn = triggerRight.createEl('button', {
+      cls: 'study-flow-trigger-cloud-btn',
+      text: 'Abrir nube ☁',
     });
 
-    // Deadline picker
-    const deadlineCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
-    deadlineCol.createSpan({ text: '📅 Vencimiento:', cls: 'study-flow-meta-label' });
-    const deadlineInput = deadlineCol.createEl('input', {
-      type: 'date',
-      cls: 'study-flow-date-input',
-    });
-
-    // Subject/Tag input
-    const subjectCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
-    subjectCol.createSpan({ text: '📚 Materia:', cls: 'study-flow-meta-label' });
-    const subjectInput = subjectCol.createEl('input', {
-      type: 'text',
-      placeholder: '#materia',
-      cls: 'study-flow-tag-input',
-    });
-
-    // Priority
-    const priorityCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
-    priorityCol.createSpan({ text: 'Prioridad:', cls: 'study-flow-meta-label' });
-    let addPriority: TaskPriority = 'none';
-    const prioritySelect = priorityCol.createEl('select', { cls: 'study-flow-priority-select' });
-    prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
-    prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
-    prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
-    prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
-    prioritySelect.addEventListener('change', () => {
-      addPriority = prioritySelect.value as TaskPriority;
-    });
-
-    // Estimate
-    const estCol = metaControlsRow.createDiv({ cls: 'study-flow-meta-col' });
-    estCol.createSpan({ text: 'Estimación:', cls: 'study-flow-meta-label' });
-    let addEstimate: number = 0;
-    const estimateSelect = estCol.createEl('select', { cls: 'study-flow-estimate-select' });
-    estimateSelect.createEl('option', { value: '0', text: '🍅 -' });
-    estimateSelect.createEl('option', { value: '1', text: '🍅 1 (25m)' });
-    estimateSelect.createEl('option', { value: '2', text: '🍅 2 (50m)' });
-    estimateSelect.createEl('option', { value: '3', text: '🍅 3 (1h15m)' });
-    estimateSelect.createEl('option', { value: '4', text: '🍅 4 (1h40m)' });
-    estimateSelect.createEl('option', { value: '5', text: '🍅 5+' });
-    estimateSelect.addEventListener('change', () => {
-      addEstimate = parseInt(estimateSelect.value, 10) || 0;
-    });
-
-    typeSelect.addEventListener('change', () => {
-      addType = typeSelect.value as 'task' | 'idea';
-      optionsToggleBtn.style.display = addType === 'idea' ? 'none' : 'flex';
-      metaControlsRow.style.display = this.isShowingTaskCreateOptions && addType === 'task' ? 'flex' : 'none';
-    });
-
-    const handleCreateTask = async () => {
-      const val = taskInput.value.trim();
-      if (!val) return;
-
-      const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
-      const content = await this.app.vault.read(file);
-
-      if (addType === 'idea') {
-        const ideaLine = val.startsWith('💡') ? val : `💡 ${val}`;
-        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
-        await this.app.vault.modify(file, updated);
-        new Notice('💡 Idea añadida a tu banco');
-      } else {
-        let textWithSubject = val;
-        const subVal = subjectInput.value.trim();
-        if (subVal) {
-          const formattedSub = subVal.startsWith('#') ? subVal : `#${subVal}`;
-          if (!textWithSubject.includes(formattedSub)) {
-            textWithSubject = `${textWithSubject} ${formattedSub}`;
-          }
-        }
-
-        let finalText = addPriority !== 'none'
-          ? formatTaskWithPriority(textWithSubject, addPriority)
-          : textWithSubject;
-
-        if (addEstimate > 0) {
-          finalText = formatTaskWithPomodoroEstimate(finalText, addEstimate);
-        }
-
-        if (deadlineInput.value) {
-          finalText = formatTaskWithDeadline(finalText, deadlineInput.value);
-        }
-
-        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-        await this.app.vault.modify(file, updated);
-        new Notice('✓ Tarea agregada al Inbox');
-      }
-
-      taskInput.value = '';
-      subjectInput.value = '';
-      deadlineInput.value = '';
-      prioritySelect.value = 'none';
-      estimateSelect.value = '0';
-      addPriority = 'none';
-      addEstimate = 0;
-      container.empty();
-      await this.renderTasksTab(container);
+    const openCreationModal = (initial = '') => {
+      new TaskCreateModal(
+        this.app,
+        this.plugin,
+        knownSubjects,
+        async () => {
+          container.empty();
+          await this.renderTasksTab(container);
+        },
+        initial
+      ).open();
     };
 
-    addBtn.addEventListener('click', handleCreateTask);
-    taskInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleCreateTask();
-      }
+    triggerBox.addEventListener('click', () => openCreationModal());
+    cloudBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCreationModal();
     });
 
     // 5. Task List Container
@@ -1022,14 +920,14 @@ export class StudyFlowView extends ItemView {
   private renderFilteredTaskList(listContainer: HTMLElement, rootContainer: HTMLElement): void {
     // 1. Filter by view mode
     let filtered = this.tasks.filter((t) => {
-      if (this.taskFilter === 'inbox') return !t.completed && !t.isIdea;
+      if (this.taskFilter === 'inbox') return !t.completed && !t.isIdea && (!t.tags || t.tags.length === 0);
       if (this.taskFilter === 'today') {
         if (t.completed || t.isIdea) return false;
         const isOverdueOrToday = t.daysRemaining !== undefined && t.daysRemaining <= 0;
         const isTodayDate = t.dueDate === formatDateKey(new Date());
         return isOverdueOrToday || isTodayDate;
       }
-      if (this.taskFilter === 'subjects') return !t.completed && !t.isIdea;
+      if (this.taskFilter === 'subjects') return !t.completed && !t.isIdea && Boolean(t.tags && t.tags.length > 0);
       if (this.taskFilter === 'ideas') return !t.completed && t.isIdea;
       if (this.taskFilter === 'completed') return t.completed;
       return true; // 'all'
@@ -1093,6 +991,10 @@ export class StudyFlowView extends ItemView {
         setIcon(emptyIcon, 'check-circle-2');
         emptyState.createEl('h4', { text: 'Sin tareas completadas aún' });
         emptyState.createEl('p', { text: 'Marcá tus tareas como hechas y las verás reflejadas aquí.' });
+      } else if (this.taskFilter === 'subjects') {
+        setIcon(emptyIcon, 'book-open');
+        emptyState.createEl('h4', { text: 'Sin tareas asignadas a materias' });
+        emptyState.createEl('p', { text: 'Asigná una materia (#materia) en la nube para organizarla por materia.' });
       } else {
         setIcon(emptyIcon, 'check-circle-2');
         emptyState.createEl('h4', { text: this.taskSearchQuery ? 'Sin resultados para la búsqueda' : '¡Todo al día!' });
