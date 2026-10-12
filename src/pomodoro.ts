@@ -12,6 +12,7 @@ export interface PomodoroStatus {
   totalDurationSeconds: number;
   completedSessionsToday: number;
   progressPercent: number;
+  streak: number; // 0 to 4 within current cycle
 }
 
 export type PomodoroListener = (status: PomodoroStatus) => void;
@@ -67,6 +68,8 @@ export class PomodoroManager {
       ? Math.min(100, Math.max(0, (elapsed / this.totalDurationSeconds) * 100))
       : 0;
 
+    const streak = this.completedSessionsToday % 4;
+
     return {
       state: this.state,
       mode: this.mode,
@@ -74,6 +77,7 @@ export class PomodoroManager {
       totalDurationSeconds: this.totalDurationSeconds,
       completedSessionsToday: this.completedSessionsToday,
       progressPercent,
+      streak,
     };
   }
 

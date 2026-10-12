@@ -18,7 +18,7 @@ export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
 
 type ActiveTab = 'pomodoro' | 'tasks' | 'planner';
 
-const CIRCLE_RADIUS = 70;
+const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 
 export class StudyFlowView extends ItemView {
@@ -128,7 +128,7 @@ export class StudyFlowView extends ItemView {
   private renderPomodoroTab(container: HTMLElement): void {
     const status = this.plugin.pomodoro.getStatus();
 
-    const card = container.createDiv({ cls: 'study-flow-card' });
+    const card = container.createDiv({ cls: 'study-flow-card study-flow-pomodoro-luxury-card' });
 
     // Presets bar
     const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
@@ -149,24 +149,65 @@ export class StudyFlowView extends ItemView {
       });
     });
 
-    // Circular SVG dial
-    const dialContainer = card.createDiv({ cls: 'study-flow-dial-container' });
+    // Luxury Dial Wrapper
+    const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
+    dialWrapper.createDiv({
+      cls: `study-flow-dial-aura ${status.mode === 'work' ? 'is-work' : 'is-break'} ${status.state === 'running' ? 'is-pulsing' : ''}`,
+    });
+
+    const dialContainer = dialWrapper.createDiv({ cls: 'study-flow-dial-container' });
 
     const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svgEl.setAttribute('class', 'study-flow-dial-svg');
-    svgEl.setAttribute('viewBox', '0 0 160 160');
+    svgEl.setAttribute('viewBox', '0 0 190 190');
 
+    // Defs for gradients
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `
+      <linearGradient id="view-pomodoro-grad-work" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ff4d4f" />
+        <stop offset="100%" stop-color="#fa8c16" />
+      </linearGradient>
+      <linearGradient id="view-pomodoro-grad-break" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#10b981" />
+        <stop offset="100%" stop-color="#06b6d4" />
+      </linearGradient>
+    `;
+    svgEl.appendChild(defs);
+
+    // 12 Chronograph ticks
+    const ticksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    ticksGroup.setAttribute('class', 'study-flow-ticks-group');
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * 2 * Math.PI;
+      const x1 = 95 + (CIRCLE_RADIUS - 6) * Math.cos(angle);
+      const y1 = 95 + (CIRCLE_RADIUS - 6) * Math.sin(angle);
+      const x2 = 95 + (CIRCLE_RADIUS + 6) * Math.cos(angle);
+      const y2 = 95 + (CIRCLE_RADIUS + 6) * Math.sin(angle);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', String(x1));
+      line.setAttribute('y1', String(y1));
+      line.setAttribute('x2', String(x2));
+      line.setAttribute('y2', String(y2));
+      line.setAttribute('class', 'study-flow-dial-tick');
+      ticksGroup.appendChild(line);
+    }
+    svgEl.appendChild(ticksGroup);
+
+    // Track circle
     const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     bgCircle.setAttribute('class', 'study-flow-dial-bg');
-    bgCircle.setAttribute('cx', '80');
-    bgCircle.setAttribute('cy', '80');
+    bgCircle.setAttribute('cx', '95');
+    bgCircle.setAttribute('cy', '95');
     bgCircle.setAttribute('r', String(CIRCLE_RADIUS));
     svgEl.appendChild(bgCircle);
 
+    // Progress circle
     const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    progressCircle.setAttribute('class', 'study-flow-dial-progress');
-    progressCircle.setAttribute('cx', '80');
-    progressCircle.setAttribute('cy', '80');
+    progressCircle.setAttribute('class', `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}`);
+    progressCircle.setAttribute('cx', '95');
+    progressCircle.setAttribute('cy', '95');
     progressCircle.setAttribute('r', String(CIRCLE_RADIUS));
     progressCircle.setAttribute('stroke-dasharray', String(CIRCUMFERENCE));
     svgEl.appendChild(progressCircle);
@@ -177,54 +218,69 @@ export class StudyFlowView extends ItemView {
     const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
 
     centerInfo.createDiv({
-      text: status.mode === 'work' ? 'TRABAJO' : 'DESCANSO',
-      cls: `study-flow-badge-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      text: status.mode === 'work' ? '• ENFOQUE •' : '• DESCANSO •',
+      cls: `study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
     });
 
     centerInfo.createDiv({
       text: this.plugin.pomodoro.formatTime(status.remainingSeconds),
-      cls: 'study-flow-dial-time',
+      cls: 'study-flow-dial-time-hero',
     });
+
+    // Streak / Cycle dots
+    const streakRow = centerInfo.createDiv({ cls: 'study-flow-streak-dots' });
+    const currentStreak = status.streak || (status.completedSessionsToday > 0 ? 4 : 0);
+    for (let i = 1; i <= 4; i++) {
+      const dot = streakRow.createDiv({
+        cls: `study-flow-streak-dot ${i <= currentStreak ? 'is-filled' : ''}`,
+      });
+      dot.setAttribute('title', `Sesión ${i}/4`);
+    }
 
     centerInfo.createDiv({
-      text: `${status.completedSessionsToday} sesiones hoy`,
-      cls: 'study-flow-dial-stats',
+      text: `${status.completedSessionsToday} completadas hoy`,
+      cls: 'study-flow-dial-stats-sub',
     });
 
-    // Main Control Buttons
-    const controls = card.createDiv({ cls: 'study-flow-main-controls' });
-    const isRunning = status.state === 'running';
+    // Control Deck
+    const controlDeck = card.createDiv({ cls: 'study-flow-control-deck' });
 
-    const playBtn = controls.createEl('button', {
-      cls: `study-flow-action-btn ${isRunning ? 'mod-warning' : 'mod-cta'}`,
+    const resetBtn = controlDeck.createEl('button', {
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      attr: { 'aria-label': 'Reiniciar' },
     });
-    const pIcon = playBtn.createSpan();
-    setIcon(pIcon, isRunning ? 'pause' : 'play');
-    playBtn.createSpan({ text: isRunning ? 'Pausar' : 'Iniciar' });
-    playBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.toggleStartPause();
-    });
-
-    const resetBtn = controls.createEl('button', { cls: 'study-flow-action-btn' });
-    const rIcon = resetBtn.createSpan();
-    setIcon(rIcon, 'rotate-ccw');
-    resetBtn.createSpan({ text: 'Reiniciar' });
+    setIcon(resetBtn, 'rotate-ccw');
     resetBtn.addEventListener('click', () => {
       this.plugin.pomodoro.reset();
     });
 
-    const skipBtn = controls.createEl('button', { cls: 'study-flow-action-btn' });
-    const sIcon = skipBtn.createSpan();
-    setIcon(sIcon, 'skip-forward');
-    skipBtn.createSpan({ text: 'Saltar' });
+    const isRunning = status.state === 'running';
+    const heroBtn = controlDeck.createEl('button', {
+      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      attr: { 'aria-label': isRunning ? 'Pausar' : 'Iniciar' },
+    });
+    const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
+    setIcon(heroIcon, isRunning ? 'pause' : 'play');
+    heroBtn.addEventListener('click', () => {
+      this.plugin.pomodoro.toggleStartPause();
+    });
+
+    const skipBtn = controlDeck.createEl('button', {
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      attr: { 'aria-label': 'Saltar' },
+    });
+    setIcon(skipBtn, 'skip-forward');
     skipBtn.addEventListener('click', () => {
       this.plugin.pomodoro.skipCycle();
     });
 
-    const add5Btn = controls.createEl('button', { cls: 'study-flow-action-btn' });
-    const aIcon = add5Btn.createSpan();
-    setIcon(aIcon, 'plus');
-    add5Btn.createSpan({ text: '+5m' });
+    const add5Btn = controlDeck.createEl('button', {
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      attr: { 'aria-label': '+5m' },
+    });
+    const plusIcon = add5Btn.createSpan();
+    setIcon(plusIcon, 'plus');
+    add5Btn.createSpan({ text: '5m', cls: 'study-flow-deck-btn-label' });
     add5Btn.addEventListener('click', () => {
       this.plugin.pomodoro.addMinutes(5);
     });
@@ -235,30 +291,48 @@ export class StudyFlowView extends ItemView {
   private updatePomodoroClock(): void {
     const status = this.plugin.pomodoro.getStatus();
 
-    const timeEl = this.containerEl.querySelector('.study-flow-dial-time');
+    const timeEl = this.containerEl.querySelector('.study-flow-dial-time-hero');
     if (timeEl) {
       timeEl.setText(this.plugin.pomodoro.formatTime(status.remainingSeconds));
     }
 
-    const pillEl = this.containerEl.querySelector('.study-flow-badge-pill');
+    const pillEl = this.containerEl.querySelector('.study-flow-luxury-pill');
     if (pillEl) {
-      pillEl.setText(status.mode === 'work' ? 'TRABAJO' : 'DESCANSO');
-      pillEl.className = `study-flow-badge-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      pillEl.setText(status.mode === 'work' ? '• ENFOQUE •' : '• DESCANSO •');
+      pillEl.className = `study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
     }
 
-    const statsEl = this.containerEl.querySelector('.study-flow-dial-stats');
+    const auraEl = this.containerEl.querySelector('.study-flow-dial-aura');
+    if (auraEl) {
+      auraEl.className = `study-flow-dial-aura ${status.mode === 'work' ? 'is-work' : 'is-break'} ${status.state === 'running' ? 'is-pulsing' : ''}`;
+    }
+
+    const statsEl = this.containerEl.querySelector('.study-flow-dial-stats-sub');
     if (statsEl) {
-      statsEl.setText(`${status.completedSessionsToday} sesiones hoy`);
+      statsEl.setText(`${status.completedSessionsToday} completadas hoy`);
     }
 
-    const playBtn = this.containerEl.querySelector('.study-flow-main-controls button:first-child');
-    if (playBtn) {
+    // Streak dots
+    const streakRow = this.containerEl.querySelector('.study-flow-streak-dots');
+    if (streakRow) {
+      streakRow.empty();
+      const currentStreak = status.streak || (status.completedSessionsToday > 0 ? 4 : 0);
+      for (let i = 1; i <= 4; i++) {
+        const dot = streakRow.createDiv({
+          cls: `study-flow-streak-dot ${i <= currentStreak ? 'is-filled' : ''}`,
+        });
+        dot.setAttribute('title', `Sesión ${i}/4`);
+      }
+    }
+
+    // Hero button
+    const heroBtn = this.containerEl.querySelector('.study-flow-hero-play-btn');
+    if (heroBtn) {
       const isRunning = status.state === 'running';
-      playBtn.className = `study-flow-action-btn ${isRunning ? 'mod-warning' : 'mod-cta'}`;
-      playBtn.empty();
-      const pIcon = playBtn.createSpan();
-      setIcon(pIcon, isRunning ? 'pause' : 'play');
-      playBtn.createSpan({ text: isRunning ? 'Pausar' : 'Iniciar' });
+      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      heroBtn.empty();
+      const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
+      setIcon(heroIcon, isRunning ? 'pause' : 'play');
     }
 
     this.updateProgressRing(status);
@@ -269,12 +343,10 @@ export class StudyFlowView extends ItemView {
     if (progressCircle) {
       const offset = CIRCUMFERENCE * (1 - status.progressPercent / 100);
       progressCircle.setAttribute('stroke-dashoffset', String(offset));
-
-      if (status.mode === 'break') {
-        progressCircle.classList.add('is-break-stroke');
-      } else {
-        progressCircle.classList.remove('is-break-stroke');
-      }
+      progressCircle.setAttribute(
+        'class',
+        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}`
+      );
     }
   }
 
