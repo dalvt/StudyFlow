@@ -33,15 +33,22 @@ export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
 export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
   const tasks: TaskRecord[] = [];
   const lines = content.split(/\r?\n/);
+  let currentSection = '';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const headerMatch = line.match(/^#{1,6}\s+(.*)$/);
+    if (headerMatch) {
+      currentSection = headerMatch[1].trim().toLowerCase();
+    }
+
     const match = line.match(/^\s*-\s+\[(.)\]\s+(.*)$/);
     if (match) {
       const statusChar = match[1];
       const taskText = match[2].trim();
       const completed = statusChar.toLowerCase() === 'x';
       const { priority } = parseTaskPriority(taskText);
+      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
@@ -50,11 +57,42 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         completed,
         statusChar,
         priority,
+        isIdea,
       });
     }
   }
 
   return tasks.sort(compareTasksByPriority);
+}
+
+export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promise<boolean> {
+  const file = app.vault.getAbstractFileByPath(task.sourceFile);
+  if (!(file instanceof TFile)) return false;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+
+  let foundIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^\s*-\s+\[.\]\s+(.*)$/);
+    if (match && match[1].trim() === task.text) {
+      foundIndex = i;
+      break;
+    }
+  }
+
+  if (foundIndex === -1) return false;
+  lines.splice(foundIndex, 1);
+  const withoutIdea = lines.join('\n');
+
+  // Strip idea markers and keep clean task title with standard priority
+  let cleanTitle = task.text.replace(/#ideas?\b/gi, '').replace(/^💡\s*/, '').trim();
+  cleanTitle = formatTaskWithPriority(cleanTitle, task.priority !== 'none' ? task.priority : 'none');
+
+  const updatedContent = appendTaskToMarkdownSection(withoutIdea, cleanTitle, '## Tareas');
+  await app.vault.modify(file, updatedContent);
+  return true;
 }
 
 export async function toggleTaskCompletionInFile(
@@ -114,6 +152,7 @@ export async function deleteTaskFromFile(app: App, task: TaskRecord): Promise<bo
 export class QuickCaptureModal extends Modal {
   private plugin: StudyFlowPlugin;
   private taskText: string = '';
+  private itemType: 'task' | 'idea' = 'task';
   private targetDestination: 'inbox' | 'activeNote' = 'inbox';
   private selectedPriority: TaskPriority = 'none';
 
@@ -128,16 +167,33 @@ export class QuickCaptureModal extends Modal {
     contentEl.addClass('study-flow-modal', 'study-flow-quick-capture');
 
     const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
-    const title = header.createEl('h2', { text: 'Captura Rápida de Tarea' });
+    const title = header.createEl('h2', { text: 'Captura Rápida' });
     const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
     setIcon(iconSpan, 'zap');
 
     const activeFile = this.app.workspace.getActiveFile();
     const canUseActiveFile = activeFile !== null && activeFile.extension === 'md';
 
+    let prioritySetting: Setting | null = null;
+
+    new Setting(contentEl)
+      .setName('Tipo de entrada')
+      .setDesc('Diferenciá entre trabajo ejecutable e ideas espontáneas')
+      .addDropdown((drop) => {
+        drop.addOption('task', '📋 Tarea accionable');
+        drop.addOption('idea', '💡 Idea espontánea (Backlog)');
+        drop.setValue('task');
+        drop.onChange((val) => {
+          this.itemType = val as 'task' | 'idea';
+          if (prioritySetting) {
+            prioritySetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+          }
+        });
+      });
+
     new Setting(contentEl)
       .setName('Guardar en')
-      .setDesc('Ubicación donde se registrará la tarea')
+      .setDesc('Ubicación donde se registrará la entrada')
       .addDropdown((drop) => {
         drop.addOption('inbox', `Inbox (${this.plugin.settings.inboxFilePath})`);
         if (canUseActiveFile && activeFile) {
@@ -149,7 +205,7 @@ export class QuickCaptureModal extends Modal {
         });
       });
 
-    new Setting(contentEl)
+    prioritySetting = new Setting(contentEl)
       .setName('Prioridad')
       .setDesc('Nivel de urgencia o impacto')
       .addDropdown((drop) => {
@@ -167,7 +223,7 @@ export class QuickCaptureModal extends Modal {
     const inputEl = inputWrap.createEl('input', {
       type: 'text',
       cls: 'study-flow-task-input study-flow-input-lg',
-      placeholder: '¿Qué necesitas hacer? (Presiona Enter para guardar)...',
+      placeholder: '¿Qué necesitas registrar? (Presiona Enter para guardar)...',
     });
 
     inputEl.focus();
@@ -194,7 +250,7 @@ export class QuickCaptureModal extends Modal {
     });
     const subIcon = submitBtn.createSpan();
     setIcon(subIcon, 'plus');
-    submitBtn.createSpan({ text: 'Añadir Tarea' });
+    submitBtn.createSpan({ text: 'Añadir' });
     submitBtn.addEventListener('click', async () => {
       this.taskText = inputEl.value.trim();
       await this.submitTask();
@@ -208,7 +264,7 @@ export class QuickCaptureModal extends Modal {
 
   private async submitTask(): Promise<void> {
     if (!this.taskText) {
-      new Notice('Ingresa el texto de la tarea');
+      new Notice('Ingresa el texto para guardar');
       return;
     }
 
@@ -224,23 +280,30 @@ export class QuickCaptureModal extends Modal {
       }
 
       if (!targetFile) {
-        const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
-        targetFile = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n');
+        const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+        targetFile = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
         targetName = targetFile.basename;
       }
 
       const content = await this.app.vault.read(targetFile);
-      const finalText = this.selectedPriority !== 'none'
-        ? formatTaskWithPriority(this.taskText, this.selectedPriority)
-        : this.taskText;
-      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-      await this.app.vault.modify(targetFile, updated);
 
-      new Notice(`✓ Tarea agregada a ${targetName}`);
+      if (this.itemType === 'idea') {
+        const ideaLine = this.taskText.startsWith('💡') ? this.taskText : `💡 ${this.taskText}`;
+        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
+        await this.app.vault.modify(targetFile, updated);
+        new Notice(`💡 Idea guardada en ${targetName}`);
+      } else {
+        const finalText = this.selectedPriority !== 'none'
+          ? formatTaskWithPriority(this.taskText, this.selectedPriority)
+          : this.taskText;
+        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
+        await this.app.vault.modify(targetFile, updated);
+        new Notice(`✓ Tarea agregada a ${targetName}`);
+      }
+
       this.close();
     } catch (err) {
-      console.error('Study Flow: Error capturando tarea', err);
-      new Notice('Error al guardar la tarea');
+      new Notice('Error al guardar');
     }
   }
 }
@@ -248,7 +311,7 @@ export class QuickCaptureModal extends Modal {
 export class TasksManagerModal extends Modal {
   private plugin: StudyFlowPlugin;
   private tasks: TaskRecord[] = [];
-  private filter: 'all' | 'pending' | 'completed' = 'pending';
+  private filter: 'all' | 'pending' | 'ideas' | 'completed' = 'pending';
   private searchQuery: string = '';
 
   constructor(app: App, plugin: StudyFlowPlugin) {
@@ -267,7 +330,7 @@ export class TasksManagerModal extends Modal {
 
   private async refreshTasks(): Promise<void> {
     this.tasks = [];
-    const filesToRead = [this.plugin.settings.inboxFilePath || 'Inbox.md'];
+    const filesToRead = [this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md'];
 
     for (const filePath of filesToRead) {
       const file = this.app.vault.getAbstractFileByPath(filePath);
@@ -294,28 +357,41 @@ export class TasksManagerModal extends Modal {
     setIcon(iconSpan, 'check-square');
 
     // Stats bar
-    const pendingCount = this.tasks.filter((t) => !t.completed).length;
+    const pendingCount = this.tasks.filter((t) => !t.completed && !t.isIdea).length;
+    const ideasCount = this.tasks.filter((t) => !t.completed && t.isIdea).length;
     const completedCount = this.tasks.filter((t) => t.completed).length;
+
     const statsBar = contentEl.createDiv({ cls: 'study-flow-stats-bar' });
     statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
+    statsBar.createSpan({ text: `${ideasCount} ideas`, cls: 'study-flow-badge-stat is-idea' });
     statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
 
     // Quick Add Bar
     const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
-      placeholder: 'Nueva tarea rápida... (Enter para añadir)',
+      placeholder: 'Nueva entrada rápida... (Enter para añadir)',
       cls: 'study-flow-task-input',
     });
 
+    let addType: 'task' | 'idea' = 'task';
+    const typeSelect = addSection.createEl('select', { cls: 'study-flow-type-select' });
+    typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
+    typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
+
     let addPriority: TaskPriority = 'none';
     const prioritySelect = addSection.createEl('select', { cls: 'study-flow-priority-select' });
-    const optNone = prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
-    const optHigh = prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
-    const optMed = prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
-    const optLow = prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
+    prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
+    prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
+    prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
+    prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
     prioritySelect.addEventListener('change', () => {
       addPriority = prioritySelect.value as TaskPriority;
+    });
+
+    typeSelect.addEventListener('change', () => {
+      addType = typeSelect.value as 'task' | 'idea';
+      prioritySelect.style.display = addType === 'idea' ? 'none' : '';
     });
 
     const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
@@ -326,18 +402,28 @@ export class TasksManagerModal extends Modal {
     const handleAdd = async () => {
       const text = addInput.value.trim();
       if (!text) return;
-      const finalText = addPriority !== 'none'
-        ? formatTaskWithPriority(text, addPriority)
-        : text;
-      const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n');
+
+      const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
       const content = await this.app.vault.read(file);
-      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-      await this.app.vault.modify(file, updated);
+
+      if (addType === 'idea') {
+        const ideaLine = text.startsWith('💡') ? text : `💡 ${text}`;
+        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
+        await this.app.vault.modify(file, updated);
+        new Notice('💡 Idea añadida a tu banco');
+      } else {
+        const finalText = addPriority !== 'none'
+          ? formatTaskWithPriority(text, addPriority)
+          : text;
+        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
+        await this.app.vault.modify(file, updated);
+        new Notice('✓ Tarea añadida al Inbox');
+      }
+
       addInput.value = '';
       prioritySelect.value = 'none';
       addPriority = 'none';
-      new Notice('Tarea añadida al Inbox');
       await this.refreshTasks();
       this.renderUI();
     };
@@ -352,8 +438,9 @@ export class TasksManagerModal extends Modal {
 
     // Filters and Search Bar
     const filterRow = contentEl.createDiv({ cls: 'study-flow-segmented-control' });
-    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string; count: number }> = [
+    const filters: Array<{ id: 'pending' | 'ideas' | 'completed' | 'all'; label: string; count: number }> = [
       { id: 'pending', label: 'Pendientes', count: pendingCount },
+      { id: 'ideas', label: '💡 Ideas', count: ideasCount },
       { id: 'completed', label: 'Completadas', count: completedCount },
       { id: 'all', label: 'Todas', count: this.tasks.length },
     ];
@@ -373,7 +460,8 @@ export class TasksManagerModal extends Modal {
     // Tasks List Container
     const listContainer = contentEl.createDiv({ cls: 'study-flow-task-list-cards' });
     const displayedTasks = this.tasks.filter((t) => {
-      if (this.filter === 'pending') return !t.completed;
+      if (this.filter === 'pending') return !t.completed && !t.isIdea;
+      if (this.filter === 'ideas') return !t.completed && t.isIdea;
       if (this.filter === 'completed') return t.completed;
       return true;
     });
@@ -381,14 +469,16 @@ export class TasksManagerModal extends Modal {
     if (displayedTasks.length === 0) {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      setIcon(emptyIcon, 'check-circle-2');
+      setIcon(emptyIcon, this.filter === 'ideas' ? 'sparkles' : 'check-circle-2');
       emptyState.createEl('h4', {
-        text: this.filter === 'pending' ? '¡Todo al día!' : 'No hay tareas registradas',
+        text: this.filter === 'ideas'
+          ? 'No hay ideas espontáneas guardadas'
+          : (this.filter === 'pending' ? '¡Todo al día!' : 'No hay tareas registradas'),
       });
       emptyState.createEl('p', {
-        text: this.filter === 'pending'
-          ? 'No tienes tareas pendientes en tu Inbox.'
-          : 'Añade una tarea arriba para comenzar.',
+        text: this.filter === 'ideas'
+          ? 'Captura tus ideas aquí para no perderlas sin saturar tu lista de tareas activas.'
+          : (this.filter === 'pending' ? 'No tienes tareas pendientes.' : 'Añade una tarea arriba para comenzar.'),
       });
     } else {
       displayedTasks.forEach((task) => {
@@ -402,7 +492,7 @@ export class TasksManagerModal extends Modal {
         cb.addEventListener('change', async () => {
           await toggleTaskCompletionInFile(this.app, task, cb.checked);
           task.completed = cb.checked;
-          new Notice(cb.checked ? '✓ Tarea completada' : 'Tarea desmarcada');
+          new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
           await this.refreshTasks();
           this.renderUI();
         });
@@ -416,12 +506,31 @@ export class TasksManagerModal extends Modal {
           cb.dispatchEvent(new Event('change'));
         });
 
-        if (task.priority === 'high') {
-          itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
-        } else if (task.priority === 'medium') {
-          itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
-        } else if (task.priority === 'low') {
-          itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+        if (task.isIdea) {
+          itemCard.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
+
+          const promoteBtn = itemCard.createEl('button', {
+            cls: 'study-flow-promote-btn',
+            attr: { 'aria-label': 'Promover a tarea accionable' },
+          });
+          const pIcon = promoteBtn.createSpan();
+          setIcon(pIcon, 'arrow-up-right');
+          promoteBtn.createSpan({ text: 'A Tarea' });
+          promoteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await promoteIdeaToTaskInFile(this.app, task);
+            new Notice(`✓ "${task.text}" promovida a tarea`);
+            await this.refreshTasks();
+            this.renderUI();
+          });
+        } else {
+          if (task.priority === 'high') {
+            itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+          } else if (task.priority === 'medium') {
+            itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+          } else if (task.priority === 'low') {
+            itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+          }
         }
 
         const fileBadge = itemCard.createSpan({
@@ -431,13 +540,13 @@ export class TasksManagerModal extends Modal {
 
         const delBtn = itemCard.createEl('button', {
           cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Eliminar tarea' },
+          attr: { 'aria-label': 'Eliminar entrada' },
         });
         setIcon(delBtn, 'trash-2');
         delBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           await deleteTaskFromFile(this.app, task);
-          new Notice('Tarea eliminada');
+          new Notice('Entrada eliminada');
           await this.refreshTasks();
           this.renderUI();
         });

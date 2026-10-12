@@ -13,6 +13,7 @@ import {
   extractAllTasksFromContent,
   TaskRecord,
   toggleTaskCompletionInFile,
+  promoteIdeaToTaskInFile,
 } from './tasks';
 import {
   appendTaskToMarkdownSection,
@@ -41,7 +42,7 @@ export class StudyFlowView extends ItemView {
 
   // Tasks state
   private tasks: TaskRecord[] = [];
-  private taskFilter: 'pending' | 'completed' | 'all' = 'pending';
+  private taskFilter: 'pending' | 'ideas' | 'completed' | 'all' = 'pending';
 
   // Habits state
   private habits: HabitItem[] = [];
@@ -447,7 +448,7 @@ export class StudyFlowView extends ItemView {
     const file = this.app.vault.getAbstractFileByPath(inboxPath);
     if (file instanceof TFile) {
       const content = await this.app.vault.read(file);
-      this.pendingInboxTasks = extractPendingTasksFromContent(content, file.path);
+      this.pendingInboxTasks = extractPendingTasksFromContent(content, file.path).filter((t) => !t.isIdea);
     }
   }
 
@@ -628,19 +629,27 @@ export class StudyFlowView extends ItemView {
     const card = container.createDiv({ cls: 'study-flow-card' });
 
     // Stats bar
-    const pendingCount = this.tasks.filter((t) => !t.completed).length;
+    const pendingCount = this.tasks.filter((t) => !t.completed && !t.isIdea).length;
+    const ideasCount = this.tasks.filter((t) => !t.completed && t.isIdea).length;
     const completedCount = this.tasks.filter((t) => t.completed).length;
+
     const statsBar = card.createDiv({ cls: 'study-flow-stats-bar' });
     statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
+    statsBar.createSpan({ text: `${ideasCount} ideas`, cls: 'study-flow-badge-stat is-idea' });
     statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
 
     // Quick Add Bar
     const addBar = card.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addBar.createEl('input', {
       type: 'text',
-      placeholder: 'Escribe una tarea...',
+      placeholder: 'Nueva entrada rápida...',
       cls: 'study-flow-task-input',
     });
+
+    let addType: 'task' | 'idea' = 'task';
+    const typeSelect = addBar.createEl('select', { cls: 'study-flow-type-select' });
+    typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
+    typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
 
     let addPriority: TaskPriority = 'none';
     const prioritySelect = addBar.createEl('select', { cls: 'study-flow-priority-select' });
@@ -652,6 +661,11 @@ export class StudyFlowView extends ItemView {
       addPriority = prioritySelect.value as TaskPriority;
     });
 
+    typeSelect.addEventListener('change', () => {
+      addType = typeSelect.value as 'task' | 'idea';
+      prioritySelect.style.display = addType === 'idea' ? 'none' : '';
+    });
+
     const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
     const aIcon = addBtn.createSpan();
     setIcon(aIcon, 'plus');
@@ -660,18 +674,28 @@ export class StudyFlowView extends ItemView {
     const handleAdd = async () => {
       const val = addInput.value.trim();
       if (!val) return;
-      const finalText = addPriority !== 'none'
-        ? formatTaskWithPriority(val, addPriority)
-        : val;
-      const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n');
+
+      const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
       const content = await this.app.vault.read(file);
-      const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-      await this.app.vault.modify(file, updated);
+
+      if (addType === 'idea') {
+        const ideaLine = val.startsWith('💡') ? val : `💡 ${val}`;
+        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
+        await this.app.vault.modify(file, updated);
+        new Notice('💡 Idea añadida a tu banco');
+      } else {
+        const finalText = addPriority !== 'none'
+          ? formatTaskWithPriority(val, addPriority)
+          : val;
+        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
+        await this.app.vault.modify(file, updated);
+        new Notice('✓ Tarea añadida al Inbox');
+      }
+
       addInput.value = '';
       prioritySelect.value = 'none';
       addPriority = 'none';
-      new Notice('Tarea añadida al Inbox');
       await this.renderTasksTab(container);
     };
 
@@ -685,8 +709,9 @@ export class StudyFlowView extends ItemView {
 
     // Segmented Filters Bar
     const filterRow = card.createDiv({ cls: 'study-flow-segmented-control' });
-    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string; count: number }> = [
+    const filters: Array<{ id: 'pending' | 'ideas' | 'completed' | 'all'; label: string; count: number }> = [
       { id: 'pending', label: 'Pendientes', count: pendingCount },
+      { id: 'ideas', label: '💡 Ideas', count: ideasCount },
       { id: 'completed', label: 'Completadas', count: completedCount },
       { id: 'all', label: 'Todas', count: this.tasks.length },
     ];
@@ -707,7 +732,8 @@ export class StudyFlowView extends ItemView {
     // Task Cards List
     const listContainer = card.createDiv({ cls: 'study-flow-task-list-cards' });
     const displayed = this.tasks.filter((t) => {
-      if (this.taskFilter === 'pending') return !t.completed;
+      if (this.taskFilter === 'pending') return !t.completed && !t.isIdea;
+      if (this.taskFilter === 'ideas') return !t.completed && t.isIdea;
       if (this.taskFilter === 'completed') return t.completed;
       return true;
     });
@@ -715,14 +741,16 @@ export class StudyFlowView extends ItemView {
     if (displayed.length === 0) {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      setIcon(emptyIcon, 'check-circle-2');
+      setIcon(emptyIcon, this.taskFilter === 'ideas' ? 'sparkles' : 'check-circle-2');
       emptyState.createEl('h4', {
-        text: this.taskFilter === 'pending' ? '¡Todo al día!' : 'No hay tareas',
+        text: this.taskFilter === 'ideas'
+          ? 'No hay ideas espontáneas guardadas'
+          : (this.taskFilter === 'pending' ? '¡Todo al día!' : 'No hay tareas'),
       });
       emptyState.createEl('p', {
-        text: this.taskFilter === 'pending'
-          ? 'No tienes tareas pendientes en tu Inbox.'
-          : 'Añade una nueva tarea arriba.',
+        text: this.taskFilter === 'ideas'
+          ? 'Capturá tus ideas aquí para no perderlas sin saturar tu foco del día a día.'
+          : (this.taskFilter === 'pending' ? 'No tienes tareas pendientes en tu Inbox.' : 'Añade una nueva tarea arriba.'),
       });
     } else {
       displayed.forEach((task) => {
@@ -737,7 +765,7 @@ export class StudyFlowView extends ItemView {
         cb.addEventListener('change', async () => {
           await toggleTaskCompletionInFile(this.app, task, cb.checked);
           task.completed = cb.checked;
-          new Notice(cb.checked ? '✓ Tarea completada' : 'Tarea desmarcada');
+          new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
           container.empty();
           await this.renderTasksTab(container);
         });
@@ -751,31 +779,50 @@ export class StudyFlowView extends ItemView {
           cb.dispatchEvent(new Event('change'));
         });
 
-        if (task.priority === 'high') {
-          itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
-        } else if (task.priority === 'medium') {
-          itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
-        } else if (task.priority === 'low') {
-          itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
-        }
+        if (task.isIdea) {
+          itemCard.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
 
-        // Quick action: Link to Pomodoro
-        const linkPomodoroBtn = itemCard.createEl('button', {
-          cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Enfocar con Pomodoro' },
-        });
-        setIcon(linkPomodoroBtn, 'timer');
-        linkPomodoroBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          this.plugin.pomodoro.setActiveTask({
-            id: task.id,
-            text: task.text,
-            sourceFile: task.sourceFile,
+          const promoteBtn = itemCard.createEl('button', {
+            cls: 'study-flow-promote-btn',
+            attr: { 'aria-label': 'Promover a tarea accionable' },
           });
-          this.activeTab = 'pomodoro';
-          this.containerEl.empty();
-          await this.renderView();
-        });
+          const pIcon = promoteBtn.createSpan();
+          setIcon(pIcon, 'arrow-up-right');
+          promoteBtn.createSpan({ text: 'A Tarea' });
+          promoteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await promoteIdeaToTaskInFile(this.app, task);
+            new Notice(`✓ "${task.text}" promovida a tarea`);
+            container.empty();
+            await this.renderTasksTab(container);
+          });
+        } else {
+          if (task.priority === 'high') {
+            itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+          } else if (task.priority === 'medium') {
+            itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+          } else if (task.priority === 'low') {
+            itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+          }
+
+          // Quick action: Link to Pomodoro
+          const linkPomodoroBtn = itemCard.createEl('button', {
+            cls: 'study-flow-icon-action-btn',
+            attr: { 'aria-label': 'Enfocar con Pomodoro' },
+          });
+          setIcon(linkPomodoroBtn, 'timer');
+          linkPomodoroBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            this.plugin.pomodoro.setActiveTask({
+              id: task.id,
+              text: task.text,
+              sourceFile: task.sourceFile,
+            });
+            this.activeTab = 'pomodoro';
+            this.containerEl.empty();
+            await this.renderView();
+          });
+        }
 
         itemCard.createSpan({
           text: '#Inbox',
@@ -784,13 +831,13 @@ export class StudyFlowView extends ItemView {
 
         const delBtn = itemCard.createEl('button', {
           cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Eliminar tarea' },
+          attr: { 'aria-label': 'Eliminar entrada' },
         });
         setIcon(delBtn, 'trash-2');
         delBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           await deleteTaskFromFile(this.app, task);
-          new Notice('Tarea eliminada');
+          new Notice('Entrada eliminada');
           container.empty();
           await this.renderTasksTab(container);
         });
@@ -800,7 +847,7 @@ export class StudyFlowView extends ItemView {
 
   private async reloadTasks(): Promise<void> {
     this.tasks = [];
-    const files = [this.plugin.settings.inboxFilePath || 'Inbox.md'];
+    const files = [this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md'];
     for (const p of files) {
       const f = this.app.vault.getAbstractFileByPath(p);
       if (f instanceof TFile) {

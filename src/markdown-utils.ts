@@ -6,6 +6,7 @@ export interface PendingTaskItem {
   text: string;
   sourceFile: string;
   priority?: TaskPriority;
+  isIdea?: boolean;
 }
 
 /**
@@ -109,19 +110,27 @@ export function extractPendingTasksFromContent(
 ): PendingTaskItem[] {
   const tasks: PendingTaskItem[] = [];
   const lines = content.split(/\r?\n/);
+  let currentSection = '';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const headerMatch = line.match(/^#{1,6}\s+(.*)$/);
+    if (headerMatch) {
+      currentSection = headerMatch[1].trim().toLowerCase();
+    }
+
     const match = line.match(/^\s*-\s+\[\s\]\s+(.*)$/);
     if (match) {
       const taskText = match[1].trim();
       const { priority } = parseTaskPriority(taskText);
+      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
         text: taskText,
         sourceFile,
         priority,
+        isIdea,
       });
     }
   }

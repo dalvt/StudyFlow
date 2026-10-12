@@ -163,3 +163,32 @@ test('computeTasksOverview calculates priority breakdown and rate', async () => 
   assert.equal(stat.byPriority.none, 1);
 });
 
+test('extractPendingTasksFromContent differentiates tasks from ideas', () => {
+  const content = `# Inbox
+
+## Tareas
+- [ ] ⏫ Estudiar para final
+- [ ] Comprar cuaderno
+
+## Ideas
+- [ ] Aprender Rust en vacaciones
+- [ ] Crear blog personal #idea
+`;
+
+  const items = extractPendingTasksFromContent(content, 'Inbox.md');
+  assert.equal(items.length, 4);
+
+  // Tareas
+  assert.equal(items[0].text, '⏫ Estudiar para final');
+  assert.equal(items[0].isIdea, false);
+  assert.equal(items[1].text, 'Comprar cuaderno');
+  assert.equal(items[1].isIdea, false);
+
+  // Ideas
+  assert.equal(items[2].text, 'Aprender Rust en vacaciones');
+  assert.equal(items[2].isIdea, true);
+  assert.equal(items[3].text, 'Crear blog personal #idea');
+  assert.equal(items[3].isIdea, true);
+});
+
+

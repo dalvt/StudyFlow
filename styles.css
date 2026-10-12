@@ -1134,6 +1134,50 @@
   border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
+.study-flow-priority-badge.is-idea {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.study-flow-badge-stat.is-idea {
+  background-color: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+.study-flow-type-select {
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px 10px;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--text-normal);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.study-flow-promote-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  color: #a855f7;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-promote-btn:hover {
+  background-color: #a855f7;
+  color: #ffffff;
+  border-color: #a855f7;
+}
+
 /* =========================================
    8. Habit Activity Heatmap (GitHub Style)
    ========================================= */

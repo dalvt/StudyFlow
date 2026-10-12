@@ -31,11 +31,11 @@ export class PomodoroModal extends Modal {
 
   private async loadPendingTasks(): Promise<void> {
     this.pendingTasks = [];
-    const inboxPath = this.plugin.settings.inboxFilePath || 'Inbox.md';
+    const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
     const file = this.app.vault.getAbstractFileByPath(inboxPath);
     if (file instanceof TFile) {
       const content = await this.app.vault.read(file);
-      this.pendingTasks = extractPendingTasksFromContent(content, file.path);
+      this.pendingTasks = extractPendingTasksFromContent(content, file.path).filter((t) => !t.isIdea);
     }
   }
 

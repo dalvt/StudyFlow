@@ -22,8 +22,8 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   pomodoroBreakDuration: 5,
   dailyNotesFolder: 'Daily',
   dailyNoteDateFormat: 'YYYY-MM-DD',
-  inboxFilePath: 'Inbox.md',
-  habitsFilePath: 'Habits.md',
+  inboxFilePath: 'StudyFlow/Inbox.md',
+  habitsFilePath: 'StudyFlow/Habits.md',
   logPomodoroToDailyNote: true,
   enableChimeSound: true,
   chimeVolume: 0.7,
@@ -171,26 +171,26 @@ export class StudyFlowSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Ruta de archivo Inbox')
-      .setDesc('Ruta del archivo Markdown para capturas rápidas (por defecto: Inbox.md).')
+      .setDesc('Ruta del archivo Markdown para capturas rápidas e ideas (por defecto: StudyFlow/Inbox.md).')
       .addText((text) =>
         text
-          .setPlaceholder('Inbox.md')
+          .setPlaceholder('StudyFlow/Inbox.md')
           .setValue(this.plugin.settings.inboxFilePath)
           .onChange(async (value) => {
-            this.plugin.settings.inboxFilePath = value.trim() || 'Inbox.md';
+            this.plugin.settings.inboxFilePath = value.trim() || 'StudyFlow/Inbox.md';
             await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
       .setName('Ruta de archivo de Hábitos')
-      .setDesc('Ruta del archivo Markdown donde se registran los hábitos y rachas (por defecto: Habits.md).')
+      .setDesc('Ruta del archivo Markdown donde se registran los hábitos y rachas (por defecto: StudyFlow/Habits.md).')
       .addText((text) =>
         text
-          .setPlaceholder('Habits.md')
+          .setPlaceholder('StudyFlow/Habits.md')
           .setValue(this.plugin.settings.habitsFilePath)
           .onChange(async (value) => {
-            this.plugin.settings.habitsFilePath = value.trim() || 'Habits.md';
+            this.plugin.settings.habitsFilePath = value.trim() || 'StudyFlow/Habits.md';
             await this.plugin.saveSettings();
           })
       );

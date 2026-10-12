@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, StudyFlowSettings, StudyFlowSettingTab } from './sett
 import { QuickCaptureModal, TasksManagerModal } from './tasks';
 import { StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
+import { migratePluginFilesToDedicatedFolder } from './utils';
 
 export default class StudyFlowPlugin extends Plugin {
   settings: StudyFlowSettings = DEFAULT_SETTINGS;
@@ -16,6 +17,8 @@ export default class StudyFlowPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    await migratePluginFilesToDedicatedFolder(this.app, this.settings);
+    await this.saveSettings();
 
     // Register Sidebar Hub View
     this.registerView(

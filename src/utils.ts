@@ -77,3 +77,50 @@ export function getDailyNotePath(
   }
   return `${folder}/${fileName}`;
 }
+
+/**
+ * Automatically migrates root Inbox.md and Habits.md to StudyFlow/ folder
+ * to maintain clean vault organization.
+ */
+export async function migratePluginFilesToDedicatedFolder(
+  app: App,
+  settings: StudyFlowSettings
+): Promise<void> {
+  try {
+    const rootInbox = app.vault.getAbstractFileByPath('Inbox.md');
+    const targetInboxPath = settings.inboxFilePath || 'StudyFlow/Inbox.md';
+
+    if (rootInbox instanceof TFile && (targetInboxPath === 'Inbox.md' || targetInboxPath === 'StudyFlow/Inbox.md')) {
+      await ensureFolderExists(app, 'StudyFlow');
+      const newPath = 'StudyFlow/Inbox.md';
+      const existingInTarget = app.vault.getAbstractFileByPath(newPath);
+      if (!existingInTarget) {
+        await app.fileManager.renameFile(rootInbox, newPath);
+        settings.inboxFilePath = newPath;
+      }
+    }
+
+    const rootHabits = app.vault.getAbstractFileByPath('Habits.md');
+    const targetHabitsPath = settings.habitsFilePath || 'StudyFlow/Habits.md';
+
+    if (rootHabits instanceof TFile && (targetHabitsPath === 'Habits.md' || targetHabitsPath === 'StudyFlow/Habits.md')) {
+      await ensureFolderExists(app, 'StudyFlow');
+      const newPath = 'StudyFlow/Habits.md';
+      const existingInTarget = app.vault.getAbstractFileByPath(newPath);
+      if (!existingInTarget) {
+        await app.fileManager.renameFile(rootHabits, newPath);
+        settings.habitsFilePath = newPath;
+      }
+    }
+
+    if (settings.inboxFilePath === 'Inbox.md') {
+      settings.inboxFilePath = 'StudyFlow/Inbox.md';
+    }
+    if (settings.habitsFilePath === 'Habits.md') {
+      settings.habitsFilePath = 'StudyFlow/Habits.md';
+    }
+  } catch (err) {
+    console.error('Study Flow: Error migrando archivos a la carpeta dedicada StudyFlow', err);
+  }
+}
+
