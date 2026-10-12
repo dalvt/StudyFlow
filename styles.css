@@ -1874,4 +1874,592 @@ body.is-study-flow-zen .workspace-split {
   transition: width 0.25s ease, height 0.25s ease;
 }
 
+/* =========================================
+   12. Interactive Calendar, Time Blocking & Deadlines Hub
+   ========================================= */
+
+.study-flow-calendar-main-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+}
+
+.study-flow-calendar-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-calendar-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-calendar-month-title {
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  color: var(--text-normal);
+  min-width: 140px;
+  text-align: center;
+}
+
+.study-flow-calendar-today-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+/* Month Grid */
+.study-flow-calendar-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-calendar-header-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.study-flow-calendar-header-cell {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 0;
+  letter-spacing: 0.5px;
+}
+
+.study-flow-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.study-flow-calendar-cell {
+  min-height: 52px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.study-flow-calendar-cell:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  transform: translateY(-1px);
+}
+
+.study-flow-calendar-cell.is-other-month {
+  opacity: 0.45;
+}
+
+.study-flow-calendar-cell.is-today {
+  border-color: var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
+}
+
+.study-flow-calendar-cell.is-today .study-flow-calendar-day-num {
+  color: var(--text-accent);
+  font-weight: 800;
+}
+
+.study-flow-calendar-cell.is-selected {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+}
+
+.study-flow-calendar-cell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.study-flow-calendar-day-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-calendar-cell-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.study-flow-cal-chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.study-flow-cal-chip.is-deadline {
+  background: rgba(239, 68, 68, 0.16);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.study-flow-cal-chip.is-deadline.is-overdue {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.study-flow-cal-chip.is-deadline.is-today {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.study-flow-cal-chip.is-block {
+  background: rgba(59, 130, 246, 0.16);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Week View */
+.study-flow-week-wrapper {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.study-flow-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.study-flow-week-day-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 110px;
+}
+
+.study-flow-week-day-card:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-week-day-card.is-today {
+  border-color: var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
+}
+
+.study-flow-week-day-card.is-selected {
+  outline: 2px solid var(--interactive-accent);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.14);
+}
+
+.study-flow-week-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 4px;
+}
+
+.study-flow-week-day-name {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.study-flow-week-day-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.study-flow-week-badges-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.study-flow-week-blocks-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.study-flow-week-mini-block {
+  background: var(--background-primary);
+  border-radius: 3px;
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-week-mini-block.is-completed {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.study-flow-week-empty-label {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.study-flow-week-more-label {
+  font-size: 9px;
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+/* Day Detail Panel */
+.study-flow-day-detail-panel {
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.study-flow-day-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-day-detail-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-day-detail-title {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.study-flow-day-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-day-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.study-flow-day-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-flow-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.study-flow-column-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.study-flow-column-title svg {
+  width: 15px;
+  height: 15px;
+  color: var(--interactive-accent);
+}
+
+/* Forms */
+.study-flow-block-create-form {
+  background: var(--background-primary);
+  border: 1px solid var(--interactive-accent);
+  border-radius: var(--radius-m);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: study-flow-fade-in 0.15s ease;
+}
+
+.study-flow-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-date-input,
+.study-flow-select-input,
+.study-flow-number-input {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 4px 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+}
+
+.study-flow-btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+/* Time Block Cards */
+.study-flow-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-timeblock-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 8px 10px;
+  transition: all 0.15s ease;
+}
+
+.study-flow-timeblock-card:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-timeblock-card.is-completed {
+  opacity: 0.6;
+}
+
+.study-flow-timeblock-cb {
+  cursor: pointer;
+}
+
+.study-flow-timeblock-badge {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #3b82f6;
+  white-space: nowrap;
+}
+
+.study-flow-timeblock-title {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.study-flow-timeblock-note-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--text-accent);
+}
+
+.study-flow-timeblock-note-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Day Deadlines List */
+.study-flow-deadlines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-deadline-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 8px 10px;
+  transition: all 0.15s ease;
+}
+
+.study-flow-deadline-card:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-deadline-card.is-completed {
+  opacity: 0.6;
+}
+
+.study-flow-deadline-item-title {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  font-weight: 500;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.study-flow-time-chip {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+}
+
+/* Deadline Badges */
+.study-flow-deadline-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.study-flow-deadline-badge.is-overdue {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.study-flow-deadline-badge.is-today {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.study-flow-deadline-badge.is-soon {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Deadlines Master Hub */
+.study-flow-deadlines-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.study-flow-hub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-hub-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-hub-title h3 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+}
+
+.study-flow-hub-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-hub-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-hub-group-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.study-flow-deadlines-hub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-deadline-hub-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 8px 12px;
+  transition: all 0.15s ease;
+}
+
+.study-flow-deadline-hub-card:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-deadline-hub-card.is-completed {
+  opacity: 0.55;
+}
+
+
 

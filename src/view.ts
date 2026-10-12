@@ -19,6 +19,7 @@ import {
 import {
   appendTaskToMarkdownSection,
   extractPendingTasksFromContent,
+  formatDeadlineHuman,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
   getDailyNotePath,
@@ -28,10 +29,28 @@ import {
   TaskPriority,
 } from './utils';
 import { renderAnalyticsDashboard } from './analytics-ui';
+import {
+  CalendarTimeBlock,
+  DeadlineItem,
+  calculateBlockDurationMinutes,
+  createDeadlineTask,
+  deleteTimeBlock,
+  formatDateKey,
+  formatLongDate,
+  formatMonthYearHeader,
+  getCalendarMonthMatrix,
+  getTimeBlocksForDate,
+  getWeekDays,
+  loadAllDeadlines,
+  saveTimeBlock,
+  SHORT_DAY_NAMES_ES,
+  syncTimeBlocksToDailyNote,
+  toggleTimeBlockCompletion,
+} from './calendar';
 
 export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
 
-type ActiveTab = 'pomodoro' | 'tasks' | 'habits' | 'planner' | 'analytics';
+export type ActiveTab = 'pomodoro' | 'tasks' | 'habits' | 'calendar' | 'analytics' | 'planner';
 
 const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
@@ -50,6 +69,15 @@ export class StudyFlowView extends ItemView {
   // Habits state
   private habits: HabitItem[] = [];
 
+  // Calendar & Deadlines state
+  private calendarViewMode: 'month' | 'week' | 'deadlines' = 'month';
+  private calendarYear: number = new Date().getFullYear();
+  private calendarMonth: number = new Date().getMonth();
+  private selectedCalendarDate: string = formatDateKey(new Date());
+  private allDeadlines: DeadlineItem[] = [];
+  private isAddingTimeBlock: boolean = false;
+  private isAddingDeadline: boolean = false;
+
   // Planner state
   private pendingPlannerTasks: PendingTaskItem[] = [];
   private selectedPlannerTaskIds: Set<string> = new Set();
@@ -62,6 +90,11 @@ export class StudyFlowView extends ItemView {
   constructor(leaf: WorkspaceLeaf, plugin: StudyFlowPlugin) {
     super(leaf);
     this.plugin = plugin;
+  }
+
+  public async setActiveTab(tab: ActiveTab): Promise<void> {
+    this.activeTab = tab;
+    await this.renderView();
   }
 
   getViewType(): string {
@@ -145,14 +178,14 @@ export class StudyFlowView extends ItemView {
       await this.renderView();
     });
 
-    // Navigation Tab Bar with 4 tabs
+    // Navigation Tab Bar with 5 tabs
     const navBar = rootWrapper.createDiv({ cls: 'study-flow-segmented-nav' });
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: string }> = [
       { id: 'pomodoro', label: 'Pomodoro', icon: 'timer' },
       { id: 'tasks', label: 'Tareas', icon: 'check-square' },
       { id: 'habits', label: 'Hábitos', icon: 'flame' },
-      { id: 'planner', label: 'Plan', icon: 'calendar-days' },
+      { id: 'calendar', label: 'Calendario', icon: 'calendar-days' },
       { id: 'analytics', label: 'Métricas', icon: 'bar-chart-2' },
     ];
 
@@ -179,8 +212,8 @@ export class StudyFlowView extends ItemView {
       await this.renderTasksTab(contentBody);
     } else if (this.activeTab === 'habits') {
       await this.renderHabitsTab(contentBody);
-    } else if (this.activeTab === 'planner') {
-      await this.renderPlannerTab(contentBody);
+    } else if (this.activeTab === 'calendar' || this.activeTab === 'planner') {
+      await this.renderCalendarTab(contentBody);
     } else if (this.activeTab === 'analytics') {
       await this.renderAnalyticsTab(contentBody);
     }
@@ -851,6 +884,20 @@ export class StudyFlowView extends ItemView {
             itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
           }
 
+          if (task.dueDate) {
+            const badgeText =
+              task.daysRemaining !== undefined
+                ? formatDeadlineHuman(task.daysRemaining, task.dueDate)
+                : `📅 ${task.dueDate}`;
+            let badgeCls = 'study-flow-deadline-badge';
+            if (task.daysRemaining !== undefined) {
+              if (task.daysRemaining < 0) badgeCls += ' is-overdue';
+              else if (task.daysRemaining === 0) badgeCls += ' is-today';
+              else if (task.daysRemaining <= 3) badgeCls += ' is-soon';
+            }
+            itemCard.createSpan({ text: badgeText, cls: badgeCls });
+          }
+
           // Quick step: log +1 Pomodoro directly
           const addPomoBtn = itemCard.createEl('button', {
             cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
@@ -921,6 +968,848 @@ export class StudyFlowView extends ItemView {
         }
       }
     }
+  }
+
+  // ===================== CALENDAR & TIME BLOCKING TAB =====================
+  private async renderCalendarTab(container: HTMLElement): Promise<void> {
+    container.empty();
+    this.allDeadlines = await loadAllDeadlines(this.app, this.plugin.settings);
+
+    const card = container.createDiv({ cls: 'study-flow-card study-flow-calendar-main-card' });
+
+    // Top Navigation & Control Bar
+    const topBar = card.createDiv({ cls: 'study-flow-calendar-top-bar' });
+
+    // Left: Month/Week Navigation
+    const navGroup = topBar.createDiv({ cls: 'study-flow-calendar-nav-group' });
+    const prevBtn = navGroup.createEl('button', {
+      cls: 'study-flow-header-icon-btn',
+      attr: { 'aria-label': 'Anterior' },
+    });
+    setIcon(prevBtn, 'chevron-left');
+    prevBtn.addEventListener('click', async () => {
+      if (this.calendarViewMode === 'week') {
+        const parts = this.selectedCalendarDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() - 7);
+        this.calendarYear = d.getFullYear();
+        this.calendarMonth = d.getMonth();
+        this.selectedCalendarDate = formatDateKey(d);
+      } else {
+        if (this.calendarMonth === 0) {
+          this.calendarMonth = 11;
+          this.calendarYear -= 1;
+        } else {
+          this.calendarMonth -= 1;
+        }
+      }
+      await this.renderCalendarTab(container);
+    });
+
+    navGroup.createEl('span', {
+      cls: 'study-flow-calendar-month-title',
+      text: formatMonthYearHeader(this.calendarYear, this.calendarMonth),
+    });
+
+    const nextBtn = navGroup.createEl('button', {
+      cls: 'study-flow-header-icon-btn',
+      attr: { 'aria-label': 'Siguiente' },
+    });
+    setIcon(nextBtn, 'chevron-right');
+    nextBtn.addEventListener('click', async () => {
+      if (this.calendarViewMode === 'week') {
+        const parts = this.selectedCalendarDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() + 7);
+        this.calendarYear = d.getFullYear();
+        this.calendarMonth = d.getMonth();
+        this.selectedCalendarDate = formatDateKey(d);
+      } else {
+        if (this.calendarMonth === 11) {
+          this.calendarMonth = 0;
+          this.calendarYear += 1;
+        } else {
+          this.calendarMonth += 1;
+        }
+      }
+      await this.renderCalendarTab(container);
+    });
+
+    const todayBtn = navGroup.createEl('button', {
+      cls: 'study-flow-icon-action-btn-styled study-flow-calendar-today-btn',
+      text: 'Hoy',
+    });
+    todayBtn.addEventListener('click', async () => {
+      const now = new Date();
+      this.calendarYear = now.getFullYear();
+      this.calendarMonth = now.getMonth();
+      this.selectedCalendarDate = formatDateKey(now);
+      await this.renderCalendarTab(container);
+    });
+
+    // Right: Segmented view toggles (Mes, Semana, Deadlines)
+    const viewSwitcher = topBar.createDiv({ cls: 'study-flow-segmented-control' });
+    const pendingDlCount = this.allDeadlines.filter((d) => !d.completed).length;
+    const viewButtons = [
+      { id: 'month' as const, label: 'Mes', icon: 'calendar' },
+      { id: 'week' as const, label: 'Semana', icon: 'columns' },
+      { id: 'deadlines' as const, label: `Deadlines (${pendingDlCount})`, icon: 'alert-circle' },
+    ];
+
+    viewButtons.forEach((v) => {
+      const btn = viewSwitcher.createEl('button', {
+        cls: `study-flow-segmented-btn ${this.calendarViewMode === v.id ? 'is-active' : ''}`,
+      });
+      const iconSpan = btn.createSpan();
+      setIcon(iconSpan, v.icon);
+      btn.createSpan({ text: v.label });
+      btn.addEventListener('click', async () => {
+        this.calendarViewMode = v.id;
+        await this.renderCalendarTab(container);
+      });
+    });
+
+    // Sub-view router
+    if (this.calendarViewMode === 'month') {
+      await this.renderCalendarMonthGrid(card, container);
+      await this.renderDayDetailPanel(card, container);
+    } else if (this.calendarViewMode === 'week') {
+      await this.renderCalendarWeekView(card, container);
+      await this.renderDayDetailPanel(card, container);
+    } else if (this.calendarViewMode === 'deadlines') {
+      await this.renderDeadlinesMasterHub(card, container);
+    }
+  }
+
+  private async renderCalendarMonthGrid(card: HTMLElement, tabContainer: HTMLElement): Promise<void> {
+    const gridWrapper = card.createDiv({ cls: 'study-flow-calendar-wrapper' });
+
+    // Days of Week Header
+    const headerRow = gridWrapper.createDiv({ cls: 'study-flow-calendar-header-row' });
+    SHORT_DAY_NAMES_ES.forEach((dayName) => {
+      headerRow.createDiv({ cls: 'study-flow-calendar-header-cell', text: dayName });
+    });
+
+    // Month Matrix
+    const matrix = getCalendarMonthMatrix(this.calendarYear, this.calendarMonth);
+    const grid = gridWrapper.createDiv({ cls: 'study-flow-calendar-grid' });
+
+    matrix.forEach((cell) => {
+      const cellEl = grid.createDiv({
+        cls: `study-flow-calendar-cell ${cell.isCurrentMonth ? '' : 'is-other-month'} ${cell.isToday ? 'is-today' : ''} ${cell.dateStr === this.selectedCalendarDate ? 'is-selected' : ''}`,
+      });
+
+      const topRow = cellEl.createDiv({ cls: 'study-flow-calendar-cell-top' });
+      topRow.createSpan({ text: String(cell.dayNumber), cls: 'study-flow-calendar-day-num' });
+
+      // Badges
+      const dayDeadlines = this.allDeadlines.filter((d) => d.dueDate === cell.dateStr && !d.completed);
+      const dayBlocks = getTimeBlocksForDate(this.plugin.settings, cell.dateStr);
+
+      const badgesWrap = cellEl.createDiv({ cls: 'study-flow-calendar-cell-badges' });
+
+      if (dayDeadlines.length > 0) {
+        const hasOverdue = dayDeadlines.some((d) => d.daysRemaining < 0);
+        const hasToday = dayDeadlines.some((d) => d.daysRemaining === 0);
+        let dCls = 'study-flow-cal-chip is-deadline';
+        if (hasOverdue) dCls += ' is-overdue';
+        else if (hasToday) dCls += ' is-today';
+        badgesWrap.createSpan({
+          text: `🚨 ${dayDeadlines.length}`,
+          cls: dCls,
+          attr: { title: `${dayDeadlines.length} entrega(s) pendiente(s)` },
+        });
+      }
+
+      if (dayBlocks.length > 0) {
+        badgesWrap.createSpan({
+          text: `⏱️ ${dayBlocks.length}`,
+          cls: 'study-flow-cal-chip is-block',
+          attr: { title: `${dayBlocks.length} bloque(s) de estudio` },
+        });
+      }
+
+      cellEl.addEventListener('click', async () => {
+        this.selectedCalendarDate = cell.dateStr;
+        if (!cell.isCurrentMonth) {
+          this.calendarYear = cell.year;
+          this.calendarMonth = cell.month;
+        }
+        await this.renderCalendarTab(tabContainer);
+      });
+    });
+  }
+
+  private async renderCalendarWeekView(card: HTMLElement, tabContainer: HTMLElement): Promise<void> {
+    const weekWrapper = card.createDiv({ cls: 'study-flow-week-wrapper' });
+    const parts = this.selectedCalendarDate.split('-').map(Number);
+    const refDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekDays = getWeekDays(refDate);
+
+    const weekGrid = weekWrapper.createDiv({ cls: 'study-flow-week-grid' });
+
+    weekDays.forEach((day) => {
+      const isSelected = day.dateStr === this.selectedCalendarDate;
+      const dayCard = weekGrid.createDiv({
+        cls: `study-flow-week-day-card ${day.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`,
+      });
+
+      const header = dayCard.createDiv({ cls: 'study-flow-week-day-header' });
+      header.createSpan({ text: day.shortDay, cls: 'study-flow-week-day-name' });
+      header.createSpan({ text: String(day.dayNumber), cls: 'study-flow-week-day-num' });
+
+      // Badges
+      const dayDeadlines = this.allDeadlines.filter((d) => d.dueDate === day.dateStr && !d.completed);
+      const dayBlocks = getTimeBlocksForDate(this.plugin.settings, day.dateStr);
+
+      const badgesRow = dayCard.createDiv({ cls: 'study-flow-week-badges-row' });
+      if (dayDeadlines.length > 0) {
+        badgesRow.createSpan({
+          text: `🚨 ${dayDeadlines.length}`,
+          cls: 'study-flow-cal-chip is-deadline',
+        });
+      }
+      if (dayBlocks.length > 0) {
+        badgesRow.createSpan({
+          text: `⏱️ ${dayBlocks.length}`,
+          cls: 'study-flow-cal-chip is-block',
+        });
+      }
+
+      // Blocks list preview
+      const previewList = dayCard.createDiv({ cls: 'study-flow-week-blocks-preview' });
+      if (dayBlocks.length === 0 && dayDeadlines.length === 0) {
+        previewList.createDiv({ text: 'Libre', cls: 'study-flow-week-empty-label' });
+      } else {
+        dayBlocks.slice(0, 3).forEach((b) => {
+          previewList.createDiv({
+            text: `${b.startTime} ${b.title}`,
+            cls: `study-flow-week-mini-block ${b.completed ? 'is-completed' : ''}`,
+          });
+        });
+        if (dayBlocks.length > 3) {
+          previewList.createDiv({
+            text: `+${dayBlocks.length - 3} más...`,
+            cls: 'study-flow-week-more-label',
+          });
+        }
+      }
+
+      dayCard.addEventListener('click', async () => {
+        this.selectedCalendarDate = day.dateStr;
+        await this.renderCalendarTab(tabContainer);
+      });
+    });
+  }
+
+  private async renderDayDetailPanel(parentCard: HTMLElement, tabContainer: HTMLElement): Promise<void> {
+    const detailPanel = parentCard.createDiv({ cls: 'study-flow-day-detail-panel' });
+
+    // Panel Header
+    const detailHeader = detailPanel.createDiv({ cls: 'study-flow-day-detail-header' });
+    const titleWrap = detailHeader.createDiv({ cls: 'study-flow-day-detail-title-wrap' });
+    const calIcon = titleWrap.createSpan({ cls: 'study-flow-section-icon' });
+    setIcon(calIcon, 'calendar');
+    titleWrap.createEl('h3', {
+      text: formatLongDate(this.selectedCalendarDate),
+      cls: 'study-flow-day-detail-title',
+    });
+
+    const headerActions = detailHeader.createDiv({ cls: 'study-flow-day-header-actions' });
+
+    // Sync to Daily Note Button
+    const syncDailyBtn = headerActions.createEl('button', {
+      cls: 'study-flow-icon-action-btn-styled',
+      attr: { 'aria-label': 'Sincronizar bloques con la Nota Diaria correspondiente' },
+    });
+    const syncIcon = syncDailyBtn.createSpan();
+    setIcon(syncIcon, 'file-output');
+    syncDailyBtn.createSpan({ text: 'Sincronizar Daily' });
+    syncDailyBtn.addEventListener('click', async () => {
+      const blocks = getTimeBlocksForDate(this.plugin.settings, this.selectedCalendarDate);
+      if (blocks.length === 0) {
+        new Notice('No hay bloques de tiempo para sincronizar en este día.');
+        return;
+      }
+      const ok = await syncTimeBlocksToDailyNote(
+        this.app,
+        this.plugin.settings,
+        this.selectedCalendarDate,
+        blocks
+      );
+      if (ok) {
+        new Notice(`✓ Bloques sincronizados en ${this.plugin.settings.dailyNotesFolder}/${this.selectedCalendarDate}.md`);
+      } else {
+        new Notice('Error al sincronizar bloques con la Daily Note.');
+      }
+    });
+
+    // Open Daily Note Button
+    const openDailyBtn = headerActions.createEl('button', {
+      cls: 'study-flow-header-icon-btn',
+      attr: { 'aria-label': 'Abrir Daily Note de este día' },
+    });
+    setIcon(openDailyBtn, 'file-text');
+    openDailyBtn.addEventListener('click', async () => {
+      const dailyPath = `${this.plugin.settings.dailyNotesFolder}/${this.selectedCalendarDate}.md`;
+      const file = await getOrCreateFile(this.app, dailyPath, `# ${this.selectedCalendarDate}\n\n`);
+      await this.app.workspace.getLeaf(false).openFile(file);
+    });
+
+    // Columns: Time Blocking & Deadlines
+    const contentColumns = detailPanel.createDiv({ cls: 'study-flow-day-columns' });
+
+    // === Column 1: Time Blocking ===
+    const timeBlocksCol = contentColumns.createDiv({ cls: 'study-flow-day-column' });
+    const tbHeader = timeBlocksCol.createDiv({ cls: 'study-flow-column-header' });
+    const tbTitle = tbHeader.createDiv({ cls: 'study-flow-column-title' });
+    const tbIcon = tbTitle.createSpan();
+    setIcon(tbIcon, 'clock');
+    tbTitle.createSpan({ text: 'Bloques de Tiempo' });
+
+    const addBlockBtn = tbHeader.createEl('button', {
+      cls: 'study-flow-icon-action-btn-styled',
+      attr: { 'aria-label': 'Agregar nuevo bloque de estudio' },
+    });
+    const addBlockIcon = addBlockBtn.createSpan();
+    setIcon(addBlockIcon, 'plus');
+    addBlockBtn.createSpan({ text: 'Nuevo Bloque' });
+    addBlockBtn.addEventListener('click', () => {
+      this.isAddingTimeBlock = !this.isAddingTimeBlock;
+      formWrapper.style.display = this.isAddingTimeBlock ? 'block' : 'none';
+    });
+
+    // Inline Add Block Form
+    const formWrapper = timeBlocksCol.createDiv({
+      cls: 'study-flow-block-create-form',
+      attr: { style: this.isAddingTimeBlock ? 'display: block;' : 'display: none;' },
+    });
+    const formRow1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const startInput = formRow1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-time-input',
+      value: '09:00',
+      attr: { placeholder: '09:00' },
+    });
+    formRow1.createSpan({ text: '—', cls: 'study-flow-time-sep' });
+    const endInput = formRow1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-time-input',
+      value: '10:30',
+      attr: { placeholder: '10:30' },
+    });
+    const titleInput = formRow1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-block-title-input',
+      attr: { placeholder: 'Materia o título del bloque (ej: Álgebra)...' },
+    });
+
+    const formRow2 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const noteInput = formRow2.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-block-note-input',
+      attr: { placeholder: 'Nota enlazada opcional (ej: [[Álgebra Cap 3]])...' },
+    });
+    const saveBlockBtn = formRow2.createEl('button', {
+      cls: 'mod-cta study-flow-btn-sm',
+      text: 'Guardar',
+    });
+    const cancelBlockBtn = formRow2.createEl('button', {
+      cls: 'study-flow-btn-sm',
+      text: 'Cancelar',
+    });
+
+    saveBlockBtn.addEventListener('click', async () => {
+      const title = titleInput.value.trim();
+      const startTime = startInput.value.trim();
+      const endTime = endInput.value.trim();
+      if (!title || !startTime || !endTime) {
+        new Notice('Completá la hora de inicio, fin y el título');
+        return;
+      }
+      const newBlock: CalendarTimeBlock = {
+        id: String(Date.now()),
+        date: this.selectedCalendarDate,
+        startTime,
+        endTime,
+        title,
+        linkedNote: noteInput.value.trim() || undefined,
+        completed: false,
+      };
+      await saveTimeBlock(this.plugin, newBlock);
+      this.isAddingTimeBlock = false;
+      new Notice(`✓ Bloque "${title}" guardado`);
+      await this.renderCalendarTab(tabContainer);
+    });
+
+    cancelBlockBtn.addEventListener('click', () => {
+      this.isAddingTimeBlock = false;
+      formWrapper.style.display = 'none';
+    });
+
+    // Time Blocks List
+    const blocks = getTimeBlocksForDate(this.plugin.settings, this.selectedCalendarDate);
+    const blocksListEl = timeBlocksCol.createDiv({ cls: 'study-flow-blocks-list' });
+
+    if (blocks.length === 0) {
+      blocksListEl.createDiv({
+        cls: 'study-flow-empty-tasks',
+        text: 'No hay bloques de tiempo para este día.',
+      });
+    } else {
+      blocks.forEach((block) => {
+        const blockCard = blocksListEl.createDiv({
+          cls: `study-flow-timeblock-card ${block.completed ? 'is-completed' : ''}`,
+        });
+
+        // Checkbox
+        const cb = blockCard.createEl('input', {
+          type: 'checkbox',
+          cls: 'study-flow-timeblock-cb',
+        });
+        cb.checked = !!block.completed;
+        cb.addEventListener('change', async () => {
+          await toggleTimeBlockCompletion(this.plugin, this.selectedCalendarDate, block.id, cb.checked);
+          await this.renderCalendarTab(tabContainer);
+        });
+
+        // Time range badge
+        const duration = calculateBlockDurationMinutes(block.startTime, block.endTime);
+        const durText = duration > 0 ? ` (${duration}m)` : '';
+        blockCard.createSpan({
+          text: `${block.startTime} — ${block.endTime}${durText}`,
+          cls: 'study-flow-timeblock-badge',
+        });
+
+        // Title
+        blockCard.createSpan({
+          text: block.title,
+          cls: `study-flow-timeblock-title ${block.completed ? 'is-strikethrough' : ''}`,
+        });
+
+        // Linked Note
+        if (block.linkedNote) {
+          const noteBtn = blockCard.createEl('button', {
+            cls: 'study-flow-timeblock-note-link',
+            attr: { 'aria-label': 'Abrir nota vinculada' },
+          });
+          const noteIcon = noteBtn.createSpan();
+          setIcon(noteIcon, 'file-text');
+          noteBtn.createSpan({ text: block.linkedNote.replace(/[\[\]]/g, '').trim() });
+          noteBtn.addEventListener('click', () => {
+            const raw = block.linkedNote?.replace(/[\[\]]/g, '').trim();
+            if (raw) this.app.workspace.openLinkText(raw, '', false);
+          });
+        }
+
+        // Action: Pomodoro Focus
+        const pomoBtn = blockCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Enfocar este bloque con Pomodoro' },
+        });
+        setIcon(pomoBtn, 'timer');
+        pomoBtn.addEventListener('click', async () => {
+          this.plugin.pomodoro.setActiveTask({
+            id: block.id,
+            text: `${block.title} [${block.startTime} - ${block.endTime}]`,
+            sourceFile: `${this.plugin.settings.dailyNotesFolder}/${this.selectedCalendarDate}.md`,
+          });
+          this.activeTab = 'pomodoro';
+          await this.renderView();
+        });
+
+        // Action: Delete Block
+        const delBtn = blockCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Eliminar bloque' },
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async () => {
+          await deleteTimeBlock(this.plugin, this.selectedCalendarDate, block.id);
+          new Notice('Bloque eliminado');
+          await this.renderCalendarTab(tabContainer);
+        });
+      });
+    }
+
+    // === Column 2: Deadlines del Día ===
+    const deadlinesCol = contentColumns.createDiv({ cls: 'study-flow-day-column' });
+    const dlHeader = deadlinesCol.createDiv({ cls: 'study-flow-column-header' });
+    const dlTitle = dlHeader.createDiv({ cls: 'study-flow-column-title' });
+    const dlIcon = dlTitle.createSpan();
+    setIcon(dlIcon, 'alert-circle');
+    dlTitle.createSpan({ text: 'Deadlines del Día' });
+
+    const addDlBtn = dlHeader.createEl('button', {
+      cls: 'study-flow-icon-action-btn-styled',
+      attr: { 'aria-label': 'Agregar deadline para este día' },
+    });
+    const addDlIcon = addDlBtn.createSpan();
+    setIcon(addDlIcon, 'plus');
+    addDlBtn.createSpan({ text: 'Nueva Entrega' });
+    addDlBtn.addEventListener('click', () => {
+      this.isAddingDeadline = !this.isAddingDeadline;
+      dlFormWrapper.style.display = this.isAddingDeadline ? 'block' : 'none';
+    });
+
+    // Inline Add Deadline Form
+    const dlFormWrapper = deadlinesCol.createDiv({
+      cls: 'study-flow-block-create-form',
+      attr: { style: this.isAddingDeadline ? 'display: block;' : 'display: none;' },
+    });
+    const dlRow1 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const dlTitleInput = dlRow1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-block-title-input',
+      attr: { placeholder: 'Título de la entrega (ej: TP Final)...' },
+    });
+    const dlTimeInput = dlRow1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-time-input',
+      attr: { placeholder: 'Hora (23:59)' },
+    });
+
+    const dlRow2 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const prioritySelect = dlRow2.createEl('select', { cls: 'study-flow-select-input' });
+    const priorities: Array<{ val: TaskPriority; label: string }> = [
+      { val: 'none', label: 'Sin prioridad' },
+      { val: 'high', label: '⏫ Alta' },
+      { val: 'medium', label: '🔼 Media' },
+      { val: 'low', label: '🔽 Baja' },
+    ];
+    priorities.forEach((p) => {
+      const opt = prioritySelect.createEl('option', { value: p.val, text: p.label });
+      if (p.val === 'high') opt.selected = true;
+    });
+
+    const pomoInput = dlRow2.createEl('input', {
+      type: 'number',
+      cls: 'study-flow-number-input',
+      attr: { placeholder: '🍅 Est.', min: '0', max: '20' },
+    });
+
+    const saveDlBtn = dlRow2.createEl('button', {
+      cls: 'mod-cta study-flow-btn-sm',
+      text: 'Crear Entrega',
+    });
+    const cancelDlBtn = dlRow2.createEl('button', {
+      cls: 'study-flow-btn-sm',
+      text: 'Cancelar',
+    });
+
+    saveDlBtn.addEventListener('click', async () => {
+      const t = dlTitleInput.value.trim();
+      if (!t) {
+        new Notice('Ingresá el título de la entrega');
+        return;
+      }
+      const timeVal = dlTimeInput.value.trim() || undefined;
+      const prioVal = prioritySelect.value as TaskPriority;
+      const pomoVal = pomoInput.value ? parseInt(pomoInput.value, 10) : undefined;
+
+      const ok = await createDeadlineTask(
+        this.app,
+        this.plugin.settings,
+        t,
+        this.selectedCalendarDate,
+        timeVal,
+        prioVal,
+        pomoVal
+      );
+      if (ok) {
+        this.isAddingDeadline = false;
+        new Notice(`✓ Deadline creada para ${this.selectedCalendarDate}`);
+        await this.renderCalendarTab(tabContainer);
+      }
+    });
+
+    cancelDlBtn.addEventListener('click', () => {
+      this.isAddingDeadline = false;
+      dlFormWrapper.style.display = 'none';
+    });
+
+    // List of day deadlines
+    const dayDeadlines = this.allDeadlines.filter((d) => d.dueDate === this.selectedCalendarDate);
+    const dlListEl = deadlinesCol.createDiv({ cls: 'study-flow-deadlines-list' });
+
+    if (dayDeadlines.length === 0) {
+      dlListEl.createDiv({
+        cls: 'study-flow-empty-tasks',
+        text: 'Sin entregas ni fechas límite para este día.',
+      });
+    } else {
+      dayDeadlines.forEach((item) => {
+        const itemCard = dlListEl.createDiv({
+          cls: `study-flow-deadline-card ${item.completed ? 'is-completed' : ''}`,
+        });
+
+        const cb = itemCard.createEl('input', {
+          type: 'checkbox',
+          cls: 'study-flow-task-cb',
+        });
+        cb.checked = item.completed;
+        cb.addEventListener('change', async () => {
+          await toggleTaskCompletionInFile(this.app, item, cb.checked);
+          await this.renderCalendarTab(tabContainer);
+        });
+
+        const textSpan = itemCard.createSpan({
+          text: item.cleanTitle,
+          cls: `study-flow-deadline-item-title ${item.completed ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
+        });
+
+        if (item.dueTime) {
+          itemCard.createSpan({
+            text: `⏰ ${item.dueTime}`,
+            cls: 'study-flow-time-chip',
+          });
+        }
+
+        const badgeText = formatDeadlineHuman(item.daysRemaining, item.dueDate);
+        let badgeCls = 'study-flow-deadline-badge';
+        if (item.daysRemaining < 0) badgeCls += ' is-overdue';
+        else if (item.daysRemaining === 0) badgeCls += ' is-today';
+        else if (item.daysRemaining <= 3) badgeCls += ' is-soon';
+        itemCard.createSpan({ text: badgeText, cls: badgeCls });
+
+        // Action: Pomodoro Focus
+        const pomoBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Enfocar con Pomodoro' },
+        });
+        setIcon(pomoBtn, 'timer');
+        pomoBtn.addEventListener('click', async () => {
+          this.plugin.pomodoro.setActiveTask({
+            id: item.id,
+            text: item.text,
+            sourceFile: item.sourceFile,
+          });
+          this.activeTab = 'pomodoro';
+          await this.renderView();
+        });
+
+        // Action: Delete
+        const delBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Eliminar entrega' },
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async () => {
+          await deleteTaskFromFile(this.app, item);
+          new Notice('Entrega eliminada');
+          await this.renderCalendarTab(tabContainer);
+        });
+      });
+    }
+  }
+
+  private async renderDeadlinesMasterHub(card: HTMLElement, tabContainer: HTMLElement): Promise<void> {
+    const hubWrapper = card.createDiv({ cls: 'study-flow-deadlines-hub' });
+
+    // Header bar
+    const hubHeader = hubWrapper.createDiv({ cls: 'study-flow-hub-header' });
+    const hubTitle = hubHeader.createDiv({ cls: 'study-flow-hub-title' });
+    const dlIcon = hubTitle.createSpan();
+    setIcon(dlIcon, 'target');
+    hubTitle.createEl('h3', { text: 'Centro de Deadlines & Fechas Límite' });
+
+    const newDlBtn = hubHeader.createEl('button', {
+      cls: 'mod-cta study-flow-btn-sm',
+    });
+    const plusIcon = newDlBtn.createSpan();
+    setIcon(plusIcon, 'plus');
+    newDlBtn.createSpan({ text: 'Nueva Entrega' });
+    newDlBtn.addEventListener('click', () => {
+      this.isAddingDeadline = !this.isAddingDeadline;
+      formWrapper.style.display = this.isAddingDeadline ? 'block' : 'none';
+    });
+
+    // Inline form for master hub
+    const formWrapper = hubWrapper.createDiv({
+      cls: 'study-flow-block-create-form',
+      attr: { style: this.isAddingDeadline ? 'display: block;' : 'display: none;' },
+    });
+    const r1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const titleIn = r1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-block-title-input',
+      attr: { placeholder: 'Título de la entrega (ej: Entrega TP Redes)...' },
+    });
+    const dateIn = r1.createEl('input', {
+      type: 'date',
+      cls: 'study-flow-date-input',
+      value: this.selectedCalendarDate,
+    });
+    const timeIn = r1.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-time-input',
+      attr: { placeholder: 'Hora (23:59)' },
+    });
+
+    const r2 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
+    const prioIn = r2.createEl('select', { cls: 'study-flow-select-input' });
+    [
+      { val: 'none', label: 'Sin prioridad' },
+      { val: 'high', label: '⏫ Alta' },
+      { val: 'medium', label: '🔼 Media' },
+      { val: 'low', label: '🔽 Baja' },
+    ].forEach((p) => {
+      const opt = prioIn.createEl('option', { value: p.val, text: p.label });
+      if (p.val === 'high') opt.selected = true;
+    });
+
+    const pomosIn = r2.createEl('input', {
+      type: 'number',
+      cls: 'study-flow-number-input',
+      attr: { placeholder: '🍅 Est.', min: '0', max: '20' },
+    });
+
+    const saveHubDl = r2.createEl('button', {
+      cls: 'mod-cta study-flow-btn-sm',
+      text: 'Guardar Entrega',
+    });
+    const cancelHubDl = r2.createEl('button', {
+      cls: 'study-flow-btn-sm',
+      text: 'Cancelar',
+    });
+
+    saveHubDl.addEventListener('click', async () => {
+      const t = titleIn.value.trim();
+      const d = dateIn.value.trim();
+      if (!t || !d) {
+        new Notice('Ingresá el título y la fecha');
+        return;
+      }
+      const ok = await createDeadlineTask(
+        this.app,
+        this.plugin.settings,
+        t,
+        d,
+        timeIn.value.trim() || undefined,
+        prioIn.value as TaskPriority,
+        pomosIn.value ? parseInt(pomosIn.value, 10) : undefined
+      );
+      if (ok) {
+        this.isAddingDeadline = false;
+        new Notice(`✓ Deadline creada para ${d}`);
+        await this.renderCalendarTab(tabContainer);
+      }
+    });
+
+    cancelHubDl.addEventListener('click', () => {
+      this.isAddingDeadline = false;
+      formWrapper.style.display = 'none';
+    });
+
+    // Urgency Groups
+    const overdue = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining < 0);
+    const dueToday = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining === 0);
+    const dueSoon = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining > 0 && d.daysRemaining <= 7);
+    const dueLater = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining > 7);
+    const completed = this.allDeadlines.filter((d) => d.completed);
+
+    const groups = [
+      { key: 'overdue', label: '🚨 Vencidas', items: overdue, cls: 'is-overdue-group' },
+      { key: 'today', label: '⚠️ Vencen Hoy', items: dueToday, cls: 'is-today-group' },
+      { key: 'soon', label: '📌 Próximos 7 Días', items: dueSoon, cls: 'is-soon-group' },
+      { key: 'later', label: '🗓️ Más Adelante', items: dueLater, cls: 'is-later-group' },
+      { key: 'completed', label: '✅ Entregadas & Completadas', items: completed, cls: 'is-completed-group' },
+    ];
+
+    if (this.allDeadlines.length === 0) {
+      hubWrapper.createDiv({
+        cls: 'study-flow-empty-tasks',
+        text: 'No hay ninguna deadline registrada en el Inbox o notas diarias. Creá una usando el botón "+ Nueva Entrega" o agregando 📅 YYYY-MM-DD a tus tareas.',
+      });
+      return;
+    }
+
+    groups.forEach((grp) => {
+      if (grp.items.length === 0) return;
+
+      const groupSection = hubWrapper.createDiv({ cls: `study-flow-hub-group ${grp.cls}` });
+      const grpHeader = groupSection.createDiv({ cls: 'study-flow-hub-group-header' });
+      grpHeader.createSpan({ text: `${grp.label} (${grp.items.length})`, cls: 'study-flow-hub-group-title' });
+
+      const listEl = groupSection.createDiv({ cls: 'study-flow-deadlines-hub-list' });
+      grp.items.forEach((item) => {
+        const itemCard = listEl.createDiv({
+          cls: `study-flow-deadline-hub-card ${item.completed ? 'is-completed' : ''}`,
+        });
+
+        const cb = itemCard.createEl('input', {
+          type: 'checkbox',
+          cls: 'study-flow-task-cb',
+        });
+        cb.checked = item.completed;
+        cb.addEventListener('change', async () => {
+          await toggleTaskCompletionInFile(this.app, item, cb.checked);
+          await this.renderCalendarTab(tabContainer);
+        });
+
+        const textSpan = itemCard.createSpan({
+          text: item.cleanTitle,
+          cls: `study-flow-deadline-item-title ${item.completed ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
+        });
+
+        const dText = formatDeadlineHuman(item.daysRemaining, item.dueDate);
+        let badgeCls = 'study-flow-deadline-badge';
+        if (item.daysRemaining < 0) badgeCls += ' is-overdue';
+        else if (item.daysRemaining === 0) badgeCls += ' is-today';
+        else if (item.daysRemaining <= 3) badgeCls += ' is-soon';
+        itemCard.createSpan({ text: dText, cls: badgeCls });
+
+        if (item.dueTime) {
+          itemCard.createSpan({ text: `⏰ ${item.dueTime}`, cls: 'study-flow-time-chip' });
+        }
+
+        // Source note chip
+        const srcFile = this.app.vault.getAbstractFileByPath(item.sourceFile);
+        const srcName = srcFile instanceof TFile ? srcFile.basename : item.sourceFile;
+        const srcChip = itemCard.createSpan({ text: `#${srcName}`, cls: 'study-flow-source-chip' });
+        srcChip.addEventListener('click', () => {
+          if (srcFile instanceof TFile) {
+            this.app.workspace.getLeaf(false).openFile(srcFile);
+          }
+        });
+
+        // Quick Focus
+        const pomoBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Enfocar con Pomodoro' },
+        });
+        setIcon(pomoBtn, 'timer');
+        pomoBtn.addEventListener('click', async () => {
+          this.plugin.pomodoro.setActiveTask({
+            id: item.id,
+            text: item.text,
+            sourceFile: item.sourceFile,
+          });
+          this.activeTab = 'pomodoro';
+          await this.renderView();
+        });
+
+        // Delete
+        const delBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': 'Eliminar entrega' },
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async () => {
+          await deleteTaskFromFile(this.app, item);
+          new Notice('Entrega eliminada');
+          await this.renderCalendarTab(tabContainer);
+        });
+      });
+    });
   }
 
   // ===================== PLANNER TAB =====================

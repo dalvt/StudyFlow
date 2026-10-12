@@ -3,6 +3,16 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import type { FocusSessionRecord } from './analytics';
 
+export interface CalendarTimeBlock {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  title: string;
+  linkedNote?: string;
+  completed?: boolean;
+}
+
 export interface StudyFlowSettings {
   pomodoroWorkDuration: number;
   pomodoroBreakDuration: number;
@@ -15,6 +25,7 @@ export interface StudyFlowSettings {
   chimeVolume: number;
   autoZenMode: boolean;
   focusHistory: FocusSessionRecord[];
+  calendarBlocks: Record<string, CalendarTimeBlock[]>;
 }
 
 export const DEFAULT_SETTINGS: StudyFlowSettings = {
@@ -29,6 +40,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   chimeVolume: 0.7,
   autoZenMode: false,
   focusHistory: [],
+  calendarBlocks: {},
 };
 
 export class StudyFlowSettingTab extends PluginSettingTab {

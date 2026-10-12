@@ -3,6 +3,7 @@ import type { StudyFlowSettings } from './settings';
 import { formatDailyNoteFileName } from './markdown-utils';
 
 export * from './markdown-utils';
+export * from './calendar-utils';
 
 /**
  * Ensures a directory path exists within the vault.

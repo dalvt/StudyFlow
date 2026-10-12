@@ -9,6 +9,67 @@ export interface PendingTaskItem {
   isIdea?: boolean;
   estimatedPomodoros?: number;
   completedPomodoros?: number;
+  dueDate?: string; // YYYY-MM-DD
+  dueTime?: string; // HH:mm
+  daysRemaining?: number;
+}
+
+export interface TaskDeadline {
+  dueDate?: string;
+  dueTime?: string;
+  cleanTitle: string;
+}
+
+/**
+ * Calculates remaining days from a reference date until a target YYYY-MM-DD string.
+ * Negative numbers mean overdue, 0 means today, positive means future.
+ */
+export function calculateDaysRemaining(dateStr: string, referenceDate: Date = new Date()): number {
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return 0;
+  const target = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+  const ref = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 0, 0, 0, 0);
+  const diffTime = target.getTime() - ref.getTime();
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Returns human readable status for days remaining.
+ */
+export function formatDeadlineHuman(daysRemaining: number, dateStr: string): string {
+  if (daysRemaining < -1) return `Venció hace ${Math.abs(daysRemaining)} días (${dateStr})`;
+  if (daysRemaining === -1) return `Venció ayer (${dateStr})`;
+  if (daysRemaining === 0) return 'Vence hoy';
+  if (daysRemaining === 1) return 'Vence mañana';
+  if (daysRemaining <= 7) return `Vence en ${daysRemaining} días (${dateStr})`;
+  return dateStr;
+}
+
+/**
+ * Parses deadline from task text (e.g. 📅 2026-10-18 or 📅 2026-10-18 14:30 or #deadline/2026-10-18).
+ */
+export function parseTaskDeadline(text: string): TaskDeadline {
+  const match = text.match(/(?:📅|:calendar:|#deadline\/|due:)\s*(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?/i);
+  if (!match) {
+    return { cleanTitle: text };
+  }
+  const dueDate = match[1];
+  const dueTime = match[2];
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return {
+    dueDate,
+    dueTime,
+    cleanTitle: cleanTitle || text,
+  };
+}
+
+/**
+ * Formats task text with an explicit deadline date and optional time.
+ */
+export function formatTaskWithDeadline(text: string, date: string, time?: string): string {
+  const { cleanTitle } = parseTaskDeadline(text);
+  const timeSuffix = time ? ` ${time}` : '';
+  return `${cleanTitle} 📅 ${date}${timeSuffix}`.trim();
 }
 
 export interface TaskPomodoroEstimate {
@@ -182,6 +243,8 @@ export function extractPendingTasksFromContent(
       const taskText = match[1].trim();
       const { priority } = parseTaskPriority(taskText);
       const { estimated, completed } = parseTaskPomodoroEstimate(taskText);
+      const { dueDate, dueTime } = parseTaskDeadline(taskText);
+      const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
       const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
@@ -192,6 +255,9 @@ export function extractPendingTasksFromContent(
         isIdea,
         estimatedPomodoros: estimated,
         completedPomodoros: completed,
+        dueDate,
+        dueTime,
+        daysRemaining,
       });
     }
   }

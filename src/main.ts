@@ -6,7 +6,7 @@ import { PomodoroModal } from './pomodoro-modal';
 import { AnalyticsModal } from './analytics-modal';
 import { DEFAULT_SETTINGS, StudyFlowSettings, StudyFlowSettingTab } from './settings';
 import { QuickCaptureModal, TasksManagerModal } from './tasks';
-import { StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
+import { ActiveTab, StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
 import { migratePluginFilesToDedicatedFolder } from './utils';
 
@@ -44,6 +44,10 @@ export default class StudyFlowPlugin extends Plugin {
       new HabitsModal(this.app, this).open();
     });
 
+    this.addRibbonIcon('calendar-days', 'Study Flow: Calendario & Time Blocking', () => {
+      this.activateView(true, 'calendar');
+    });
+
     this.addRibbonIcon('calendar-check', 'Study Flow: Planificar el día siguiente', () => {
       new NextDayPlannerModal(this.app, this).open();
     });
@@ -58,6 +62,22 @@ export default class StudyFlowPlugin extends Plugin {
       name: 'Abrir interfaz completa (Pestaña central)',
       callback: () => {
         this.activateView(true);
+      },
+    });
+
+    this.addCommand({
+      id: 'open-study-flow-calendar',
+      name: 'Abrir Calendario y Bloques de Tiempo',
+      callback: () => {
+        this.activateView(true, 'calendar');
+      },
+    });
+
+    this.addCommand({
+      id: 'open-study-flow-deadlines',
+      name: 'Abrir Centro de Deadlines & Entregas',
+      callback: () => {
+        this.activateView(true, 'calendar');
       },
     });
 
@@ -170,7 +190,7 @@ export default class StudyFlowPlugin extends Plugin {
     }
   }
 
-  async activateView(inTab: boolean = true): Promise<void> {
+  async activateView(inTab: boolean = true, defaultTab?: ActiveTab): Promise<void> {
     const { workspace } = this.app;
     const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW);
 
@@ -215,6 +235,9 @@ export default class StudyFlowPlugin extends Plugin {
     if (targetLeaf) {
       workspace.setActiveLeaf(targetLeaf, { focus: true });
       workspace.revealLeaf(targetLeaf);
+      if (defaultTab && targetLeaf.view instanceof StudyFlowView) {
+        await targetLeaf.view.setActiveTab(defaultTab);
+      }
     }
   }
 

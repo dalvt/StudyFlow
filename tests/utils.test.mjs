@@ -2,10 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   appendTaskToMarkdownSection,
+  calculateDaysRemaining,
   extractPendingTasksFromContent,
   formatDailyNoteFileName,
+  formatDeadlineHuman,
+  formatTaskWithDeadline,
   formatTaskWithPriority,
   formatTaskWithPomodoroEstimate,
+  parseTaskDeadline,
   parseTaskPriority,
   parseTaskPomodoroEstimate,
 } from '../src/markdown-utils.ts';
@@ -249,3 +253,85 @@ test('computeTasksOverview includes pomodoro estimates and completions', async (
   assert.equal(stat.totalEstimatedPomodoros, 7);
   assert.equal(stat.totalCompletedPomodoros, 3);
 });
+
+test('parseTaskDeadline extracts due dates and times', () => {
+  const item1 = parseTaskDeadline('Entrega Trabajo Práctico 📅 2026-10-20');
+  assert.equal(item1.dueDate, '2026-10-20');
+  assert.equal(item1.dueTime, undefined);
+  assert.equal(item1.cleanTitle, 'Entrega Trabajo Práctico');
+
+  const item2 = parseTaskDeadline('Examen Parcial 📅 2026-10-25 15:30');
+  assert.equal(item2.dueDate, '2026-10-25');
+  assert.equal(item2.dueTime, '15:30');
+  assert.equal(item2.cleanTitle, 'Examen Parcial');
+
+  const item3 = parseTaskDeadline('Repasar sin fecha');
+  assert.equal(item3.dueDate, undefined);
+  assert.equal(item3.cleanTitle, 'Repasar sin fecha');
+});
+
+test('formatTaskWithDeadline formats and updates deadline cleanly', () => {
+  assert.equal(formatTaskWithDeadline('Entregar TP', '2026-10-20'), 'Entregar TP 📅 2026-10-20');
+  assert.equal(formatTaskWithDeadline('Entregar TP 📅 2026-10-15', '2026-10-20'), 'Entregar TP 📅 2026-10-20');
+  assert.equal(formatTaskWithDeadline('Entregar TP', '2026-10-20', '18:00'), 'Entregar TP 📅 2026-10-20 18:00');
+});
+
+test('calculateDaysRemaining and formatDeadlineHuman handle relative dates', () => {
+  const ref = new Date('2026-10-12T10:00:00');
+  assert.equal(calculateDaysRemaining('2026-10-12', ref), 0);
+  assert.equal(calculateDaysRemaining('2026-10-13', ref), 1);
+  assert.equal(calculateDaysRemaining('2026-10-15', ref), 3);
+  assert.equal(calculateDaysRemaining('2026-10-10', ref), -2);
+
+  assert.equal(formatDeadlineHuman(0, '2026-10-12'), 'Vence hoy');
+  assert.equal(formatDeadlineHuman(1, '2026-10-13'), 'Vence mañana');
+  assert.equal(formatDeadlineHuman(3, '2026-10-15'), 'Vence en 3 días (2026-10-15)');
+  assert.equal(formatDeadlineHuman(-1, '2026-10-11'), 'Venció ayer (2026-10-11)');
+  assert.equal(formatDeadlineHuman(-3, '2026-10-09'), 'Venció hace 3 días (2026-10-09)');
+});
+
+test('extractPendingTasksFromContent populates dueDate and daysRemaining', () => {
+  const content = `# Inbox
+
+## Tareas
+- [ ] ⏫ Entrega Final 📅 2026-10-20
+- [ ] Tarea sin deadline
+`;
+  const tasks = extractPendingTasksFromContent(content, 'Inbox.md');
+  assert.equal(tasks.length, 2);
+  assert.equal(tasks[0].dueDate, '2026-10-20');
+  assert.ok(typeof tasks[0].daysRemaining === 'number');
+  assert.equal(tasks[1].dueDate, undefined);
+  assert.equal(tasks[1].daysRemaining, undefined);
+});
+
+test('getCalendarMonthMatrix calculates correct rows and days for month', async () => {
+  const { getCalendarMonthMatrix, formatMonthYearHeader, formatLongDate } = await import('../src/calendar-utils.ts');
+  const ref = new Date('2026-10-12T12:00:00');
+  // October 2026 (month index 9) has 31 days. Oct 1 is Thursday (index 3 in Mon-Sun).
+  const cells = getCalendarMonthMatrix(2026, 9, ref);
+  assert.equal(cells.length % 7, 0); // Complete rows of 7
+
+  const currentMonthCells = cells.filter((c) => c.isCurrentMonth);
+  assert.equal(currentMonthCells.length, 31);
+
+  const todayCell = cells.find((c) => c.dateStr === '2026-10-12');
+  assert.ok(todayCell);
+  assert.equal(todayCell.isToday, true);
+
+  assert.equal(formatMonthYearHeader(2026, 9), 'Octubre 2026');
+  assert.equal(formatLongDate('2026-10-12'), 'Lunes 12 de Octubre, 2026');
+});
+
+test('getWeekDays generates 7 days Monday to Sunday', async () => {
+  const { getWeekDays } = await import('../src/calendar-utils.ts');
+  const ref = new Date('2026-10-14T12:00:00'); // Wednesday
+  const days = getWeekDays(ref);
+  assert.equal(days.length, 7);
+  assert.equal(days[0].shortDay, 'Lun');
+  assert.equal(days[0].dateStr, '2026-10-12');
+  assert.equal(days[6].shortDay, 'Dom');
+  assert.equal(days[6].dateStr, '2026-10-18');
+});
+
+

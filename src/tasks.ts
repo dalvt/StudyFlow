@@ -2,9 +2,13 @@ import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   appendTaskToMarkdownSection,
+  calculateDaysRemaining,
+  formatDeadlineHuman,
+  formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
   getOrCreateFile,
+  parseTaskDeadline,
   parseTaskPomodoroEstimate,
   parseTaskPriority,
   PendingTaskItem,
@@ -17,6 +21,9 @@ export interface TaskRecord extends PendingTaskItem {
   priority: TaskPriority;
   estimatedPomodoros?: number;
   completedPomodoros?: number;
+  dueDate?: string;
+  dueTime?: string;
+  daysRemaining?: number;
 }
 
 export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
@@ -29,6 +36,17 @@ export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
   if (a.completed !== b.completed) {
     return a.completed ? 1 : -1;
   }
+  // Prioritize imminent/overdue deadlines
+  if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) {
+    return a.dueDate.localeCompare(b.dueDate);
+  }
+  if (a.dueDate && !b.dueDate && (a.daysRemaining !== undefined && a.daysRemaining <= 1)) {
+    return -1;
+  }
+  if (!a.dueDate && b.dueDate && (b.daysRemaining !== undefined && b.daysRemaining <= 1)) {
+    return 1;
+  }
+
   const diff = priorityWeight[b.priority] - priorityWeight[a.priority];
   if (diff !== 0) return diff;
   return a.text.localeCompare(b.text);
@@ -53,6 +71,8 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
       const completed = statusChar.toLowerCase() === 'x';
       const { priority } = parseTaskPriority(taskText);
       const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
+      const { dueDate, dueTime } = parseTaskDeadline(taskText);
+      const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
       const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
@@ -65,6 +85,9 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         isIdea,
         estimatedPomodoros: estimated,
         completedPomodoros: pomodoroCompleted,
+        dueDate,
+        dueTime,
+        daysRemaining,
       });
     }
   }
@@ -145,7 +168,7 @@ export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promi
 
 export async function toggleTaskCompletionInFile(
   app: App,
-  task: TaskRecord,
+  task: { sourceFile: string; text: string },
   newCompleted: boolean
 ): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(task.sourceFile);
@@ -173,7 +196,10 @@ export async function toggleTaskCompletionInFile(
   return false;
 }
 
-export async function deleteTaskFromFile(app: App, task: TaskRecord): Promise<boolean> {
+export async function deleteTaskFromFile(
+  app: App,
+  task: { sourceFile: string; text: string }
+): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(task.sourceFile);
   if (!(file instanceof TFile)) return false;
 
@@ -204,6 +230,7 @@ export class QuickCaptureModal extends Modal {
   private targetDestination: 'inbox' | 'activeNote' = 'inbox';
   private selectedPriority: TaskPriority = 'none';
   private selectedEstimate: number = 0;
+  private selectedDeadline: string = '';
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -225,6 +252,7 @@ export class QuickCaptureModal extends Modal {
 
     let prioritySetting: Setting | null = null;
     let estimateSetting: Setting | null = null;
+    let deadlineSetting: Setting | null = null;
 
     new Setting(contentEl)
       .setName('Tipo de entrada')
@@ -240,6 +268,9 @@ export class QuickCaptureModal extends Modal {
           }
           if (estimateSetting) {
             estimateSetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+          }
+          if (deadlineSetting) {
+            deadlineSetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
           }
         });
       });
@@ -286,6 +317,16 @@ export class QuickCaptureModal extends Modal {
         drop.setValue(String(this.selectedEstimate));
         drop.onChange((val) => {
           this.selectedEstimate = parseInt(val, 10) || 0;
+        });
+      });
+
+    deadlineSetting = new Setting(contentEl)
+      .setName('Fecha límite (Deadline)')
+      .setDesc('Fecha límite o entrega prevista (opcional)')
+      .addText((text) => {
+        text.inputEl.type = 'date';
+        text.onChange((val) => {
+          this.selectedDeadline = val.trim();
         });
       });
 
@@ -368,6 +409,9 @@ export class QuickCaptureModal extends Modal {
           : this.taskText;
         if (this.selectedEstimate > 0) {
           finalText = formatTaskWithPomodoroEstimate(finalText, this.selectedEstimate);
+        }
+        if (this.selectedDeadline) {
+          finalText = formatTaskWithDeadline(finalText, this.selectedDeadline);
         }
         const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
         await this.app.vault.modify(targetFile, updated);
@@ -638,6 +682,27 @@ export class TasksManagerModal extends Modal {
               badgeLabel = `🍅 ${compCount}`;
             }
             itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
+          }
+
+          if (task.dueDate) {
+            let dCls = 'study-flow-deadline-badge';
+            let dText = `📅 ${task.dueDate}`;
+            if (task.daysRemaining !== undefined) {
+              if (task.daysRemaining < 0) {
+                dCls += ' is-overdue';
+                dText = `🚨 Vencida (${task.dueDate})`;
+              } else if (task.daysRemaining === 0) {
+                dCls += ' is-today';
+                dText = `⚠️ Vence hoy`;
+              } else if (task.daysRemaining === 1) {
+                dCls += ' is-tomorrow';
+                dText = `📌 Vence mañana`;
+              } else if (task.daysRemaining <= 7) {
+                dCls += ' is-soon';
+                dText = `📅 En ${task.daysRemaining}d (${task.dueDate})`;
+              }
+            }
+            itemCard.createSpan({ text: dText, cls: dCls });
           }
 
           const addPomoBtn = itemCard.createEl('button', {
