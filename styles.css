@@ -127,23 +127,53 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 4px;
+  padding: 4px 6px 12px 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 4px;
 }
 
 .study-flow-brand-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: var(--font-ui-medium);
+  gap: 10px;
+  user-select: none;
+}
+
+.study-flow-brand-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.22), rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.05));
+  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--interactive-accent);
+  box-shadow: 0 0 10px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
+}
+
+.study-flow-brand-icon-box svg {
+  width: 16px;
+  height: 16px;
+}
+
+.study-flow-brand-text {
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
   color: var(--text-normal);
 }
 
-.study-flow-brand-title svg {
-  width: 18px;
-  height: 18px;
-  color: var(--interactive-accent);
+.study-flow-brand-sub {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
+  color: var(--text-accent);
+  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
 }
 
 .study-flow-header-actions {
@@ -157,62 +187,65 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
   color: var(--text-muted);
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-header-icon-btn:hover {
   color: var(--text-normal);
   background-color: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
+  transform: translateY(-1px);
 }
 
 .study-flow-header-icon-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 .study-flow-expand-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-s);
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 5px 12px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-expand-tab-btn:hover {
   filter: brightness(1.1);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.45);
 }
 
 .study-flow-expand-tab-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
-/* Responsive 4-Column Grid Navigation */
+/* Responsive 5-Column Navigation */
 .study-flow-segmented-nav {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
+  border-radius: 10px;
   padding: 4px;
   gap: 4px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .study-flow-nav-pill {
@@ -220,46 +253,66 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   padding: 8px 10px;
-  border-radius: var(--radius-s);
-  border: none;
+  border-radius: 7px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   white-space: nowrap;
+  user-select: none;
 }
 
 .study-flow-nav-pill:hover {
   color: var(--text-normal);
   background-color: var(--background-modifier-hover);
+  transform: translateY(-1px);
 }
 
 .study-flow-nav-pill.is-active {
-  background-color: var(--interactive-accent);
+  background: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 3px 12px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35), 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .study-flow-nav-pill svg {
   width: 15px;
   height: 15px;
+  transition: transform 0.2s ease;
 }
 
-/* In narrow panels/sidebars (< 460px), stack icon and label */
-@media (max-width: 460px) {
-  .study-flow-container {
-    padding: 12px;
-    gap: 12px;
+.study-flow-nav-pill.is-active svg {
+  transform: scale(1.08);
+}
+
+/* In narrow panels/sidebars (< 560px), stack icon and label */
+@media (max-width: 560px) {
+  .study-flow-segmented-nav {
+    padding: 3px;
+    gap: 3px;
   }
   .study-flow-nav-pill {
     flex-direction: column;
     gap: 3px;
     padding: 6px 2px;
     font-size: 10.5px;
+  }
+  .study-flow-nav-pill svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .study-flow-nav-pill {
+    padding: 5px 1px;
+    font-size: 9.5px;
   }
 }
 

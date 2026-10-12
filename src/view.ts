@@ -140,9 +140,11 @@ export class StudyFlowView extends ItemView {
     // Top Brand Header
     const brandRow = rootWrapper.createDiv({ cls: 'study-flow-brand-header' });
     const brandTitle = brandRow.createDiv({ cls: 'study-flow-brand-title' });
-    const brandIcon = brandTitle.createSpan();
+    const brandIconBox = brandTitle.createSpan({ cls: 'study-flow-brand-icon-box' });
+    const brandIcon = brandIconBox.createSpan();
     setIcon(brandIcon, 'sparkles');
-    brandTitle.createSpan({ text: 'Study Flow Hub' });
+    brandTitle.createSpan({ text: 'Study Flow', cls: 'study-flow-brand-text' });
+    brandTitle.createSpan({ text: 'Hub', cls: 'study-flow-brand-sub' });
 
     // Header Action Buttons
     const headerActions = brandRow.createDiv({ cls: 'study-flow-header-actions' });
