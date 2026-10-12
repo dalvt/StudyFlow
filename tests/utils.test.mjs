@@ -221,6 +221,20 @@ test('formatTaskWithPomodoroEstimate formats estimated and completed counts clea
   assert.equal(formatTaskWithPomodoroEstimate('Estudiar cálculo', undefined), 'Estudiar cálculo');
 });
 
+test('formatTaskWithPomodoroEstimate correctly decrements and clears pomodoros', () => {
+  const step1 = formatTaskWithPomodoroEstimate('Tarea 🍅 2/4', 4, 1);
+  assert.equal(step1, 'Tarea 🍅 1/4');
+
+  const step2 = formatTaskWithPomodoroEstimate(step1, 4, 0);
+  assert.equal(step2, 'Tarea 🍅 4');
+
+  const noEstStep1 = formatTaskWithPomodoroEstimate('Tarea 🍅 2', undefined, 1);
+  assert.equal(noEstStep1, 'Tarea 🍅 1');
+
+  const noEstStep2 = formatTaskWithPomodoroEstimate(noEstStep1, undefined, 0);
+  assert.equal(noEstStep2, 'Tarea');
+});
+
 test('extractPendingTasksFromContent parses pomodoro estimates from markdown lines', () => {
   const content = `# Inbox
 

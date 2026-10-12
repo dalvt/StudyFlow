@@ -67,6 +67,49 @@ export async function incrementTaskPomodoroInFile(
   return { updatedText: newText };
 }
 
+export async function decrementTaskPomodoroInFile(
+  app: App,
+  task: { sourceFile: string; text: string }
+): Promise<{ updatedText: string } | null> {
+  const file = app.vault.getAbstractFileByPath(task.sourceFile);
+  if (!(file instanceof TFile)) return null;
+
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+
+  let targetIndex = -1;
+  let currentLine = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
+      targetIndex = i;
+      currentLine = line;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) return null;
+
+  const match = currentLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+  if (!match) return null;
+
+  const prefix = match[1];
+  const oldText = match[2].trim();
+
+  const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
+  if (!completed || completed <= 0) return null;
+
+  const newCompleted = Math.max(0, completed - 1);
+  const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
+
+  lines[targetIndex] = `${prefix}${newText}`;
+  await app.vault.modify(file, lines.join('\n'));
+
+  return { updatedText: newText };
+}
+
 export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(task.sourceFile);
   if (!(file instanceof TFile)) return false;
@@ -729,6 +772,23 @@ export class TasksManagerModal extends Modal {
               }
             }
             itemCard.createSpan({ text: dText, cls: dCls });
+          }
+
+          if ((task.completedPomodoros || 0) > 0) {
+            const minusPomoBtn = itemCard.createEl('button', {
+              cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn',
+              attr: { 'aria-label': 'Restar pomodoro a esta tarea (−1 🍅)' },
+            });
+            minusPomoBtn.createSpan({ text: '−🍅' });
+            minusPomoBtn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const res = await decrementTaskPomodoroInFile(this.app, task);
+              if (res) {
+                new Notice(`🍅 Pomodoro restado para "${task.text}"`);
+                await this.refreshTasks();
+                this.renderUI();
+              }
+            });
           }
 
           const addPomoBtn = itemCard.createEl('button', {

@@ -15,6 +15,7 @@ import {
   toggleTaskCompletionInFile,
   promoteIdeaToTaskInFile,
   incrementTaskPomodoroInFile,
+  decrementTaskPomodoroInFile,
   updateTaskTextInFile,
   toggleSubtaskInFile,
   addSubtaskToFile,
@@ -1361,6 +1362,24 @@ export class StudyFlowView extends ItemView {
     const actionsToolbar = itemCard.createDiv({ cls: 'study-flow-task-actions-toolbar' });
 
     if (!task.completed && !task.isIdea) {
+      // −🍅 Quick Pomodoro decrement (if at least 1 completed)
+      if ((task.completedPomodoros || 0) > 0) {
+        const minusPomoBtn = actionsToolbar.createEl('button', {
+          cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn',
+          attr: { 'aria-label': 'Restar pomodoro a esta tarea (−1 🍅)' },
+        });
+        minusPomoBtn.createSpan({ text: '−🍅' });
+        minusPomoBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const res = await decrementTaskPomodoroInFile(this.app, task);
+          if (res) {
+            new Notice(`🍅 Pomodoro restado para "${task.text}"`);
+            rootContainer.empty();
+            await this.renderTasksTab(rootContainer);
+          }
+        });
+      }
+
       // +🍅 Quick Pomodoro increment
       const addPomoBtn = actionsToolbar.createEl('button', {
         cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',

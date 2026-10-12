@@ -3061,10 +3061,27 @@ body.is-study-flow-zen .workspace-split {
   background: rgba(255, 77, 79, 0.12);
   border: 1px solid rgba(255, 77, 79, 0.25);
   color: #ff4d4f;
+  transition: all 0.15s ease;
 }
 
 .study-flow-pomo-step-btn:hover {
   background: #ff4d4f;
+  color: #fff;
+}
+
+.study-flow-pomo-minus-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  background: rgba(250, 140, 22, 0.12);
+  border: 1px solid rgba(250, 140, 22, 0.25);
+  color: #fa8c16;
+  transition: all 0.15s ease;
+}
+
+.study-flow-pomo-minus-btn:hover {
+  background: #fa8c16;
   color: #fff;
 }
 
