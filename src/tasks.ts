@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting, TFile } from 'obsidian';
+import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   appendTaskToMarkdownSection,
@@ -8,12 +8,9 @@ import {
 
 export interface TaskRecord extends PendingTaskItem {
   completed: boolean;
-  statusChar: string; // ' ' for pending, 'x' for completed, '>' for migrated, etc.
+  statusChar: string;
 }
 
-/**
- * Reads all markdown checkboxes from content (both [ ] and [x] etc.)
- */
 export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
   const tasks: TaskRecord[] = [];
   const lines = content.split(/\r?\n/);
@@ -39,9 +36,6 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
   return tasks;
 }
 
-/**
- * Toggles the completion status of a task in its markdown file.
- */
 export async function toggleTaskCompletionInFile(
   app: App,
   task: TaskRecord,
@@ -72,9 +66,6 @@ export async function toggleTaskCompletionInFile(
   return false;
 }
 
-/**
- * Deletes a task line from its markdown file.
- */
 export async function deleteTaskFromFile(app: App, task: TaskRecord): Promise<boolean> {
   const file = app.vault.getAbstractFileByPath(task.sourceFile);
   if (!(file instanceof TFile)) return false;
@@ -112,20 +103,19 @@ export class QuickCaptureModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.addClass('study-flow-modal');
+    contentEl.addClass('study-flow-modal', 'study-flow-quick-capture');
 
-    contentEl.createEl('h2', { text: 'Capturar tarea rápida' });
-    contentEl.createEl('p', {
-      text: 'Ingresa una nueva tarea para registrarla con formato - [ ] en la sección ## Tareas.',
-      cls: 'study-flow-modal-desc',
-    });
+    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
+    const title = header.createEl('h2', { text: 'Captura Rápida de Tarea' });
+    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
+    setIcon(iconSpan, 'zap');
 
     const activeFile = this.app.workspace.getActiveFile();
     const canUseActiveFile = activeFile !== null && activeFile.extension === 'md';
 
     new Setting(contentEl)
-      .setName('Destino')
-      .setDesc('Selecciona dónde registrar la tarea')
+      .setName('Guardar en')
+      .setDesc('Ubicación donde se registrará la tarea')
       .addDropdown((drop) => {
         drop.addOption('inbox', `Inbox (${this.plugin.settings.inboxFilePath})`);
         if (canUseActiveFile && activeFile) {
@@ -137,11 +127,11 @@ export class QuickCaptureModal extends Modal {
         });
       });
 
-    const inputContainer = contentEl.createDiv();
-    const inputEl = inputContainer.createEl('input', {
+    const inputWrap = contentEl.createDiv({ cls: 'study-flow-input-wrap' });
+    const inputEl = inputWrap.createEl('input', {
       type: 'text',
-      cls: 'study-flow-task-input',
-      placeholder: 'Escribe tu tarea y presiona Enter...',
+      cls: 'study-flow-task-input study-flow-input-lg',
+      placeholder: '¿Qué necesitas hacer? (Presiona Enter para guardar)...',
     });
 
     inputEl.focus();
@@ -154,14 +144,21 @@ export class QuickCaptureModal extends Modal {
       }
     });
 
-    const btnContainer = contentEl.createDiv({ cls: 'study-flow-button-row' });
-    const cancelBtn = btnContainer.createEl('button', { text: 'Cancelar' });
+    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
+    const hint = footer.createEl('span', {
+      text: '↵ Enter para confirmar • Esc para cancelar',
+      cls: 'study-flow-shortcut-hint',
+    });
+
+    const cancelBtn = footer.createEl('button', { text: 'Cancelar' });
     cancelBtn.addEventListener('click', () => this.close());
 
-    const submitBtn = btnContainer.createEl('button', {
-      text: 'Guardar Tarea',
+    const submitBtn = footer.createEl('button', {
       cls: 'mod-cta',
     });
+    const subIcon = submitBtn.createSpan();
+    setIcon(subIcon, 'plus');
+    submitBtn.createSpan({ text: 'Añadir Tarea' });
     submitBtn.addEventListener('click', async () => {
       this.taskText = inputEl.value.trim();
       await this.submitTask();
@@ -175,7 +172,7 @@ export class QuickCaptureModal extends Modal {
 
   private async submitTask(): Promise<void> {
     if (!this.taskText) {
-      new Notice('Por favor ingresa el texto de la tarea');
+      new Notice('Ingresa el texto de la tarea');
       return;
     }
 
@@ -200,22 +197,20 @@ export class QuickCaptureModal extends Modal {
       const updated = appendTaskToMarkdownSection(content, this.taskText, '## Tareas');
       await this.app.vault.modify(targetFile, updated);
 
-      new Notice(`Tarea agregada a ${targetName}`);
+      new Notice(`✓ Tarea agregada a ${targetName}`);
       this.close();
     } catch (err) {
-      console.error('Study Flow Assistant: Error capturando tarea', err);
-      new Notice('Error al guardar la tarea en el archivo');
+      console.error('Study Flow: Error capturando tarea', err);
+      new Notice('Error al guardar la tarea');
     }
   }
 }
 
-/**
- * Dedicated visual interface modal for task management
- */
 export class TasksManagerModal extends Modal {
   private plugin: StudyFlowPlugin;
   private tasks: TaskRecord[] = [];
   private filter: 'all' | 'pending' | 'completed' = 'pending';
+  private searchQuery: string = '';
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -226,12 +221,6 @@ export class TasksManagerModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-tasks-modal');
-
-    contentEl.createEl('h2', { text: 'Gestor de Tareas & Inbox' });
-    contentEl.createEl('p', {
-      text: 'Visualiza, marca y gestiona las tareas de tu Inbox y notas en tiempo real.',
-      cls: 'study-flow-modal-desc',
-    });
 
     await this.refreshTasks();
     this.renderUI();
@@ -249,7 +238,7 @@ export class TasksManagerModal extends Modal {
           const found = extractAllTasksFromContent(content, file.path);
           this.tasks.push(...found);
         } catch (err) {
-          console.error('Error cargando tareas de:', filePath, err);
+          console.error('Error cargando tareas:', filePath, err);
         }
       }
     }
@@ -258,19 +247,31 @@ export class TasksManagerModal extends Modal {
   private renderUI(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl('h2', { text: 'Gestor de Tareas & Inbox' });
 
-    // Quick Add Input
-    const addSection = contentEl.createDiv({ cls: 'study-flow-add-task-bar' });
+    // Header
+    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
+    const title = header.createEl('h2', { text: 'Gestor de Tareas & Inbox' });
+    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
+    setIcon(iconSpan, 'check-square');
+
+    // Stats bar
+    const pendingCount = this.tasks.filter((t) => !t.completed).length;
+    const completedCount = this.tasks.filter((t) => t.completed).length;
+    const statsBar = contentEl.createDiv({ cls: 'study-flow-stats-bar' });
+    statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
+    statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
+
+    // Quick Add Bar
+    const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
-      placeholder: 'Nueva tarea rápida... (Presiona Enter para añadir)',
+      placeholder: 'Nueva tarea rápida... (Enter para añadir)',
       cls: 'study-flow-task-input',
     });
-    const addBtn = addSection.createEl('button', {
-      text: 'Añadir',
-      cls: 'mod-cta',
-    });
+    const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
+    const addIcon = addBtn.createSpan();
+    setIcon(addIcon, 'plus');
+    addBtn.createSpan({ text: 'Añadir' });
 
     const handleAdd = async () => {
       const text = addInput.value.trim();
@@ -281,7 +282,7 @@ export class TasksManagerModal extends Modal {
       const updated = appendTaskToMarkdownSection(content, text, '## Tareas');
       await this.app.vault.modify(file, updated);
       addInput.value = '';
-      new Notice('Tarea añadida a Inbox');
+      new Notice('Tarea añadida al Inbox');
       await this.refreshTasks();
       this.renderUI();
     };
@@ -294,27 +295,28 @@ export class TasksManagerModal extends Modal {
       }
     });
 
-    // Filters Bar
-    const filterRow = contentEl.createDiv({ cls: 'study-flow-filter-row' });
-    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string }> = [
-      { id: 'pending', label: `Pendientes (${this.tasks.filter((t) => !t.completed).length})` },
-      { id: 'completed', label: `Completadas (${this.tasks.filter((t) => t.completed).length})` },
-      { id: 'all', label: `Todas (${this.tasks.length})` },
+    // Filters and Search Bar
+    const filterRow = contentEl.createDiv({ cls: 'study-flow-segmented-control' });
+    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string; count: number }> = [
+      { id: 'pending', label: 'Pendientes', count: pendingCount },
+      { id: 'completed', label: 'Completadas', count: completedCount },
+      { id: 'all', label: 'Todas', count: this.tasks.length },
     ];
 
     filters.forEach((f) => {
-      const fBtn = filterRow.createEl('button', {
-        text: f.label,
-        cls: this.filter === f.id ? 'mod-cta' : '',
+      const btn = filterRow.createEl('button', {
+        cls: `study-flow-segmented-btn ${this.filter === f.id ? 'is-active' : ''}`,
       });
-      fBtn.addEventListener('click', () => {
+      btn.createSpan({ text: f.label });
+      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
+      btn.addEventListener('click', () => {
         this.filter = f.id;
         this.renderUI();
       });
     });
 
     // Tasks List Container
-    const listContainer = contentEl.createDiv({ cls: 'study-flow-task-list-full' });
+    const listContainer = contentEl.createDiv({ cls: 'study-flow-task-list-cards' });
     const displayedTasks = this.tasks.filter((t) => {
       if (this.filter === 'pending') return !t.completed;
       if (this.filter === 'completed') return t.completed;
@@ -322,35 +324,55 @@ export class TasksManagerModal extends Modal {
     });
 
     if (displayedTasks.length === 0) {
-      listContainer.createDiv({
-        cls: 'study-flow-empty-tasks',
-        text: 'No hay tareas en esta vista.',
+      const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
+      const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
+      setIcon(emptyIcon, 'check-circle-2');
+      emptyState.createEl('h4', {
+        text: this.filter === 'pending' ? '¡Todo al día!' : 'No hay tareas registradas',
+      });
+      emptyState.createEl('p', {
+        text: this.filter === 'pending'
+          ? 'No tienes tareas pendientes en tu Inbox.'
+          : 'Añade una tarea arriba para comenzar.',
       });
     } else {
       displayedTasks.forEach((task) => {
-        const itemRow = listContainer.createDiv({ cls: 'study-flow-task-row-interactive' });
+        const itemCard = listContainer.createDiv({
+          cls: `study-flow-task-card ${task.completed ? 'is-done' : ''}`,
+        });
 
-        const cb = itemRow.createEl('input', { type: 'checkbox' });
+        const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
+        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
         cb.checked = task.completed;
         cb.addEventListener('change', async () => {
           await toggleTaskCompletionInFile(this.app, task, cb.checked);
           task.completed = cb.checked;
-          new Notice(cb.checked ? 'Tarea completada' : 'Tarea desmarcada');
+          new Notice(cb.checked ? '✓ Tarea completada' : 'Tarea desmarcada');
           await this.refreshTasks();
           this.renderUI();
         });
 
-        const label = itemRow.createEl('span', {
+        const textSpan = itemCard.createEl('span', {
           text: task.text,
-          cls: task.completed ? 'is-completed' : '',
+          cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
         });
 
-        const delBtn = itemRow.createEl('button', {
-          text: '🗑',
-          cls: 'study-flow-delete-btn',
+        const fileBadge = itemCard.createSpan({
+          text: '#Inbox',
+          cls: 'study-flow-source-chip',
+        });
+
+        const delBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
           attr: { 'aria-label': 'Eliminar tarea' },
         });
-        delBtn.addEventListener('click', async () => {
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
           await deleteTaskFromFile(this.app, task);
           new Notice('Tarea eliminada');
           await this.refreshTasks();
@@ -359,8 +381,8 @@ export class TasksManagerModal extends Modal {
       });
     }
 
-    // Close button
-    const footer = contentEl.createDiv({ cls: 'study-flow-button-row' });
+    // Modal Footer
+    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
     const closeBtn = footer.createEl('button', { text: 'Cerrar' });
     closeBtn.addEventListener('click', () => this.close());
   }

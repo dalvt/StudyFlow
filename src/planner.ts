@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting, TFile } from 'obsidian';
+import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   extractPendingTasksFromContent,
@@ -20,8 +20,8 @@ export class NextDayPlannerModal extends Modal {
   private selectedTaskIds: Set<string> = new Set();
   private markMigratedInSource: boolean = false;
   private studyBlocks: StudyBlock[] = [
-    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque de Estudio 1' },
-    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque de Estudio 2' },
+    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino: Estudio Intenso' },
+    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico: Ejercicios' },
   ];
 
   constructor(app: App, plugin: StudyFlowPlugin) {
@@ -34,13 +34,7 @@ export class NextDayPlannerModal extends Modal {
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-planner-modal');
 
-    contentEl.createEl('h2', { text: 'Planificador del día siguiente' });
-    contentEl.createEl('p', {
-      text: 'Revisa tareas pendientes, organiza tus bloques de tiempo y prepara tu jornada.',
-      cls: 'study-flow-modal-desc',
-    });
-
-    const loadingEl = contentEl.createEl('div', { text: 'Buscando tareas pendientes...' });
+    const loadingEl = contentEl.createEl('div', { cls: 'study-flow-empty-tasks', text: 'Cargando pendientes...' });
     await this.loadTasks();
     loadingEl.remove();
 
@@ -80,33 +74,51 @@ export class NextDayPlannerModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl('h2', { text: 'Planificador del día siguiente' });
+    // Modal Header
+    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
+    const title = header.createEl('h2', { text: 'Planificar el Día Siguiente' });
+    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
+    setIcon(iconSpan, 'calendar-check');
+
+    contentEl.createEl('p', {
+      text: 'Organiza tus bloques de tiempo y selecciona las tareas pendientes que priorizarás mañana.',
+      cls: 'study-flow-modal-desc',
+    });
 
     const container = contentEl.createDiv({ cls: 'study-flow-planner-container' });
 
-    // Section 1: Study Blocks Editor
-    const blocksSection = container.createDiv({ cls: 'study-flow-blocks-section' });
-    const blocksHeader = blocksSection.createDiv({
-      attr: { style: 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;' },
-    });
-    blocksHeader.createEl('h3', { text: 'Bloques de Estudio', attr: { style: 'margin: 0;' } });
+    // Section 1: Study Blocks Timeline
+    const blocksSection = container.createDiv({ cls: 'study-flow-section-card' });
+    const blocksHeader = blocksSection.createDiv({ cls: 'study-flow-section-header' });
+    const blocksTitle = blocksHeader.createEl('h3', { text: 'Bloques de Estudio' });
+    const bIcon = blocksTitle.createSpan({ cls: 'study-flow-section-icon' });
+    setIcon(bIcon, 'clock');
 
-    const addBlockBtn = blocksHeader.createEl('button', { text: '+ Añadir Bloque' });
+    const addBlockBtn = blocksHeader.createEl('button', { cls: 'study-flow-icon-action-btn-styled' });
+    const addIcon = addBlockBtn.createSpan();
+    setIcon(addIcon, 'plus');
+    addBlockBtn.createSpan({ text: 'Añadir Bloque' });
     addBlockBtn.addEventListener('click', () => {
       this.studyBlocks.push({
         id: String(Date.now()),
         startTime: '14:00',
         endTime: '15:30',
-        title: 'Nuevo Bloque',
+        title: 'Bloque Vespertino',
       });
       this.renderModalContent();
     });
 
-    const blocksListEl = blocksSection.createDiv({ cls: 'study-flow-blocks-list' });
+    const blocksListEl = blocksSection.createDiv({ cls: 'study-flow-timeline-list' });
     this.studyBlocks.forEach((block, index) => {
-      const row = blocksListEl.createDiv({ cls: 'study-flow-block-row' });
+      const row = blocksListEl.createDiv({ cls: 'study-flow-timeline-item' });
 
-      const startInput = row.createEl('input', {
+      const nodeDot = row.createDiv({ cls: 'study-flow-timeline-dot' });
+      setIcon(nodeDot, 'calendar');
+
+      const inputsWrap = row.createDiv({ cls: 'study-flow-timeline-content' });
+      const timeWrap = inputsWrap.createDiv({ cls: 'study-flow-time-range-wrap' });
+
+      const startInput = timeWrap.createEl('input', {
         type: 'text',
         value: block.startTime,
         cls: 'study-flow-time-input',
@@ -116,9 +128,9 @@ export class NextDayPlannerModal extends Modal {
         this.updatePreview();
       });
 
-      row.createSpan({ text: '—' });
+      timeWrap.createSpan({ text: '—', cls: 'study-flow-time-sep' });
 
-      const endInput = row.createEl('input', {
+      const endInput = timeWrap.createEl('input', {
         type: 'text',
         value: block.endTime,
         cls: 'study-flow-time-input',
@@ -128,54 +140,59 @@ export class NextDayPlannerModal extends Modal {
         this.updatePreview();
       });
 
-      const titleInput = row.createEl('input', {
+      const titleInput = inputsWrap.createEl('input', {
         type: 'text',
         value: block.title,
         cls: 'study-flow-block-title-input',
+        placeholder: 'Título o materia del bloque...',
       });
       titleInput.addEventListener('change', () => {
         block.title = titleInput.value.trim();
         this.updatePreview();
       });
 
-      const removeBtn = row.createEl('button', { text: '✕', cls: 'study-flow-delete-btn' });
+      const removeBtn = row.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Eliminar bloque' },
+      });
+      setIcon(removeBtn, 'trash-2');
       removeBtn.addEventListener('click', () => {
         this.studyBlocks.splice(index, 1);
         this.renderModalContent();
       });
     });
 
-    // Section 2: Tasks Selection
-    const tasksHeader = container.createDiv({
-      attr: { style: 'display: flex; justify-content: space-between; align-items: center; margin-top: 12px;' },
+    // Section 2: Priority Tasks Selection
+    const tasksSection = container.createDiv({ cls: 'study-flow-section-card' });
+    const tasksHeader = tasksSection.createDiv({ cls: 'study-flow-section-header' });
+    const tasksTitle = tasksHeader.createEl('h3', {
+      text: `Tareas Pendientes (${this.pendingTasks.length})`,
     });
-    tasksHeader.createEl('h3', {
-      text: `Tareas pendientes (${this.pendingTasks.length})`,
-      attr: { style: 'margin: 0;' },
-    });
+    const tIcon = tasksTitle.createSpan({ cls: 'study-flow-section-icon' });
+    setIcon(tIcon, 'check-circle');
 
     if (this.pendingTasks.length > 0) {
-      const bulkActions = tasksHeader.createDiv({ attr: { style: 'display: flex; gap: 8px;' } });
-      const selectAllBtn = bulkActions.createEl('button', { text: 'Todas' });
+      const bulkActions = tasksHeader.createDiv({ cls: 'study-flow-bulk-actions' });
+      const selectAllBtn = bulkActions.createEl('button', { text: 'Todas', cls: 'study-flow-mini-btn' });
       selectAllBtn.addEventListener('click', () => {
         this.pendingTasks.forEach((t) => this.selectedTaskIds.add(t.id));
         this.renderModalContent();
       });
 
-      const deselectAllBtn = bulkActions.createEl('button', { text: 'Ninguna' });
+      const deselectAllBtn = bulkActions.createEl('button', { text: 'Ninguna', cls: 'study-flow-mini-btn' });
       deselectAllBtn.addEventListener('click', () => {
         this.selectedTaskIds.clear();
         this.renderModalContent();
       });
     }
 
-    const taskListEl = container.createDiv({ cls: 'study-flow-task-list' });
+    const taskListEl = tasksSection.createDiv({ cls: 'study-flow-task-list-cards' });
     this.populateTaskList(taskListEl);
 
     // Option: Mark migrated
-    new Setting(container)
+    new Setting(tasksSection)
       .setName('Marcar como migradas en origen')
-      .setDesc('Marca las tareas seleccionadas como [>] en el archivo original.')
+      .setDesc('Convierte [ ] a [>] en la nota original para mantener trazabilidad.')
       .addToggle((toggle) =>
         toggle.setValue(this.markMigratedInSource).onChange((val) => {
           this.markMigratedInSource = val;
@@ -183,23 +200,20 @@ export class NextDayPlannerModal extends Modal {
       );
 
     // Section 3: Live Preview
-    const previewSection = container.createDiv({ cls: 'study-flow-preview-section' });
-    previewSection.createDiv({
-      text: 'Vista previa de la plantilla generada:',
-      cls: 'study-flow-preview-label',
-    });
+    const previewSection = container.createDiv({ cls: 'study-flow-section-card' });
+    previewSection.createEl('h3', { text: 'Vista Previa del Archivo' });
     const previewBox = previewSection.createDiv({ cls: 'study-flow-preview-box' });
     previewBox.setText(this.generateTemplateString());
 
     // Action buttons
-    const btnRow = contentEl.createDiv({ cls: 'study-flow-button-row' });
+    const btnRow = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
     const cancelBtn = btnRow.createEl('button', { text: 'Cancelar' });
     cancelBtn.addEventListener('click', () => this.close());
 
-    const submitBtn = btnRow.createEl('button', {
-      text: 'Generar Plan de Mañana',
-      cls: 'mod-cta',
-    });
+    const submitBtn = btnRow.createEl('button', { cls: 'mod-cta' });
+    const genIcon = submitBtn.createSpan();
+    setIcon(genIcon, 'calendar-plus');
+    submitBtn.createSpan({ text: 'Generar Plan de Mañana' });
     submitBtn.addEventListener('click', async () => {
       await this.generateTomorrowPlan();
     });
@@ -240,8 +254,9 @@ ${tasksBlock}`;
     }
 
     this.pendingTasks.forEach((task) => {
-      const itemEl = container.createDiv({ cls: 'study-flow-task-item' });
-      const checkbox = itemEl.createEl('input', { type: 'checkbox' });
+      const itemEl = container.createDiv({ cls: 'study-flow-task-card' });
+      const cbWrapper = itemEl.createDiv({ cls: 'study-flow-cb-wrapper' });
+      const checkbox = cbWrapper.createEl('input', { type: 'checkbox' });
       checkbox.checked = this.selectedTaskIds.has(task.id);
 
       checkbox.addEventListener('change', () => {
@@ -253,20 +268,17 @@ ${tasksBlock}`;
         this.updatePreview();
       });
 
-      const label = itemEl.createEl('label', { text: task.text });
+      const label = itemEl.createEl('span', { text: task.text, cls: 'study-flow-task-text' });
       label.addEventListener('click', () => {
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event('change'));
       });
 
-      const sourceBadge = itemEl.createEl('span', {
+      itemEl.createSpan({
         text: task.sourceFile.endsWith('.md')
           ? task.sourceFile.substring(0, task.sourceFile.length - 3)
           : task.sourceFile,
-        attr: {
-          style:
-            'font-size: var(--font-ui-smaller); color: var(--text-faint); margin-left: auto; padding-left: 8px;',
-        },
+        cls: 'study-flow-source-chip',
       });
     });
   }

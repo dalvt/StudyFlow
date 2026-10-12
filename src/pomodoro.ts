@@ -11,6 +11,7 @@ export interface PomodoroStatus {
   remainingSeconds: number;
   totalDurationSeconds: number;
   completedSessionsToday: number;
+  progressPercent: number;
 }
 
 export type PomodoroListener = (status: PomodoroStatus) => void;
@@ -61,12 +62,18 @@ export class PomodoroManager {
   }
 
   public getStatus(): PomodoroStatus {
+    const elapsed = Math.max(0, this.totalDurationSeconds - this.remainingSeconds);
+    const progressPercent = this.totalDurationSeconds > 0
+      ? Math.min(100, Math.max(0, (elapsed / this.totalDurationSeconds) * 100))
+      : 0;
+
     return {
       state: this.state,
       mode: this.mode,
       remainingSeconds: this.remainingSeconds,
       totalDurationSeconds: this.totalDurationSeconds,
       completedSessionsToday: this.completedSessionsToday,
+      progressPercent,
     };
   }
 
@@ -92,6 +99,19 @@ export class PomodoroManager {
       this.updateDisplay();
       this.notifyListeners();
     }
+  }
+
+  public setCustomMinutes(minutes: number, mode: PomodoroMode = 'work'): void {
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.mode = mode;
+    this.state = 'idle';
+    this.totalDurationSeconds = Math.max(1, minutes) * 60;
+    this.remainingSeconds = this.totalDurationSeconds;
+    this.updateDisplay();
+    this.notifyListeners();
   }
 
   public toggleStartPause(): void {
@@ -143,8 +163,11 @@ export class PomodoroManager {
     }
 
     this.state = 'idle';
-    this.mode = 'work';
-    this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    const durationMin =
+      this.mode === 'work'
+        ? this.plugin.settings.pomodoroWorkDuration
+        : this.plugin.settings.pomodoroBreakDuration;
+    this.totalDurationSeconds = durationMin * 60;
     this.remainingSeconds = this.totalDurationSeconds;
     this.updateDisplay();
     this.notifyListeners();

@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, TFile } from 'obsidian';
+import { ItemView, Notice, setIcon, WorkspaceLeaf, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   deleteTaskFromFile,
@@ -18,6 +18,9 @@ export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
 
 type ActiveTab = 'pomodoro' | 'tasks' | 'planner';
 
+const CIRCLE_RADIUS = 70;
+const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+
 export class StudyFlowView extends ItemView {
   private plugin: StudyFlowPlugin;
   private activeTab: ActiveTab = 'pomodoro';
@@ -31,6 +34,10 @@ export class StudyFlowView extends ItemView {
   private pendingPlannerTasks: PendingTaskItem[] = [];
   private selectedPlannerTaskIds: Set<string> = new Set();
   private plannerDateOffset: number = 0; // 0 for today, 1 for tomorrow
+  private studyBlocks: Array<{ id: string; startTime: string; endTime: string; title: string }> = [
+    { id: '1', startTime: '08:00', endTime: '09:30', title: 'Bloque Matutino' },
+    { id: '2', startTime: '10:00', endTime: '11:30', title: 'Bloque Práctico' },
+  ];
 
   constructor(leaf: WorkspaceLeaf, plugin: StudyFlowPlugin) {
     super(leaf);
@@ -56,7 +63,6 @@ export class StudyFlowView extends ItemView {
 
     await this.renderView();
 
-    // Subscribe to pomodoro updates
     this.unsubscribePomodoro = this.plugin.pomodoro.subscribe(() => {
       if (this.activeTab === 'pomodoro') {
         this.updatePomodoroClock();
@@ -76,27 +82,37 @@ export class StudyFlowView extends ItemView {
     const { containerEl } = this;
     containerEl.empty();
 
-    // 1. Navigation Tab Bar
-    const navBar = containerEl.createDiv({ cls: 'study-flow-nav-tabs' });
+    // Top Brand Header
+    const brandRow = containerEl.createDiv({ cls: 'study-flow-brand-header' });
+    const brandTitle = brandRow.createDiv({ cls: 'study-flow-brand-title' });
+    const brandIcon = brandTitle.createSpan();
+    setIcon(brandIcon, 'sparkles');
+    brandTitle.createSpan({ text: 'Study Flow Hub' });
+
+    // Navigation Tab Bar
+    const navBar = containerEl.createDiv({ cls: 'study-flow-segmented-nav' });
 
     const tabs: Array<{ id: ActiveTab; label: string; icon: string }> = [
-      { id: 'pomodoro', label: 'Pomodoro', icon: '🍅' },
-      { id: 'tasks', label: 'Tareas', icon: '📋' },
-      { id: 'planner', label: 'Planificador', icon: '📅' },
+      { id: 'pomodoro', label: 'Pomodoro', icon: 'timer' },
+      { id: 'tasks', label: 'Tareas', icon: 'check-square' },
+      { id: 'planner', label: 'Planificador', icon: 'calendar-days' },
     ];
 
     tabs.forEach((tab) => {
       const btn = navBar.createEl('button', {
-        cls: `study-flow-nav-btn ${this.activeTab === tab.id ? 'is-active' : ''}`,
-        text: `${tab.icon} ${tab.label}`,
+        cls: `study-flow-nav-pill ${this.activeTab === tab.id ? 'is-active' : ''}`,
       });
+      const iconSpan = btn.createSpan();
+      setIcon(iconSpan, tab.icon);
+      btn.createSpan({ text: tab.label });
+
       btn.addEventListener('click', async () => {
         this.activeTab = tab.id;
         await this.renderView();
       });
     });
 
-    // 2. Tab Content Container
+    // Content Body
     const contentBody = containerEl.createDiv({ cls: 'study-flow-tab-body' });
 
     if (this.activeTab === 'pomodoro') {
@@ -114,101 +130,151 @@ export class StudyFlowView extends ItemView {
 
     const card = container.createDiv({ cls: 'study-flow-card' });
 
-    // Header Pill
-    const pill = card.createDiv({
-      text: status.mode === 'work' ? '🍅 Sesión de Trabajo' : '☕ Descanso',
-      cls: `study-flow-mode-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+    // Presets bar
+    const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
+    const presets = [
+      { label: '25m', mins: 25, mode: 'work' as const },
+      { label: '50m', mins: 50, mode: 'work' as const },
+      { label: '5m', mins: 5, mode: 'break' as const },
+      { label: '15m', mins: 15, mode: 'break' as const },
+    ];
+
+    presets.forEach((p) => {
+      const chip = presetsRow.createEl('button', {
+        text: p.label,
+        cls: 'study-flow-preset-chip',
+      });
+      chip.addEventListener('click', () => {
+        this.plugin.pomodoro.setCustomMinutes(p.mins, p.mode);
+      });
     });
 
-    // Big Clock
-    card.createEl('div', {
+    // Circular SVG dial
+    const dialContainer = card.createDiv({ cls: 'study-flow-dial-container' });
+
+    const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgEl.setAttribute('class', 'study-flow-dial-svg');
+    svgEl.setAttribute('viewBox', '0 0 160 160');
+
+    const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    bgCircle.setAttribute('class', 'study-flow-dial-bg');
+    bgCircle.setAttribute('cx', '80');
+    bgCircle.setAttribute('cy', '80');
+    bgCircle.setAttribute('r', String(CIRCLE_RADIUS));
+    svgEl.appendChild(bgCircle);
+
+    const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    progressCircle.setAttribute('class', 'study-flow-dial-progress');
+    progressCircle.setAttribute('cx', '80');
+    progressCircle.setAttribute('cy', '80');
+    progressCircle.setAttribute('r', String(CIRCLE_RADIUS));
+    progressCircle.setAttribute('stroke-dasharray', String(CIRCUMFERENCE));
+    svgEl.appendChild(progressCircle);
+
+    dialContainer.appendChild(svgEl);
+
+    // Dial center text
+    const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
+
+    centerInfo.createDiv({
+      text: status.mode === 'work' ? 'TRABAJO' : 'DESCANSO',
+      cls: `study-flow-badge-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+    });
+
+    centerInfo.createDiv({
       text: this.plugin.pomodoro.formatTime(status.remainingSeconds),
-      cls: 'study-flow-big-clock',
+      cls: 'study-flow-dial-time',
     });
 
-    // Progress Bar
-    const track = card.createDiv({ cls: 'study-flow-progress-track' });
-    const percent = Math.min(
-      100,
-      Math.max(0, ((status.totalDurationSeconds - status.remainingSeconds) / status.totalDurationSeconds) * 100)
-    );
-    track.createDiv({
-      cls: 'study-flow-progress-fill',
-      attr: { style: `width: ${percent}%;` },
+    centerInfo.createDiv({
+      text: `${status.completedSessionsToday} sesiones hoy`,
+      cls: 'study-flow-dial-stats',
     });
 
-    // Stats
-    card.createDiv({
-      text: `Sesiones hoy: ${status.completedSessionsToday}`,
-      cls: 'study-flow-session-counter',
-    });
-
-    // Main Controls
-    const controls = card.createDiv({ cls: 'study-flow-pomodoro-controls' });
+    // Main Control Buttons
+    const controls = card.createDiv({ cls: 'study-flow-main-controls' });
     const isRunning = status.state === 'running';
 
     const playBtn = controls.createEl('button', {
-      text: isRunning ? '⏸ Pausar' : '▶ Iniciar',
-      cls: isRunning ? 'mod-warning' : 'mod-cta',
+      cls: `study-flow-action-btn ${isRunning ? 'mod-warning' : 'mod-cta'}`,
     });
+    const pIcon = playBtn.createSpan();
+    setIcon(pIcon, isRunning ? 'pause' : 'play');
+    playBtn.createSpan({ text: isRunning ? 'Pausar' : 'Iniciar' });
     playBtn.addEventListener('click', () => {
       this.plugin.pomodoro.toggleStartPause();
     });
 
-    const resetBtn = controls.createEl('button', { text: '↺ Reiniciar' });
+    const resetBtn = controls.createEl('button', { cls: 'study-flow-action-btn' });
+    const rIcon = resetBtn.createSpan();
+    setIcon(rIcon, 'rotate-ccw');
+    resetBtn.createSpan({ text: 'Reiniciar' });
     resetBtn.addEventListener('click', () => {
       this.plugin.pomodoro.reset();
     });
 
-    const skipBtn = controls.createEl('button', { text: '⏭ Saltar' });
+    const skipBtn = controls.createEl('button', { cls: 'study-flow-action-btn' });
+    const sIcon = skipBtn.createSpan();
+    setIcon(sIcon, 'skip-forward');
+    skipBtn.createSpan({ text: 'Saltar' });
     skipBtn.addEventListener('click', () => {
       this.plugin.pomodoro.skipCycle();
     });
 
-    // Quick Time Modifiers
-    const quickRow = card.createDiv({ cls: 'study-flow-adjust-row' });
-    const add5Btn = quickRow.createEl('button', { text: '+5m' });
-    add5Btn.addEventListener('click', () => this.plugin.pomodoro.addMinutes(5));
-
-    const switchBtn = quickRow.createEl('button', {
-      text: status.mode === 'work' ? 'Modo Descanso' : 'Modo Trabajo',
+    const add5Btn = controls.createEl('button', { cls: 'study-flow-action-btn' });
+    const aIcon = add5Btn.createSpan();
+    setIcon(aIcon, 'plus');
+    add5Btn.createSpan({ text: '+5m' });
+    add5Btn.addEventListener('click', () => {
+      this.plugin.pomodoro.addMinutes(5);
     });
-    switchBtn.addEventListener('click', () => this.plugin.pomodoro.switchMode());
+
+    this.updateProgressRing(status);
   }
 
   private updatePomodoroClock(): void {
     const status = this.plugin.pomodoro.getStatus();
 
-    const clockEl = this.containerEl.querySelector('.study-flow-big-clock');
-    if (clockEl) {
-      clockEl.setText(this.plugin.pomodoro.formatTime(status.remainingSeconds));
+    const timeEl = this.containerEl.querySelector('.study-flow-dial-time');
+    if (timeEl) {
+      timeEl.setText(this.plugin.pomodoro.formatTime(status.remainingSeconds));
     }
 
-    const pillEl = this.containerEl.querySelector('.study-flow-mode-pill');
+    const pillEl = this.containerEl.querySelector('.study-flow-badge-pill');
     if (pillEl) {
-      pillEl.setText(status.mode === 'work' ? '🍅 Sesión de Trabajo' : '☕ Descanso');
-      pillEl.className = `study-flow-mode-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      pillEl.setText(status.mode === 'work' ? 'TRABAJO' : 'DESCANSO');
+      pillEl.className = `study-flow-badge-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
     }
 
-    const fillEl = this.containerEl.querySelector('.study-flow-progress-fill') as HTMLElement | null;
-    if (fillEl) {
-      const percent = Math.min(
-        100,
-        Math.max(0, ((status.totalDurationSeconds - status.remainingSeconds) / status.totalDurationSeconds) * 100)
-      );
-      fillEl.style.width = `${percent}%`;
+    const statsEl = this.containerEl.querySelector('.study-flow-dial-stats');
+    if (statsEl) {
+      statsEl.setText(`${status.completedSessionsToday} sesiones hoy`);
     }
 
-    const counterEl = this.containerEl.querySelector('.study-flow-session-counter');
-    if (counterEl) {
-      counterEl.setText(`Sesiones hoy: ${status.completedSessionsToday}`);
-    }
-
-    const playBtn = this.containerEl.querySelector('.study-flow-pomodoro-controls button:first-child');
+    const playBtn = this.containerEl.querySelector('.study-flow-main-controls button:first-child');
     if (playBtn) {
       const isRunning = status.state === 'running';
-      playBtn.setText(isRunning ? '⏸ Pausar' : '▶ Iniciar');
-      playBtn.className = isRunning ? 'mod-warning' : 'mod-cta';
+      playBtn.className = `study-flow-action-btn ${isRunning ? 'mod-warning' : 'mod-cta'}`;
+      playBtn.empty();
+      const pIcon = playBtn.createSpan();
+      setIcon(pIcon, isRunning ? 'pause' : 'play');
+      playBtn.createSpan({ text: isRunning ? 'Pausar' : 'Iniciar' });
+    }
+
+    this.updateProgressRing(status);
+  }
+
+  private updateProgressRing(status: { progressPercent: number; mode: string }): void {
+    const progressCircle = this.containerEl.querySelector('.study-flow-dial-progress') as SVGCircleElement | null;
+    if (progressCircle) {
+      const offset = CIRCUMFERENCE * (1 - status.progressPercent / 100);
+      progressCircle.setAttribute('stroke-dashoffset', String(offset));
+
+      if (status.mode === 'break') {
+        progressCircle.classList.add('is-break-stroke');
+      } else {
+        progressCircle.classList.remove('is-break-stroke');
+      }
     }
   }
 
@@ -217,16 +283,25 @@ export class StudyFlowView extends ItemView {
     await this.reloadTasks();
 
     const card = container.createDiv({ cls: 'study-flow-card' });
-    card.createEl('h3', { text: 'Gestor de Tareas & Inbox', attr: { style: 'margin-top: 0;' } });
+
+    // Stats bar
+    const pendingCount = this.tasks.filter((t) => !t.completed).length;
+    const completedCount = this.tasks.filter((t) => t.completed).length;
+    const statsBar = card.createDiv({ cls: 'study-flow-stats-bar' });
+    statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
+    statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
 
     // Quick Add Bar
-    const addBar = card.createDiv({ cls: 'study-flow-add-task-bar' });
+    const addBar = card.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addBar.createEl('input', {
       type: 'text',
       placeholder: 'Escribe una tarea y presiona Enter...',
       cls: 'study-flow-task-input',
     });
-    const addBtn = addBar.createEl('button', { text: '+ Añadir', cls: 'mod-cta' });
+    const addBtn = addBar.createEl('button', { cls: 'mod-cta' });
+    const aIcon = addBtn.createSpan();
+    setIcon(aIcon, 'plus');
+    addBtn.createSpan({ text: 'Añadir' });
 
     const handleAdd = async () => {
       const val = addInput.value.trim();
@@ -249,19 +324,20 @@ export class StudyFlowView extends ItemView {
       }
     });
 
-    // Filters Bar
-    const filterRow = card.createDiv({ cls: 'study-flow-filter-row' });
-    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string }> = [
-      { id: 'pending', label: `Pendientes (${this.tasks.filter((t) => !t.completed).length})` },
-      { id: 'completed', label: `Completadas (${this.tasks.filter((t) => t.completed).length})` },
-      { id: 'all', label: `Todas (${this.tasks.length})` },
+    // Segmented Filters Bar
+    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control' });
+    const filters: Array<{ id: 'pending' | 'completed' | 'all'; label: string; count: number }> = [
+      { id: 'pending', label: 'Pendientes', count: pendingCount },
+      { id: 'completed', label: 'Completadas', count: completedCount },
+      { id: 'all', label: 'Todas', count: this.tasks.length },
     ];
 
     filters.forEach((f) => {
       const btn = filterRow.createEl('button', {
-        text: f.label,
-        cls: this.taskFilter === f.id ? 'mod-cta' : '',
+        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
       });
+      btn.createSpan({ text: f.label });
+      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
       btn.addEventListener('click', async () => {
         this.taskFilter = f.id;
         container.empty();
@@ -269,8 +345,8 @@ export class StudyFlowView extends ItemView {
       });
     });
 
-    // Tasks List
-    const listContainer = card.createDiv({ cls: 'study-flow-task-list-full' });
+    // Task Cards List
+    const listContainer = card.createDiv({ cls: 'study-flow-task-list-cards' });
     const displayed = this.tasks.filter((t) => {
       if (this.taskFilter === 'pending') return !t.completed;
       if (this.taskFilter === 'completed') return t.completed;
@@ -278,35 +354,56 @@ export class StudyFlowView extends ItemView {
     });
 
     if (displayed.length === 0) {
-      listContainer.createDiv({
-        cls: 'study-flow-empty-tasks',
-        text: 'No hay tareas en esta categoría.',
+      const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
+      const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
+      setIcon(emptyIcon, 'check-circle-2');
+      emptyState.createEl('h4', {
+        text: this.taskFilter === 'pending' ? '¡Todo al día!' : 'No hay tareas',
+      });
+      emptyState.createEl('p', {
+        text: this.taskFilter === 'pending'
+          ? 'No tienes tareas pendientes en tu Inbox.'
+          : 'Añade una nueva tarea arriba.',
       });
     } else {
       displayed.forEach((task) => {
-        const row = listContainer.createDiv({ cls: 'study-flow-task-row-interactive' });
-        const cb = row.createEl('input', { type: 'checkbox' });
+        const itemCard = listContainer.createDiv({
+          cls: `study-flow-task-card ${task.completed ? 'is-done' : ''}`,
+        });
+
+        const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
+        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
         cb.checked = task.completed;
 
         cb.addEventListener('change', async () => {
           await toggleTaskCompletionInFile(this.app, task, cb.checked);
           task.completed = cb.checked;
-          new Notice(cb.checked ? 'Tarea completada' : 'Tarea pendiente');
+          new Notice(cb.checked ? '✓ Tarea completada' : 'Tarea desmarcada');
           container.empty();
           await this.renderTasksTab(container);
         });
 
-        row.createEl('span', {
+        const textSpan = itemCard.createEl('span', {
           text: task.text,
-          cls: task.completed ? 'is-completed' : '',
+          cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
+        });
+        textSpan.addEventListener('click', () => {
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event('change'));
         });
 
-        const delBtn = row.createEl('button', {
-          text: '✕',
-          cls: 'study-flow-delete-btn',
+        itemCard.createSpan({
+          text: '#Inbox',
+          cls: 'study-flow-source-chip',
+        });
+
+        const delBtn = itemCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
           attr: { 'aria-label': 'Eliminar tarea' },
         });
-        delBtn.addEventListener('click', async () => {
+        setIcon(delBtn, 'trash-2');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
           await deleteTaskFromFile(this.app, task);
           new Notice('Tarea eliminada');
           container.empty();
@@ -337,14 +434,15 @@ export class StudyFlowView extends ItemView {
     await this.reloadPlannerTasks();
 
     const card = container.createDiv({ cls: 'study-flow-card' });
-    card.createEl('h3', { text: 'Planificador Diario', attr: { style: 'margin-top: 0;' } });
 
-    // Target selector: Hoy o Mañana
-    const dateSelector = card.createDiv({ cls: 'study-flow-filter-row' });
+    // Target selector chips
+    const dateSelector = card.createDiv({ cls: 'study-flow-segmented-control' });
     const todayBtn = dateSelector.createEl('button', {
-      text: 'Nota de Hoy',
-      cls: this.plannerDateOffset === 0 ? 'mod-cta' : '',
+      cls: `study-flow-segmented-btn ${this.plannerDateOffset === 0 ? 'is-active' : ''}`,
     });
+    const tIcon = todayBtn.createSpan();
+    setIcon(tIcon, 'calendar');
+    todayBtn.createSpan({ text: 'Nota de Hoy' });
     todayBtn.addEventListener('click', async () => {
       this.plannerDateOffset = 0;
       container.empty();
@@ -352,29 +450,107 @@ export class StudyFlowView extends ItemView {
     });
 
     const tomorrowBtn = dateSelector.createEl('button', {
-      text: 'Nota de Mañana',
-      cls: this.plannerDateOffset === 1 ? 'mod-cta' : '',
+      cls: `study-flow-segmented-btn ${this.plannerDateOffset === 1 ? 'is-active' : ''}`,
     });
+    const tmIcon = tomorrowBtn.createSpan();
+    setIcon(tmIcon, 'calendar-plus');
+    tomorrowBtn.createSpan({ text: 'Nota de Mañana' });
     tomorrowBtn.addEventListener('click', async () => {
       this.plannerDateOffset = 1;
       container.empty();
       await this.renderPlannerTab(container);
     });
 
-    // Pending tasks selection
+    // Study Blocks Timeline section
+    const blocksHeader = card.createDiv({ cls: 'study-flow-section-header' });
+    const bTitle = blocksHeader.createEl('h4', { text: 'Bloques de Estudio' });
+    const clockIcon = bTitle.createSpan({ cls: 'study-flow-section-icon' });
+    setIcon(clockIcon, 'clock');
+
+    const addBlockBtn = blocksHeader.createEl('button', { cls: 'study-flow-icon-action-btn-styled' });
+    const plusIcon = addBlockBtn.createSpan();
+    setIcon(plusIcon, 'plus');
+    addBlockBtn.createSpan({ text: 'Bloque' });
+    addBlockBtn.addEventListener('click', async () => {
+      this.studyBlocks.push({
+        id: String(Date.now()),
+        startTime: '14:00',
+        endTime: '15:30',
+        title: 'Bloque Vespertino',
+      });
+      container.empty();
+      await this.renderPlannerTab(container);
+    });
+
+    const blocksListEl = card.createDiv({ cls: 'study-flow-timeline-list' });
+    this.studyBlocks.forEach((block, index) => {
+      const row = blocksListEl.createDiv({ cls: 'study-flow-timeline-item' });
+
+      const nodeDot = row.createDiv({ cls: 'study-flow-timeline-dot' });
+      setIcon(nodeDot, 'calendar');
+
+      const inputsWrap = row.createDiv({ cls: 'study-flow-timeline-content' });
+      const timeWrap = inputsWrap.createDiv({ cls: 'study-flow-time-range-wrap' });
+
+      const startInput = timeWrap.createEl('input', {
+        type: 'text',
+        value: block.startTime,
+        cls: 'study-flow-time-input',
+      });
+      startInput.addEventListener('change', () => {
+        block.startTime = startInput.value.trim();
+        this.updatePlannerPreviewBox();
+      });
+
+      timeWrap.createSpan({ text: '—', cls: 'study-flow-time-sep' });
+
+      const endInput = timeWrap.createEl('input', {
+        type: 'text',
+        value: block.endTime,
+        cls: 'study-flow-time-input',
+      });
+      endInput.addEventListener('change', () => {
+        block.endTime = endInput.value.trim();
+        this.updatePlannerPreviewBox();
+      });
+
+      const titleInput = inputsWrap.createEl('input', {
+        type: 'text',
+        value: block.title,
+        cls: 'study-flow-block-title-input',
+      });
+      titleInput.addEventListener('change', () => {
+        block.title = titleInput.value.trim();
+        this.updatePlannerPreviewBox();
+      });
+
+      const removeBtn = row.createEl('button', {
+        cls: 'study-flow-icon-action-btn',
+        attr: { 'aria-label': 'Eliminar bloque' },
+      });
+      setIcon(removeBtn, 'trash-2');
+      removeBtn.addEventListener('click', async () => {
+        this.studyBlocks.splice(index, 1);
+        container.empty();
+        await this.renderPlannerTab(container);
+      });
+    });
+
+    // Pending tasks selector
     card.createEl('div', {
-      text: `Tareas pendientes disponibles (${this.pendingPlannerTasks.length}):`,
+      text: `Tareas prioritarias a incorporar (${this.pendingPlannerTasks.length}):`,
       cls: 'study-flow-preview-label',
       attr: { style: 'margin-top: 10px;' },
     });
 
-    const taskListEl = card.createDiv({ cls: 'study-flow-task-list', attr: { style: 'max-height: 180px;' } });
+    const taskListEl = card.createDiv({ cls: 'study-flow-task-list-cards', attr: { style: 'max-height: 160px;' } });
     if (this.pendingPlannerTasks.length === 0) {
       taskListEl.createDiv({ cls: 'study-flow-empty-tasks', text: 'No hay tareas pendientes en el Inbox.' });
     } else {
       this.pendingPlannerTasks.forEach((task) => {
-        const row = taskListEl.createDiv({ cls: 'study-flow-task-item' });
-        const cb = row.createEl('input', { type: 'checkbox' });
+        const itemCard = taskListEl.createDiv({ cls: 'study-flow-task-card' });
+        const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
+        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
         cb.checked = this.selectedPlannerTaskIds.has(task.id);
         cb.addEventListener('change', () => {
           if (cb.checked) {
@@ -385,7 +561,7 @@ export class StudyFlowView extends ItemView {
           this.updatePlannerPreviewBox();
         });
 
-        const label = row.createEl('label', { text: task.text });
+        const label = itemCard.createEl('span', { text: task.text, cls: 'study-flow-task-text' });
         label.addEventListener('click', () => {
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change'));
@@ -394,19 +570,23 @@ export class StudyFlowView extends ItemView {
     }
 
     // Template preview
-    const previewLabel = card.createDiv({
-      text: 'Vista previa a insertar:',
+    card.createEl('div', {
+      text: 'Vista previa:',
       cls: 'study-flow-preview-label',
-      attr: { style: 'margin-top: 12px;' },
+      attr: { style: 'margin-top: 10px;' },
     });
     const previewBox = card.createDiv({ cls: 'study-flow-preview-box' });
     previewBox.setText(this.buildPlannerTemplate());
 
-    // Generate / Apply button
-    const actionsRow = card.createDiv({ cls: 'study-flow-button-row' });
+    // Call to action button
+    const actionsRow = card.createDiv({ cls: 'study-flow-modal-footer' });
     const applyBtn = actionsRow.createEl('button', {
-      text: this.plannerDateOffset === 0 ? 'Aplicar a Nota de Hoy' : 'Generar Nota de Mañana',
       cls: 'mod-cta',
+    });
+    const appIcon = applyBtn.createSpan();
+    setIcon(appIcon, 'file-input');
+    applyBtn.createSpan({
+      text: this.plannerDateOffset === 0 ? 'Aplicar a Nota de Hoy' : 'Generar Nota de Mañana',
     });
     applyBtn.addEventListener('click', async () => {
       await this.applyPlannerTemplate();
@@ -421,6 +601,10 @@ export class StudyFlowView extends ItemView {
   }
 
   private buildPlannerTemplate(): string {
+    const blocksStr = this.studyBlocks
+      .map((b) => `- [ ] ${b.startTime} - ${b.endTime} | ${b.title}`)
+      .join('\n');
+
     const selected = this.pendingPlannerTasks.filter((t) => this.selectedPlannerTaskIds.has(t.id));
     const tasksBlock =
       selected.length > 0
@@ -428,8 +612,7 @@ export class StudyFlowView extends ItemView {
         : '- [ ] (Sin tareas prioritarias seleccionadas)';
 
     return `## Bloques de Estudio
-- [ ] 08:00 - 09:30 | 
-- [ ] 10:00 - 11:30 | 
+${blocksStr || '- [ ] 08:00 - 09:30 | \n- [ ] 10:00 - 11:30 | '}
 
 ## Tareas Prioritarias
 ${tasksBlock}`;
