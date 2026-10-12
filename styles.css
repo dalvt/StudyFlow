@@ -1691,3 +1691,82 @@
   max-width: 800px;
 }
 
+/* =========================================
+   11. Zen / Distraction-Free Focus Mode
+   ========================================= */
+.study-flow-zen-toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--background-modifier-border);
+  transition: all 0.2s ease;
+}
+
+.study-flow-zen-toggle-chip.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 10px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4);
+}
+
+.study-flow-zen-indicator {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--interactive-accent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  border-radius: 30px;
+  padding: 6px 14px 6px 12px;
+  animation: study-flow-float-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+}
+
+@keyframes study-flow-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.study-flow-zen-indicator-icon {
+  display: inline-flex;
+  color: var(--interactive-accent);
+}
+
+.study-flow-zen-indicator-text {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.study-flow-zen-indicator-btn {
+  background-color: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: var(--text-normal);
+  transition: all 0.15s ease;
+}
+
+.study-flow-zen-indicator-btn:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+body.is-study-flow-zen .workspace-split {
+  transition: width 0.25s ease, height 0.25s ease;
+}
+
+

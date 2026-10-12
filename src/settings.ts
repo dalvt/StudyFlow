@@ -13,6 +13,7 @@ export interface StudyFlowSettings {
   logPomodoroToDailyNote: boolean;
   enableChimeSound: boolean;
   chimeVolume: number;
+  autoZenMode: boolean;
   focusHistory: FocusSessionRecord[];
 }
 
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   logPomodoroToDailyNote: true,
   enableChimeSound: true,
   chimeVolume: 0.7,
+  autoZenMode: false,
   focusHistory: [],
 };
 
@@ -123,6 +125,18 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setIcon('bell')
           .onClick(() => {
             playPomodoroChime('work', this.plugin.settings.chimeVolume);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName('Modo Zen automático al estudiar')
+      .setDesc('Pliega automáticamente las barras laterales de Obsidian y minimiza distracciones cuando se inicia un Pomodoro.')
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoZenMode)
+          .onChange(async (value) => {
+            this.plugin.settings.autoZenMode = value;
+            await this.plugin.saveSettings();
           })
       );
 

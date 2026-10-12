@@ -207,6 +207,18 @@ export class StudyFlowView extends ItemView {
       });
     });
 
+    const zenBtn = presetsRow.createEl('button', {
+      cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
+      attr: { 'aria-label': 'Alternar Modo Zen (plegar barras laterales)' },
+    });
+    const zenIcon = zenBtn.createSpan();
+    setIcon(zenIcon, 'eye-off');
+    zenBtn.createSpan({ text: this.plugin.zen.isZen() ? 'Zen Activo' : 'Zen' });
+    zenBtn.addEventListener('click', () => {
+      this.plugin.zen.toggleZen();
+      this.renderView();
+    });
+
     // Active Task Linking Section
     await this.renderActiveTaskBannerInView(card, status);
 

@@ -7,10 +7,12 @@ import { AnalyticsModal } from './analytics-modal';
 import { DEFAULT_SETTINGS, StudyFlowSettings, StudyFlowSettingTab } from './settings';
 import { QuickCaptureModal, TasksManagerModal } from './tasks';
 import { StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
+import { ZenModeManager } from './zen';
 
 export default class StudyFlowPlugin extends Plugin {
   settings: StudyFlowSettings = DEFAULT_SETTINGS;
   pomodoro: PomodoroManager = new PomodoroManager(this);
+  zen: ZenModeManager = new ZenModeManager(this);
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -144,6 +146,14 @@ export default class StudyFlowPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'toggle-zen-mode',
+      name: 'Modo Zen: Alternar enfoque sin distracciones',
+      callback: () => {
+        this.zen.toggleZen();
+      },
+    });
+
     // Add Settings Tab
     this.addSettingTab(new StudyFlowSettingTab(this.app, this));
   }
@@ -151,6 +161,9 @@ export default class StudyFlowPlugin extends Plugin {
   onunload(): void {
     if (this.pomodoro) {
       this.pomodoro.destroy();
+    }
+    if (this.zen) {
+      this.zen.destroy();
     }
   }
 

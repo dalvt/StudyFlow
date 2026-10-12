@@ -189,6 +189,10 @@ export class PomodoroManager {
       this.tick();
     }, 1000);
 
+    if (this.mode === 'work' && this.plugin.settings.autoZenMode) {
+      this.plugin.zen.enableZen(true);
+    }
+
     this.updateDisplay();
     this.notifyListeners();
   }
@@ -211,6 +215,10 @@ export class PomodoroManager {
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+
+    if (this.plugin.settings.autoZenMode && this.plugin.zen.isZen()) {
+      this.plugin.zen.disableZen(true);
     }
 
     this.state = 'idle';
@@ -306,6 +314,10 @@ export class PomodoroManager {
 
       if (this.plugin.settings.logPomodoroToDailyNote) {
         await this.logSession();
+      }
+
+      if (this.plugin.settings.autoZenMode && this.plugin.zen.isZen()) {
+        this.plugin.zen.disableZen(true);
       }
 
       this.mode = 'break';
