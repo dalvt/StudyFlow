@@ -2881,23 +2881,25 @@ body.is-study-flow-zen .workspace-split {
 
 /* Floating Cloud Modal for Tasks */
 .modal:has(.study-flow-cloud-modal) {
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--background-modifier-border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--background-modifier-border);
 }
 
 .study-flow-cloud-modal {
-  padding: 20px 24px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 540px;
+  width: 500px;
+  max-width: 92vw;
 }
 
 .study-flow-cloud-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
@@ -2915,7 +2917,7 @@ body.is-study-flow-zen .workspace-split {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.18);
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.16);
   color: var(--interactive-accent);
   flex-shrink: 0;
 }
@@ -2925,158 +2927,229 @@ body.is-study-flow-zen .workspace-split {
   height: 18px;
 }
 
+.study-flow-cloud-header-titles {
+  display: flex;
+  flex-direction: column;
+}
+
 .study-flow-cloud-modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-normal);
 }
 
 .study-flow-cloud-modal-sub {
   margin: 2px 0 0 0;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
+/* Header Type Switch */
+.study-flow-cloud-type-segmented {
+  display: inline-flex;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.study-flow-cloud-type-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-cloud-type-btn:hover {
+  color: var(--text-normal);
+}
+
+.study-flow-cloud-type-btn.is-active {
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.18);
+  color: var(--text-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Body */
 .study-flow-cloud-modal-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.study-flow-cloud-field {
+.study-flow-cloud-title-wrap {
+  width: 100%;
+}
+
+.study-flow-cloud-title-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  color: var(--text-normal);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.study-flow-cloud-title-input:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* 2x2 Metadata Grid */
+.study-flow-cloud-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+  width: 100%;
+}
+
+.study-flow-cloud-grid.is-idea-mode {
+  grid-template-columns: 1fr;
+}
+
+.study-flow-cloud-grid-cell {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .study-flow-cloud-label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
 }
 
-.study-flow-cloud-input {
+.study-flow-cloud-control {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
-  padding: 7px 10px;
-  font-size: 12.5px;
   color: var(--text-normal);
+  box-sizing: border-box;
   transition: all 0.15s ease;
-  width: 100%;
+  cursor: pointer;
 }
 
-.study-flow-cloud-input:focus {
+.study-flow-cloud-control:focus {
   border-color: var(--interactive-accent);
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-.study-flow-cloud-input-title {
-  font-size: 14px;
-  padding: 10px 12px;
+.study-flow-cloud-custom-input {
+  cursor: text;
 }
 
-.study-flow-cloud-pills {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.study-flow-cloud-pill-btn {
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 9999px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.study-flow-cloud-pill-btn:hover {
-  color: var(--text-normal);
-  border-color: var(--text-muted);
-}
-
-.study-flow-cloud-pill-btn.is-active {
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.18);
-  border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
-}
-
-.study-flow-cloud-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.study-flow-cloud-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.study-flow-cloud-select {
-  flex: 1;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  padding: 6px 10px;
-  font-size: 12px;
-  color: var(--text-normal);
-  cursor: pointer;
-}
-
-.study-flow-cloud-custom-subject {
-  width: 110px;
-}
-
+/* Pomodoro Stepper */
 .study-flow-cloud-stepper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  width: 100%;
+  height: 36px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px;
+  box-sizing: border-box;
 }
 
 .study-flow-stepper-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 100%;
   border-radius: var(--radius-s);
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
   font-size: 16px;
   font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .study-flow-stepper-btn:hover {
-  border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .study-flow-stepper-val {
-  font-size: 12px;
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-muted);
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
 }
 
 .study-flow-stepper-val.is-active {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+  color: #ff4d4f;
+  font-weight: 700;
 }
 
+/* Priority Segmented Row (4 Equal Buttons, No Wrap) */
+.study-flow-cloud-priority-segment {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px;
+  box-sizing: border-box;
+  gap: 2px;
+}
+
+.study-flow-priority-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.study-flow-priority-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.study-flow-priority-btn.is-active {
+  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
+  color: var(--text-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.study-flow-prio-icon {
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* Footer */
 .study-flow-cloud-modal-footer {
   display: flex;
   align-items: center;
@@ -3096,6 +3169,16 @@ body.is-study-flow-zen .workspace-split {
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-s);
+  transition: all 0.15s ease;
+}
+
+.study-flow-cloud-cancel-btn:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 
 .study-flow-cloud-submit-btn {
@@ -3103,9 +3186,10 @@ body.is-study-flow-zen .workspace-split {
   align-items: center;
   gap: 6px;
   padding: 7px 16px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  border-radius: var(--radius-s);
 }
 
 /* Subject Grouping */

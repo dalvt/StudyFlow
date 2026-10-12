@@ -1,4 +1,4 @@
-import { App, Modal, Notice, setIcon, TFile } from 'obsidian';
+import { App, Modal, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   appendTaskToMarkdownSection,
@@ -18,11 +18,9 @@ export class TaskCreateModal extends Modal {
   private taskTitle: string = '';
   private itemType: 'task' | 'idea' = 'task';
   private selectedSubject: string = '';
-  private customSubject: string = '';
   private selectedDeadline: string = '';
   private pomodoroEstimate: number = 0;
   private selectedPriority: TaskPriority = 'none';
-  private targetDestination: 'inbox' | 'activeNote' = 'inbox';
 
   constructor(
     app: App,
@@ -43,76 +41,71 @@ export class TaskCreateModal extends Modal {
     contentEl.empty();
     contentEl.addClass('study-flow-cloud-modal');
 
-    // Header
+    // 1. Header with Title on Left, Type Switch on Right
     const header = contentEl.createDiv({ cls: 'study-flow-cloud-modal-header' });
     const headerLeft = header.createDiv({ cls: 'study-flow-cloud-header-left' });
     const iconSpan = headerLeft.createSpan({ cls: 'study-flow-cloud-header-icon' });
     setIcon(iconSpan, 'sparkles');
-    const titleCol = headerLeft.createDiv();
+
+    const titleCol = headerLeft.createDiv({ cls: 'study-flow-cloud-header-titles' });
     titleCol.createEl('h3', { text: 'Nueva Tarea Académica', cls: 'study-flow-cloud-modal-title' });
     titleCol.createEl('p', {
-      text: 'Configurá los detalles de estudio, materia y plazos',
+      text: 'Organizá tus metas de estudio, materia y plazos',
       cls: 'study-flow-cloud-modal-sub',
     });
 
-    // Body Form
+    // Segmented Type Switch in Header
+    const typeSwitch = header.createDiv({ cls: 'study-flow-cloud-type-segmented' });
+    const taskBtn = typeSwitch.createEl('button', {
+      cls: 'study-flow-cloud-type-btn is-active',
+      text: '📋 Tarea',
+    });
+    const ideaBtn = typeSwitch.createEl('button', {
+      cls: 'study-flow-cloud-type-btn',
+      text: '💡 Idea',
+    });
+
+    // 2. Body
     const body = contentEl.createDiv({ cls: 'study-flow-cloud-modal-body' });
 
-    // 1. Title Input
-    const titleSection = body.createDiv({ cls: 'study-flow-cloud-field' });
-    titleSection.createEl('label', { text: '¿Qué necesitás hacer o estudiar?', cls: 'study-flow-cloud-label' });
-    const titleInput = titleSection.createEl('input', {
+    // Main Title Input
+    const titleInputWrap = body.createDiv({ cls: 'study-flow-cloud-title-wrap' });
+    const titleInput = titleInputWrap.createEl('input', {
       type: 'text',
-      cls: 'study-flow-cloud-input study-flow-cloud-input-title',
-      placeholder: 'Ej: Resolver guía práctica de matrices, repasar teoría...',
+      cls: 'study-flow-cloud-title-input',
+      placeholder: '¿Qué necesitás hacer o estudiar? (ej: Resolver guía de álgebra...)',
     });
     titleInput.value = this.initialText;
     titleInput.focus();
 
-    // 2. Type Selector (Task vs Idea)
-    const typeSection = body.createDiv({ cls: 'study-flow-cloud-field' });
-    typeSection.createEl('label', { text: 'Tipo de entrada', cls: 'study-flow-cloud-label' });
-    const typePills = typeSection.createDiv({ cls: 'study-flow-cloud-pills' });
-
-    const taskPill = typePills.createEl('button', {
-      cls: 'study-flow-cloud-pill-btn is-active',
-      text: '📋 Tarea ejecutable',
-    });
-    const ideaPill = typePills.createEl('button', {
-      cls: 'study-flow-cloud-pill-btn',
-      text: '💡 Idea espontánea',
-    });
-
-    // 3. Grid for Academic Metadata (Subject, Deadline, Estimate, Priority)
+    // 3. Metadata 2x2 Grid (Balanced heights)
     const metaGrid = body.createDiv({ cls: 'study-flow-cloud-grid' });
 
-    // Subject / Materia
-    const subjectField = metaGrid.createDiv({ cls: 'study-flow-cloud-field' });
-    subjectField.createEl('label', { text: '📚 Materia', cls: 'study-flow-cloud-label' });
-    const subjectRow = subjectField.createDiv({ cls: 'study-flow-cloud-row' });
-    const subjectSelect = subjectRow.createEl('select', { cls: 'study-flow-cloud-select' });
-    subjectSelect.createEl('option', { value: '', text: '— Sin materia (Inbox general) —' });
+    // Cell 1: Materia
+    const subjectField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
+    subjectField.createEl('span', { text: '📚 Materia', cls: 'study-flow-cloud-label' });
+    const subjectSelect = subjectField.createEl('select', { cls: 'study-flow-cloud-control' });
+    subjectSelect.createEl('option', { value: '', text: '— Sin materia (Inbox) —' });
 
     this.knownSubjects.forEach((subj) => {
       const cleanSubj = subj.startsWith('#') ? subj : `#${subj}`;
       subjectSelect.createEl('option', { value: cleanSubj, text: cleanSubj });
     });
-    subjectSelect.createEl('option', { value: '__custom__', text: '➕ Otra materia / nuevo tag...' });
+    subjectSelect.createEl('option', { value: '__custom__', text: '➕ Otra / nueva materia...' });
 
-    const customSubjectInput = subjectRow.createEl('input', {
+    const customSubjectInput = subjectField.createEl('input', {
       type: 'text',
-      placeholder: '#materia',
-      cls: 'study-flow-cloud-input study-flow-cloud-custom-subject',
+      placeholder: 'Ingresá #materia...',
+      cls: 'study-flow-cloud-control study-flow-cloud-custom-input',
     });
     customSubjectInput.style.display = 'none';
 
     subjectSelect.addEventListener('change', () => {
       if (subjectSelect.value === '__custom__') {
-        customSubjectInput.style.display = 'inline-block';
+        subjectSelect.style.display = 'none';
+        customSubjectInput.style.display = 'block';
         customSubjectInput.focus();
-        this.selectedSubject = customSubjectInput.value.trim();
       } else {
-        customSubjectInput.style.display = 'none';
         this.selectedSubject = subjectSelect.value;
       }
     });
@@ -121,20 +114,29 @@ export class TaskCreateModal extends Modal {
       this.selectedSubject = customSubjectInput.value.trim();
     });
 
-    // Deadline / Fecha Límite
-    const deadlineField = metaGrid.createDiv({ cls: 'study-flow-cloud-field' });
-    deadlineField.createEl('label', { text: '📅 Fecha límite (Deadline)', cls: 'study-flow-cloud-label' });
+    customSubjectInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !customSubjectInput.value) {
+        customSubjectInput.style.display = 'none';
+        subjectSelect.style.display = 'block';
+        subjectSelect.value = '';
+        this.selectedSubject = '';
+      }
+    });
+
+    // Cell 2: Fecha Límite (Deadline)
+    const deadlineField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
+    deadlineField.createEl('span', { text: '📅 Fecha límite', cls: 'study-flow-cloud-label' });
     const deadlineInput = deadlineField.createEl('input', {
       type: 'date',
-      cls: 'study-flow-cloud-input',
+      cls: 'study-flow-cloud-control',
     });
     deadlineInput.addEventListener('change', () => {
       this.selectedDeadline = deadlineInput.value;
     });
 
-    // Pomodoro Estimate Stepper
-    const estimateField = metaGrid.createDiv({ cls: 'study-flow-cloud-field' });
-    estimateField.createEl('label', { text: '🍅 Estimación Pomodoro', cls: 'study-flow-cloud-label' });
+    // Cell 3: Estimación Pomodoro
+    const estimateField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
+    estimateField.createEl('span', { text: '🍅 Estimación Pomodoro', cls: 'study-flow-cloud-label' });
     const stepperRow = estimateField.createDiv({ cls: 'study-flow-cloud-stepper' });
     const minusBtn = stepperRow.createEl('button', { text: '−', cls: 'study-flow-stepper-btn' });
     const estimateDisplay = stepperRow.createSpan({ text: 'Sin estimar', cls: 'study-flow-stepper-val' });
@@ -146,7 +148,7 @@ export class TaskCreateModal extends Modal {
         estimateDisplay.removeClass('is-active');
       } else {
         const mins = this.pomodoroEstimate * (this.plugin.settings.pomodoroWorkDuration || 25);
-        estimateDisplay.setText(`🍅 ${this.pomodoroEstimate} (~${mins} min)`);
+        estimateDisplay.setText(`🍅 ${this.pomodoroEstimate} (${mins}m)`);
         estimateDisplay.addClass('is-active');
       }
     };
@@ -165,24 +167,27 @@ export class TaskCreateModal extends Modal {
       }
     });
 
-    // Priority Selector
-    const priorityField = metaGrid.createDiv({ cls: 'study-flow-cloud-field' });
-    priorityField.createEl('label', { text: '⚡ Prioridad', cls: 'study-flow-cloud-label' });
-    const priorityRow = priorityField.createDiv({ cls: 'study-flow-cloud-pills' });
+    // Cell 4: Prioridad (Segmented row with NO wrapping)
+    const priorityField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
+    priorityField.createEl('span', { text: '⚡ Prioridad', cls: 'study-flow-cloud-label' });
+    const prioritySegment = priorityField.createDiv({ cls: 'study-flow-cloud-priority-segment' });
 
-    const priorities: Array<{ id: TaskPriority; label: string }> = [
-      { id: 'none', label: 'Normal' },
-      { id: 'low', label: '🔽 Baja' },
-      { id: 'medium', label: '🔼 Media' },
-      { id: 'high', label: '⏫ Alta' },
+    const priorities: Array<{ id: TaskPriority; label: string; icon: string }> = [
+      { id: 'none', label: 'Normal', icon: '' },
+      { id: 'low', label: 'Baja', icon: '🔽' },
+      { id: 'medium', label: 'Media', icon: '🔼' },
+      { id: 'high', label: 'Alta', icon: '⏫' },
     ];
 
     const priorityBtns: HTMLButtonElement[] = [];
     priorities.forEach((p) => {
-      const btn = priorityRow.createEl('button', {
-        cls: `study-flow-cloud-pill-btn ${this.selectedPriority === p.id ? 'is-active' : ''}`,
-        text: p.label,
+      const btn = prioritySegment.createEl('button', {
+        cls: `study-flow-priority-btn ${this.selectedPriority === p.id ? 'is-active' : ''}`,
       });
+      if (p.icon) {
+        btn.createSpan({ text: p.icon, cls: 'study-flow-prio-icon' });
+      }
+      btn.createSpan({ text: p.label });
       btn.addEventListener('click', () => {
         this.selectedPriority = p.id;
         priorityBtns.forEach((b) => b.removeClass('is-active'));
@@ -191,31 +196,33 @@ export class TaskCreateModal extends Modal {
       priorityBtns.push(btn);
     });
 
-    // Toggle Task vs Idea fields
+    // Sync Type Switch
     const syncItemType = (type: 'task' | 'idea') => {
       this.itemType = type;
       if (type === 'idea') {
-        taskPill.removeClass('is-active');
-        ideaPill.addClass('is-active');
-        estimateField.style.display = 'none';
+        taskBtn.removeClass('is-active');
+        ideaBtn.addClass('is-active');
         deadlineField.style.display = 'none';
+        estimateField.style.display = 'none';
         priorityField.style.display = 'none';
+        metaGrid.addClass('is-idea-mode');
       } else {
-        ideaPill.removeClass('is-active');
-        taskPill.addClass('is-active');
-        estimateField.style.display = '';
+        ideaBtn.removeClass('is-active');
+        taskBtn.addClass('is-active');
         deadlineField.style.display = '';
+        estimateField.style.display = '';
         priorityField.style.display = '';
+        metaGrid.removeClass('is-idea-mode');
       }
     };
 
-    taskPill.addEventListener('click', () => syncItemType('task'));
-    ideaPill.addEventListener('click', () => syncItemType('idea'));
+    taskBtn.addEventListener('click', () => syncItemType('task'));
+    ideaBtn.addEventListener('click', () => syncItemType('idea'));
 
-    // Footer
+    // 4. Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-cloud-modal-footer' });
     const hint = footer.createEl('span', {
-      text: '↵ Enter para guardar • Esc para cerrar',
+      text: '↵ Guardar  •  Esc Cancelar',
       cls: 'study-flow-shortcut-hint',
     });
 
