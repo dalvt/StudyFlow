@@ -1259,17 +1259,26 @@ export class StudyFlowView extends ItemView {
       // Tags & Badges Row
       const badgesRow = mainCol.createDiv({ cls: 'study-flow-task-badges-row' });
 
+      // Subject tags chips first (Zen Minimal style)
+      if (task.tags && task.tags.length > 0) {
+        task.tags.forEach((tag) => {
+          const tagChip = badgesRow.createSpan({
+            text: tag.startsWith('#') ? tag : `#${tag}`,
+            cls: 'study-flow-subject-chip',
+          });
+          tagChip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
+            this.taskFilter = 'subjects';
+            rootContainer.empty();
+            this.renderTasksTab(rootContainer);
+          });
+        });
+      }
+
       if (task.isIdea) {
         badgesRow.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
       } else {
-        if (task.priority === 'high') {
-          badgesRow.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
-        } else if (task.priority === 'medium') {
-          badgesRow.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
-        } else if (task.priority === 'low') {
-          badgesRow.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
-        }
-
         const estCount = task.estimatedPomodoros || 0;
         const compCount = task.completedPomodoros || 0;
         if (estCount > 0 || compCount > 0) {
@@ -1299,23 +1308,14 @@ export class StudyFlowView extends ItemView {
           }
           badgesRow.createSpan({ text: badgeText, cls: badgeCls });
         }
-      }
 
-      // Subject tags chips
-      if (task.tags && task.tags.length > 0) {
-        task.tags.forEach((tag) => {
-          const tagChip = badgesRow.createSpan({
-            text: tag.startsWith('#') ? tag : `#${tag}`,
-            cls: 'study-flow-subject-chip',
-          });
-          tagChip.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
-            this.taskFilter = 'subjects';
-            rootContainer.empty();
-            this.renderTasksTab(rootContainer);
-          });
-        });
+        if (task.priority === 'high') {
+          badgesRow.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
+        } else if (task.priority === 'medium') {
+          badgesRow.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
+        } else if (task.priority === 'low') {
+          badgesRow.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
+        }
       }
 
       // Source indicator chip
