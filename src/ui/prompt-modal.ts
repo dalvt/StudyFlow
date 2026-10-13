@@ -1,0 +1,57 @@
+import { App, Modal } from 'obsidian';
+import { t } from '../i18n/index.ts';
+
+export class PromptModal extends Modal {
+  private titleText: string;
+  private placeholder: string;
+  private onSubmit: (value: string) => void | Promise<void>;
+
+  constructor(
+    app: App,
+    titleText: string,
+    placeholder: string,
+    onSubmit: (value: string) => void | Promise<void>
+  ) {
+    super(app);
+    this.titleText = titleText;
+    this.placeholder = placeholder;
+    this.onSubmit = onSubmit;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('study-flow-prompt-modal');
+
+    contentEl.createEl('h3', { text: this.titleText, cls: 'study-flow-prompt-title' });
+
+    const input = contentEl.createEl('input', {
+      type: 'text',
+      cls: 'study-flow-prompt-input',
+      attr: { placeholder: this.placeholder },
+    });
+    input.focus();
+
+    const btnContainer = contentEl.createDiv({ cls: 'study-flow-prompt-buttons' });
+    const cancelBtn = btnContainer.createEl('button', { text: t('common.cancel') });
+    cancelBtn.addEventListener('click', () => this.close());
+
+    const submitBtn = btnContainer.createEl('button', { text: t('common.accept'), cls: 'mod-cta' });
+
+    const handleConfirm = async () => {
+      const val = input.value.trim();
+      if (val) {
+        this.close();
+        await this.onSubmit(val);
+      }
+    };
+
+    submitBtn.addEventListener('click', handleConfirm);
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
+      }
+    });
+  }
+}

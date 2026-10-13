@@ -2,17 +2,23 @@ import { App, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   buildAnalyticsSummary,
+  computeSubjectsAnalyticsSummary,
   formatMinutesHuman,
-  syncHistoricalSessionsFromVault,
 } from './analytics';
+import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from './storage-migration';
 import { loadHabitsFromFile } from './habits';
 import { extractAllTasksFromContent, TaskRecord } from './tasks';
 import { getDailyNotePath } from './utils';
+import { t } from './i18n/index.ts';
 
 /**
  * Loads tasks from inbox and today's daily note to calculate task completion metrics.
  */
 async function loadAllCurrentTasks(app: App, plugin: StudyFlowPlugin): Promise<TaskRecord[]> {
+  if (plugin.taskIndex) {
+    return plugin.taskIndex.getAllTasks().filter((t) => !t.text.includes('Pomodoro completado a las'));
+  }
+
   const allTasks: TaskRecord[] = [];
   const processedKeys = new Set<string>();
 
@@ -74,19 +80,22 @@ export async function renderAnalyticsDashboard(
   // 1. Fetch data
   const habits = await loadHabitsFromFile(app, plugin.settings.habitsFilePath || 'Habits.md');
   const tasks = await loadAllCurrentTasks(app, plugin);
-  const sessions = plugin.settings.focusHistory || [];
+  const sessions =
+    plugin.focusSessions && plugin.focusSessions.length > 0
+      ? plugin.focusSessions
+      : await loadFocusSessionsFromFile(app);
   const summary = buildAnalyticsSummary(sessions, habits, tasks);
 
   // 2. Header bar with sync action
   const headerCard = rootWrapper.createDiv({ cls: 'study-flow-analytics-header' });
   const titleBlock = headerCard.createDiv({ cls: 'study-flow-analytics-title-block' });
   
-  const titleEl = titleBlock.createEl('h3', { text: 'Métricas & Rendimiento de Estudio' });
+  const titleEl = titleBlock.createEl('h3', { text: t('analytics.title') });
   const headerIcon = titleEl.createSpan({ cls: 'study-flow-analytics-header-icon' });
   setIcon(headerIcon, 'bar-chart-2');
   
   titleBlock.createEl('p', {
-    text: 'Visualizá tus horas netas de foco, la constancia en tus hábitos y la tasa de resolución de tareas.',
+    text: t('analytics.subtitle'),
     cls: 'study-flow-analytics-subtitle',
   });
 
@@ -94,17 +103,16 @@ export async function renderAnalyticsDashboard(
   
   const syncBtn = headerActions.createEl('button', {
     cls: 'study-flow-btn study-flow-btn-ghost',
-    attr: { 'aria-label': 'Sincronizar sesiones históricas desde notas diarias' },
+    attr: { 'aria-label': t('analytics.syncTooltip') },
   });
   const syncIcon = syncBtn.createSpan();
   setIcon(syncIcon, 'refresh-cw');
-  syncBtn.createSpan({ text: 'Sincronizar' });
+  syncBtn.createSpan({ text: t('analytics.sync') });
   syncBtn.addEventListener('click', async () => {
     syncBtn.addClass('is-loading');
-    const added = await syncHistoricalSessionsFromVault(app, plugin.settings);
-    await plugin.saveSettings();
+    const added = await syncHistoricalSessionsFromVault(app, plugin.settings, plugin);
     syncBtn.removeClass('is-loading');
-    new Notice(`Sincronización completa: ${added} sesiones históricas añadidas.`);
+    new Notice(t('analytics.syncCompleteNotice', { count: String(added) }));
     if (onRefresh) {
       await onRefresh();
     } else {
@@ -118,7 +126,7 @@ export async function renderAnalyticsDashboard(
   // KPI 1: Foco Hoy
   const kpiToday = kpiGrid.createDiv({ cls: 'study-flow-kpi-card' });
   const kpiTodayHeader = kpiToday.createDiv({ cls: 'study-flow-kpi-card-header' });
-  kpiTodayHeader.createSpan({ text: 'Foco Hoy', cls: 'study-flow-kpi-title' });
+  kpiTodayHeader.createSpan({ text: t('analytics.kpiFocusToday'), cls: 'study-flow-kpi-title' });
   const kpiTodayIcon = kpiTodayHeader.createSpan({ cls: 'study-flow-kpi-icon is-primary' });
   setIcon(kpiTodayIcon, 'timer');
   kpiToday.createDiv({
@@ -126,14 +134,16 @@ export async function renderAnalyticsDashboard(
     cls: 'study-flow-kpi-value',
   });
   kpiToday.createDiv({
-    text: `${summary.todaySessionCount} ${summary.todaySessionCount === 1 ? 'sesión' : 'sesiones'} completadas`,
+    text: summary.todaySessionCount === 1
+      ? t('analytics.kpiSessionsCompleted_one', { count: '1' })
+      : t('analytics.kpiSessionsCompleted_other', { count: String(summary.todaySessionCount) }),
     cls: 'study-flow-kpi-subtext',
   });
 
   // KPI 2: Foco Semana
   const kpiWeek = kpiGrid.createDiv({ cls: 'study-flow-kpi-card' });
   const kpiWeekHeader = kpiWeek.createDiv({ cls: 'study-flow-kpi-card-header' });
-  kpiWeekHeader.createSpan({ text: 'Últimos 7 días', cls: 'study-flow-kpi-title' });
+  kpiWeekHeader.createSpan({ text: t('analytics.kpiLast7Days'), cls: 'study-flow-kpi-title' });
   const kpiWeekIcon = kpiWeekHeader.createSpan({ cls: 'study-flow-kpi-icon is-accent' });
   setIcon(kpiWeekIcon, 'trending-up');
   kpiWeek.createDiv({
@@ -141,14 +151,14 @@ export async function renderAnalyticsDashboard(
     cls: 'study-flow-kpi-value',
   });
   kpiWeek.createDiv({
-    text: `Promedio: ${formatMinutesHuman(summary.dailyAverageMinutes)} / día`,
+    text: t('analytics.kpiDailyAverage', { avg: formatMinutesHuman(summary.dailyAverageMinutes) }),
     cls: 'study-flow-kpi-subtext',
   });
 
   // KPI 3: Hábitos
   const kpiHabits = kpiGrid.createDiv({ cls: 'study-flow-kpi-card' });
   const kpiHabitsHeader = kpiHabits.createDiv({ cls: 'study-flow-kpi-card-header' });
-  kpiHabitsHeader.createSpan({ text: 'Consistencia Hábitos', cls: 'study-flow-kpi-title' });
+  kpiHabitsHeader.createSpan({ text: t('analytics.kpiHabitConsistency'), cls: 'study-flow-kpi-title' });
   const kpiHabitsIcon = kpiHabitsHeader.createSpan({ cls: 'study-flow-kpi-icon is-warning' });
   setIcon(kpiHabitsIcon, 'flame');
   kpiHabits.createDiv({
@@ -156,14 +166,14 @@ export async function renderAnalyticsDashboard(
     cls: 'study-flow-kpi-value',
   });
   kpiHabits.createDiv({
-    text: `Hoy: ${summary.habits.completedTodayCount} de ${summary.habits.totalHabits} completados`,
+    text: t('analytics.kpiHabitsToday', { completed: String(summary.habits.completedTodayCount), total: String(summary.habits.totalHabits) }),
     cls: 'study-flow-kpi-subtext',
   });
 
   // KPI 4: Tareas
   const kpiTasks = kpiGrid.createDiv({ cls: 'study-flow-kpi-card' });
   const kpiTasksHeader = kpiTasks.createDiv({ cls: 'study-flow-kpi-card-header' });
-  kpiTasksHeader.createSpan({ text: 'Resolución de Tareas', cls: 'study-flow-kpi-title' });
+  kpiTasksHeader.createSpan({ text: t('analytics.kpiTaskResolution'), cls: 'study-flow-kpi-title' });
   const kpiTasksIcon = kpiTasksHeader.createSpan({ cls: 'study-flow-kpi-icon is-success' });
   setIcon(kpiTasksIcon, 'check-circle-2');
   kpiTasks.createDiv({
@@ -171,10 +181,10 @@ export async function renderAnalyticsDashboard(
     cls: 'study-flow-kpi-value',
   });
   const pomoSubtext = summary.tasks.totalEstimatedPomodoros > 0
-    ? ` • 🍅 ${summary.tasks.totalCompletedPomodoros}/${summary.tasks.totalEstimatedPomodoros} pomodoros`
+    ? t('analytics.kpiPomodorosSubtext', { completed: String(summary.tasks.totalCompletedPomodoros), total: String(summary.tasks.totalEstimatedPomodoros) })
     : '';
   kpiTasks.createDiv({
-    text: `${summary.tasks.totalCompleted} resueltas / ${summary.tasks.totalPending} pendientes${pomoSubtext}`,
+    text: t('analytics.kpiTasksSubtext', { completed: String(summary.tasks.totalCompleted), pending: String(summary.tasks.totalPending), pomos: pomoSubtext }),
     cls: 'study-flow-kpi-subtext',
   });
 
@@ -184,11 +194,11 @@ export async function renderAnalyticsDashboard(
   const chartTitleLeft = chartHeader.createDiv({ cls: 'study-flow-chart-title-left' });
   const chartIcon = chartTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
   setIcon(chartIcon, 'activity');
-  chartTitleLeft.createEl('h4', { text: 'Horas de Foco Diario (Últimos 7 días)' });
+  chartTitleLeft.createEl('h4', { text: t('analytics.chartTitle') });
 
   chartHeader.createDiv({
     cls: 'study-flow-chart-badge',
-    text: `Total semanal: ${formatMinutesHuman(summary.weekFocusMinutes)}`,
+    text: t('analytics.chartWeeklyTotal', { total: formatMinutesHuman(summary.weekFocusMinutes) }),
   });
 
   // Render Bar Chart
@@ -228,11 +238,139 @@ export async function renderAnalyticsDashboard(
     label.createSpan({ text: day.shortDay, cls: 'study-flow-bar-day' });
     label.createSpan({ text: day.date.slice(8, 10), cls: 'study-flow-bar-date' });
     if (day.isToday) {
-      label.createSpan({ text: 'Hoy', cls: 'study-flow-bar-today-pill' });
+      label.createSpan({ text: t('analytics.chartTodayPill'), cls: 'study-flow-bar-today-pill' });
     }
   }
 
-  // 5. Two-Column Lower Grid: Tag Distribution & Breakdown
+  // 5. Weekly Subject Progress Section (Materia)
+  const subjectsSummary = computeSubjectsAnalyticsSummary(
+    sessions,
+    tasks,
+    plugin.settings.subjects || []
+  );
+
+  const subjectsCard = rootWrapper.createDiv({ cls: 'study-flow-card study-flow-subjects-card' });
+  const subHeader = subjectsCard.createDiv({ cls: 'study-flow-chart-header' });
+  const subTitleLeft = subHeader.createDiv({ cls: 'study-flow-chart-title-left' });
+  const subIcon = subTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
+  setIcon(subIcon, 'book-open');
+  subTitleLeft.createEl('h4', { text: t('analytics.subjectsSectionTitle') });
+
+  subHeader.createDiv({
+    cls: 'study-flow-chart-badge',
+    text: `${subjectsSummary.weekStartDate} — ${subjectsSummary.weekEndDate}`,
+  });
+
+  if (subjectsSummary.subjects.length === 0) {
+    const emptyBox = subjectsCard.createDiv({ cls: 'study-flow-empty-state' });
+    const emptyIcon = emptyBox.createDiv({ cls: 'study-flow-empty-icon' });
+    setIcon(emptyIcon, 'book-open');
+    emptyBox.createEl('h4', { text: t('analytics.subjectsEmptyTitle') });
+    emptyBox.createEl('p', { text: t('analytics.subjectsEmptyDesc') });
+    const settingsBtn = emptyBox.createEl('button', {
+      cls: 'mod-cta study-flow-btn-sm',
+      text: t('analytics.goToSettingsBtn'),
+    });
+    settingsBtn.addEventListener('click', () => {
+      try {
+        const settingObj = (app as any).setting;
+        if (settingObj?.open) {
+          settingObj.open();
+          if (settingObj.openTabById && plugin.manifest?.id) {
+            settingObj.openTabById(plugin.manifest.id);
+          }
+        }
+      } catch (e) {
+        console.error('Error opening settings:', e);
+      }
+    });
+  } else {
+    const subList = subjectsCard.createDiv({ cls: 'study-flow-subjects-list' });
+    for (const item of subjectsSummary.subjects) {
+      const row = subList.createDiv({ cls: 'study-flow-subject-progress-item' });
+
+      // Header row of subject
+      const itemHeader = row.createDiv({ cls: 'study-flow-subject-item-header' });
+      const titleBox = itemHeader.createDiv({ cls: 'study-flow-subject-item-title-box' });
+
+      const badge = titleBox.createSpan({ cls: 'study-flow-subject-badge' });
+      if (item.subject.color) {
+        const dot = badge.createSpan({ cls: 'study-flow-subject-dot' });
+        dot.style.backgroundColor = item.subject.color;
+      }
+      const nameEl = badge.createSpan({ text: item.subject.name });
+      if (item.subject.color) {
+        nameEl.style.color = item.subject.color;
+      }
+
+      titleBox.createSpan({
+        text: item.subject.tag,
+        cls: 'study-flow-subject-item-tag',
+      });
+
+      // Goal streak badge (racha de cumplimiento de metas)
+      const streakBadge = itemHeader.createSpan({
+        cls: `study-flow-subject-streak-badge ${item.goalStreakWeeks > 0 ? '' : 'is-zero'}`,
+      });
+      const flameIcon = streakBadge.createSpan();
+      setIcon(flameIcon, 'flame');
+      streakBadge.createSpan({
+        text: item.goalStreakWeeks > 0
+          ? t('analytics.subjectStreak', { count: String(item.goalStreakWeeks) })
+          : t('analytics.subjectStreakNone'),
+      });
+
+      // Goal vs Actual Bar row (barra meta vs real)
+      const metaRow = row.createDiv({ cls: 'study-flow-subject-meta-row' });
+      const goalHours = item.subject.weeklyGoalHours || 0;
+      const actualHoursStr = formatMinutesHuman(item.actualMinutes);
+      const goalHoursStr = `${goalHours}h`;
+
+      metaRow.createSpan({
+        cls: 'study-flow-subject-time-text',
+        text: `${actualHoursStr} / ${goalHoursStr} (${item.percentage}%)`,
+      });
+
+      if (item.actualMinutes >= item.goalMinutes && item.goalMinutes > 0) {
+        const metBadge = metaRow.createSpan({ cls: 'study-flow-subject-goal-met-badge' });
+        const checkIcon = metBadge.createSpan();
+        setIcon(checkIcon, 'check');
+        metBadge.createSpan({ text: t('analytics.subjectGoalMet') });
+      }
+
+      // Progress bar track & fill
+      const track = row.createDiv({ cls: 'study-flow-subject-track' });
+      const fill = track.createDiv({ cls: 'study-flow-subject-fill' });
+      fill.style.width = `${Math.min(100, Math.max(0, item.percentage))}%`;
+      if (item.subject.color) {
+        fill.style.backgroundColor = item.subject.color;
+      }
+
+      // Pomodoros row (estimado vs real de pomodoros por materia)
+      const pomoRow = row.createDiv({ cls: 'study-flow-subject-pomo-row' });
+      const pomoText = item.estimatedPomodoros > 0
+        ? t('analytics.subjectPomodorosEstimateVsReal', {
+            completed: String(item.completedPomodoros),
+            estimated: String(item.estimatedPomodoros),
+          })
+        : t('analytics.subjectPomodorosCompleted', {
+            completed: String(item.completedPomodoros),
+          });
+
+      pomoRow.createSpan({ text: pomoText });
+
+      if (item.actualSessionsCount > 0) {
+        pomoRow.createSpan({
+          text: item.actualSessionsCount === 1
+            ? t('analytics.kpiSessionsCompleted_one', { count: '1' })
+            : t('analytics.kpiSessionsCompleted_other', { count: String(item.actualSessionsCount) }),
+          cls: 'study-flow-text-muted',
+        });
+      }
+    }
+  }
+
+  // 6. Two-Column Lower Grid: Tag Distribution & Breakdown
   const subGrid = rootWrapper.createDiv({ cls: 'study-flow-analytics-subgrid' });
 
   // Left: Distribution by tag/subject
@@ -241,15 +379,15 @@ export async function renderAnalyticsDashboard(
   const tagTitleLeft = tagHeader.createDiv({ cls: 'study-flow-chart-title-left' });
   const tagIcon = tagTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
   setIcon(tagIcon, 'tag');
-  tagTitleLeft.createEl('h4', { text: 'Distribución por Materia / Etiqueta' });
+  tagTitleLeft.createEl('h4', { text: t('analytics.tagDistributionTitle') });
 
   if (summary.tagDistribution.length === 0) {
     const emptyBox = tagCard.createDiv({ cls: 'study-flow-empty-state' });
     emptyBox.createEl('p', {
-      text: 'Aún no hay etiquetas registradas en tus pomodoros.',
+      text: t('analytics.noTagsYet'),
     });
     emptyBox.createEl('small', {
-      text: 'Consejo: Asigná tareas con #etiqueta (ej. #algebra, #programacion) o [[Nota]] al temporizador para categorizar tu tiempo automáticamente.',
+      text: t('analytics.noTagsTip'),
       cls: 'study-flow-text-muted',
     });
   } else {
@@ -276,42 +414,50 @@ export async function renderAnalyticsDashboard(
   const healthTitleLeft = healthHeader.createDiv({ cls: 'study-flow-chart-title-left' });
   const healthIcon = healthTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
   setIcon(healthIcon, 'check-square');
-  healthTitleLeft.createEl('h4', { text: 'Estado de Tareas & Hábitos' });
+  healthTitleLeft.createEl('h4', { text: t('analytics.taskHabitHealthTitle') });
 
   // Priority distribution pills
   const taskSection = healthCard.createDiv({ cls: 'study-flow-health-section' });
-  taskSection.createEl('h5', { text: 'Tareas Pendientes por Prioridad', cls: 'study-flow-subheading' });
+  taskSection.createEl('h5', { text: t('analytics.pendingByPriorityTitle'), cls: 'study-flow-subheading' });
   const priorityPills = taskSection.createDiv({ cls: 'study-flow-priority-pills' });
 
   const pHigh = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-high' });
-  pHigh.createSpan({ text: '⏫ Alta: ' });
+  const hIcon = pHigh.createSpan({ cls: 'study-flow-pill-icon' });
+  setIcon(hIcon, 'chevrons-up');
+  pHigh.createSpan({ text: t('analytics.priorityHigh') });
   pHigh.createEl('strong', { text: String(summary.tasks.byPriority.high) });
 
   const pMed = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-medium' });
-  pMed.createSpan({ text: '🔼 Media: ' });
+  const mIcon = pMed.createSpan({ cls: 'study-flow-pill-icon' });
+  setIcon(mIcon, 'chevron-up');
+  pMed.createSpan({ text: t('analytics.priorityMedium') });
   pMed.createEl('strong', { text: String(summary.tasks.byPriority.medium) });
 
   const pLow = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-low' });
-  pLow.createSpan({ text: '🔽 Baja: ' });
+  const lIcon = pLow.createSpan({ cls: 'study-flow-pill-icon' });
+  setIcon(lIcon, 'chevron-down');
+  pLow.createSpan({ text: t('analytics.priorityLow') });
   pLow.createEl('strong', { text: String(summary.tasks.byPriority.low) });
 
   const pNone = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-none' });
-  pNone.createSpan({ text: 'Normal: ' });
+  pNone.createSpan({ text: t('analytics.priorityNormal') });
   pNone.createEl('strong', { text: String(summary.tasks.byPriority.none) });
 
   if (summary.tasks.totalEstimatedPomodoros > 0) {
     const pPomo = priorityPills.createSpan({ cls: 'study-flow-priority-pill is-pomo' });
-    pPomo.createSpan({ text: '🍅 Pomodoros: ' });
+    const pomoIcon = pPomo.createSpan({ cls: 'study-flow-pill-icon' });
+    setIcon(pomoIcon, 'timer');
+    pPomo.createSpan({ text: t('analytics.priorityPomodoros') });
     pPomo.createEl('strong', { text: `${summary.tasks.totalCompletedPomodoros}/${summary.tasks.totalEstimatedPomodoros}` });
   }
 
   // Habit consistency list
   const habitSection = healthCard.createDiv({ cls: 'study-flow-health-section' });
-  habitSection.createEl('h5', { text: 'Rachas de Hábitos Activos', cls: 'study-flow-subheading' });
+  habitSection.createEl('h5', { text: t('analytics.activeHabitStreaksTitle'), cls: 'study-flow-subheading' });
 
   if (habits.length === 0) {
     habitSection.createEl('p', {
-      text: 'No tenés hábitos creados todavía en Habits.md.',
+      text: t('analytics.noHabitsCreated'),
       cls: 'study-flow-text-muted',
     });
   } else {
@@ -321,11 +467,13 @@ export async function renderAnalyticsDashboard(
       row.createSpan({ text: h.name, cls: 'study-flow-analytics-habit-name' });
       
       const badge = row.createSpan({ cls: 'study-flow-analytics-streak-badge' });
-      badge.createSpan({ text: `🔥 ${h.streak} días` });
+      const fIcon = badge.createSpan({ cls: 'study-flow-streak-icon' });
+      setIcon(fIcon, 'flame');
+      badge.createSpan({ text: t('analytics.habitStreakDays', { count: String(h.streak) }) });
 
       const todayPill = row.createSpan({
         cls: `study-flow-analytics-today-status ${h.completedToday ? 'is-done' : 'is-pending'}`,
-        text: h.completedToday ? '✓ Listo hoy' : '○ Pendiente',
+        text: h.completedToday ? t('analytics.habitDoneToday') : t('analytics.habitPendingToday'),
       });
     }
   }

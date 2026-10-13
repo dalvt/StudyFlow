@@ -1,4 +1,90 @@
-/* Study Flow Assistant — Ultra-Polished Obsidian Theme */
+/* Study Flow Assistant — Refactored Design System */
+
+/* ==========================================================================
+   0. Design Tokens (Obsidian Native Derivative Tokens)
+   ========================================================================== */
+:root {
+  /* Corner Radii derived from Obsidian variables */
+  --sf-radius-xs: var(--radius-s, 4px);
+  --sf-radius-s: var(--radius-s, 4px);
+  --sf-radius-m: var(--radius-m, 8px);
+  --sf-radius-l: var(--radius-l, 12px);
+  --sf-radius-round: var(--radius-round, 9999px);
+  --sf-radius: var(--sf-radius-m);
+
+  /* Spacing Scale */
+  --sf-space-2xs: 2px;
+  --sf-space-xs: 4px;
+  --sf-space-s: 8px;
+  --sf-space-m: 12px;
+  --sf-space-l: 16px;
+  --sf-space-xl: 20px;
+  --sf-space-2xl: 24px;
+  --sf-space-3xl: 32px;
+
+  /* Accent & Semantic Palette derived from Obsidian native theme */
+  --sf-accent: var(--interactive-accent);
+  --sf-accent-hover: var(--interactive-accent-hover);
+  --sf-accent-subtle: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  --sf-accent-border: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+
+  --sf-danger: var(--text-error);
+  --sf-danger-subtle: color-mix(in srgb, var(--text-error) 14%, transparent);
+  --sf-danger-border: color-mix(in srgb, var(--text-error) 28%, transparent);
+
+  --sf-success: var(--text-success);
+  --sf-success-subtle: color-mix(in srgb, var(--text-success) 14%, transparent);
+  --sf-success-border: color-mix(in srgb, var(--text-success) 28%, transparent);
+
+  --sf-warning: var(--text-warning);
+  --sf-warning-subtle: color-mix(in srgb, var(--text-warning) 15%, transparent);
+  --sf-warning-border: color-mix(in srgb, var(--text-warning) 28%, transparent);
+
+  --sf-info: var(--text-accent);
+  --sf-info-subtle: color-mix(in srgb, var(--text-accent) 14%, transparent);
+  --sf-info-border: color-mix(in srgb, var(--text-accent) 28%, transparent);
+
+  /* Native Surfaces, Borders & Shadows */
+  --sf-bg-primary: var(--background-primary);
+  --sf-bg-secondary: var(--background-secondary);
+  --sf-bg-secondary-alt: var(--background-secondary-alt, var(--background-secondary));
+  --sf-bg-hover: var(--background-modifier-hover);
+  --sf-border: var(--background-modifier-border);
+  --sf-border-focus: var(--background-modifier-border-focus);
+  --sf-border-hover: var(--background-modifier-border-hover);
+
+  --sf-shadow-xs: 0 1px 2px color-mix(in srgb, var(--text-normal) 4%, transparent);
+  --sf-shadow-s: 0 1px 3px color-mix(in srgb, var(--text-normal) 6%, transparent);
+  --sf-shadow-m: 0 2px 6px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --sf-shadow-focus: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* ==========================================================================
+   Reduced Motion Accessibility (prefers-reduced-motion: reduce)
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Visible Focus for Keyboard Navigation & Accessibility
+   ========================================================================== */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--sf-accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px var(--sf-border-focus) !important;
+}
 
 /* =========================================
    1. Status Bar Item
@@ -24,19 +110,19 @@
   border-color: var(--interactive-accent);
   color: var(--text-accent);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text-normal) 12%, transparent);
 }
 
 .status-bar-item.study-flow-pomodoro.is-running {
-  background-color: rgba(229, 62, 62, 0.14);
+  background-color: color-mix(in srgb, var(--sf-danger) 14%, transparent);
   border-color: var(--text-accent);
   color: var(--text-accent);
 }
 
 .status-bar-item.study-flow-pomodoro.is-break {
-  background-color: rgba(72, 187, 120, 0.14);
-  border-color: var(--text-success, #48bb78);
-  color: var(--text-success, #48bb78);
+  background-color: color-mix(in srgb, var(--sf-success) 14%, transparent);
+  border-color: var(--sf-success);
+  color: var(--sf-success);
 }
 
 .status-bar-item.study-flow-pomodoro.is-paused {
@@ -77,12 +163,7 @@
   color: var(--interactive-accent);
 }
 
-.study-flow-modal-desc {
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
+
 
 .study-flow-modal-footer {
   display: flex;
@@ -143,13 +224,13 @@
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.22), rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.05));
-  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35);
+  background: var(--sf-accent-subtle);
+  border: 1px solid color-mix(in srgb, var(--sf-accent) 35%, transparent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--interactive-accent);
-  box-shadow: 0 0 10px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sf-accent) 20%, transparent);
 }
 
 .study-flow-brand-icon-box svg {
@@ -171,9 +252,9 @@
   letter-spacing: 0.6px;
   padding: 2px 6px;
   border-radius: 5px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
+  background: color-mix(in srgb, var(--sf-accent) 12%, transparent);
   color: var(--text-accent);
-  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
+  border: 1px solid color-mix(in srgb, var(--sf-accent) 25%, transparent);
 }
 
 .study-flow-header-actions {
@@ -215,20 +296,20 @@
   gap: 6px;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid color-mix(in srgb, var(--text-on-accent) 15%, transparent);
   border-radius: var(--radius-s);
   padding: 5px 12px;
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sf-accent) 35%, transparent);
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-expand-tab-btn:hover {
   filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.45);
+  box-shadow: var(--sf-shadow-s);
 }
 
 .study-flow-expand-tab-btn svg {
@@ -245,7 +326,7 @@
   border-radius: 10px;
   padding: 4px;
   gap: 4px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--text-normal) 8%, transparent);
 }
 
 .study-flow-nav-pill {
@@ -277,8 +358,8 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   font-weight: 600;
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 3px 12px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35), 0 1px 2px rgba(0, 0, 0, 0.15);
+  border-color: color-mix(in srgb, var(--text-on-accent) 15%, transparent);
+  box-shadow: var(--sf-shadow-s);
 }
 
 .study-flow-nav-pill svg {
@@ -330,14 +411,14 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text-normal) 4%, transparent);
 }
 
 /* =========================================
    4. Luxury Pomodoro Dial & Control Deck
    ========================================= */
 .study-flow-pomodoro-luxury-card {
-  background: radial-gradient(circle at 50% 30%, var(--background-secondary-alt, var(--background-secondary)), var(--background-secondary));
+  background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   position: relative;
   overflow: hidden;
@@ -386,7 +467,7 @@
   border-radius: var(--radius-m);
   background-color: var(--background-primary);
   border: 1px solid var(--interactive-accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--text-normal) 4%, transparent);
 }
 
 .study-flow-task-target-icon svg {
@@ -419,16 +500,16 @@
   font-size: 11px;
   font-weight: 700;
   border-radius: var(--radius-s);
-  background-color: rgba(72, 187, 120, 0.15);
-  border: 1px solid rgba(72, 187, 120, 0.35);
-  color: var(--text-success, #48bb78);
+  background-color: color-mix(in srgb, var(--sf-success) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-success) 35%, transparent);
+  color: var(--sf-success);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .study-flow-task-complete-btn:hover {
-  background-color: var(--text-success, #48bb78);
-  color: #fff;
+  background-color: var(--sf-success);
+  color: var(--text-on-accent);
 }
 
 .study-flow-task-complete-btn svg {
@@ -520,11 +601,11 @@
 }
 
 .study-flow-dial-aura.is-work {
-  background: radial-gradient(circle, #ff4d4f, #fa8c16);
+  background: var(--sf-danger-subtle);
 }
 
 .study-flow-dial-aura.is-break {
-  background: radial-gradient(circle, #10b981, #06b6d4);
+  background: var(--sf-success-subtle);
 }
 
 .study-flow-dial-aura.is-pulsing {
@@ -550,12 +631,12 @@
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08));
+  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--text-normal) 8%, transparent));
 }
 
 .study-flow-dial-bg {
   fill: none;
-  stroke: var(--background-modifier-border-hover, rgba(255, 255, 255, 0.1));
+  stroke: var(--background-modifier-border-hover, color-mix(in srgb, var(--text-on-accent) 10%, transparent));
   stroke-width: 9;
   opacity: 0.7;
 }
@@ -574,13 +655,13 @@
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: #ff4d4f;
-  filter: drop-shadow(0 0 6px rgba(255, 77, 79, 0.6));
+  stroke: var(--sf-danger);
+  
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: #10b981;
-  filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6));
+  stroke: var(--sf-success);
+  
 }
 
 .study-flow-dial-center {
@@ -605,15 +686,15 @@
 }
 
 .study-flow-luxury-pill.is-work {
-  background-color: rgba(255, 77, 79, 0.15);
-  color: #ff4d4f;
-  border: 1px solid rgba(255, 77, 79, 0.3);
+  background-color: color-mix(in srgb, var(--sf-danger) 15%, transparent);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 30%, transparent);
 }
 
 .study-flow-luxury-pill.is-break {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background-color: color-mix(in srgb, var(--sf-success) 15%, transparent);
+  color: var(--sf-success);
+  border: 1px solid color-mix(in srgb, var(--sf-success) 30%, transparent);
 }
 
 /* Modern Clean Sans-Serif Numbers (No Dotted-Zero Eyes) */
@@ -626,7 +707,7 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
   margin: 4px 0;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  text-shadow: none;
 }
 
 /* Streak Micro Dots */
@@ -647,9 +728,9 @@
 }
 
 .study-flow-streak-dot.is-filled {
-  background-color: #ff4d4f;
-  border-color: #ff4d4f;
-  box-shadow: 0 0 6px rgba(255, 77, 79, 0.7);
+  background-color: var(--sf-danger);
+  border-color: var(--sf-danger);
+  box-shadow: var(--sf-shadow-xs);
   transform: scale(1.15);
 }
 
@@ -680,14 +761,14 @@
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--text-normal) 5%, transparent);
 }
 
 .study-flow-deck-btn:hover {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
 .study-flow-deck-btn svg {
@@ -711,26 +792,26 @@
   border: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--sf-shadow-m);
 }
 
 .study-flow-hero-play-btn.is-work {
-  background: linear-gradient(135deg, #ff4d4f 0%, #fa8c16 100%);
-  color: #ffffff;
+  background: var(--sf-danger);
+  color: var(--text-on-accent);
 }
 
 .study-flow-hero-play-btn.is-break {
-  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
-  color: #ffffff;
+  background: var(--sf-success);
+  color: var(--text-on-accent);
 }
 
 .study-flow-hero-play-btn:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 22px rgba(255, 77, 79, 0.45);
+  box-shadow: var(--sf-shadow-s);
 }
 
 .study-flow-hero-play-btn.is-break:hover {
-  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.45);
+  box-shadow: var(--sf-shadow-s);
 }
 
 .study-flow-hero-play-btn.is-running {
@@ -841,7 +922,7 @@
 .study-flow-segmented-btn.is-active {
   background-color: var(--background-secondary);
   color: var(--text-normal);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-normal) 8%, transparent);
 }
 
 .study-flow-count-pill {
@@ -873,7 +954,7 @@
 
 .study-flow-task-card:hover {
   border-color: var(--interactive-accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--text-normal) 5%, transparent);
 }
 
 .study-flow-task-card.is-done {
@@ -914,17 +995,17 @@
   gap: 4px;
   padding: 3px 8px;
   border-radius: var(--radius-s);
-  background: rgba(250, 140, 22, 0.15);
-  border: 1px solid rgba(250, 140, 22, 0.35);
+  background: color-mix(in srgb, var(--sf-warning) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-warning) 35%, transparent);
   font-size: 11px;
   font-weight: 700;
-  color: #fa8c16;
+  color: var(--sf-warning);
 }
 
 .study-flow-flame-icon svg {
   width: 12px;
   height: 12px;
-  color: #fa8c16;
+  color: var(--sf-warning);
 }
 
 .study-flow-source-chip {
@@ -950,7 +1031,7 @@
 }
 
 .study-flow-icon-action-btn:hover {
-  color: var(--text-error, #e53e3e);
+  color: var(--sf-danger);
   background-color: var(--background-modifier-hover);
 }
 
@@ -1005,31 +1086,11 @@
 /* =========================================
    6. Study Blocks & Planner UI
    ========================================= */
-.study-flow-section-card {
-  background-color: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-l);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
-.study-flow-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 
-.study-flow-section-header h3,
-.study-flow-section-header h4 {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-ui-medium);
-  font-weight: 700;
-}
+
+
+
 
 .study-flow-section-icon svg {
   width: 16px;
@@ -1048,58 +1109,17 @@
   border-radius: var(--radius-s);
 }
 
-.study-flow-timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  position: relative;
-  padding-left: 14px;
-  border-left: 2px dashed var(--interactive-accent);
-  margin-left: 8px;
-}
 
-.study-flow-timeline-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  padding: 8px 10px;
-}
 
-.study-flow-timeline-dot {
-  position: absolute;
-  left: -23px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
-.study-flow-timeline-dot svg {
-  width: 9px;
-  height: 9px;
-}
 
-.study-flow-timeline-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 
-.study-flow-time-range-wrap {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+
+
+
+
+
+
 
 .study-flow-time-input {
   width: 58px;
@@ -1122,42 +1142,14 @@
   padding: 4px 8px;
 }
 
-.study-flow-preview-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
 
-.study-flow-preview-box {
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  padding: 10px 12px;
-  font-family: var(--font-monospace);
-  font-size: var(--font-ui-smaller);
-  white-space: pre-wrap;
-  color: var(--text-muted);
-  max-height: 120px;
-  overflow-y: auto;
-  line-height: 1.45;
-}
+
+
 
 /* =========================================
    7. Priority Badges & Selectors
    ========================================= */
-.study-flow-priority-select {
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  padding: 8px 10px;
-  font-size: var(--font-ui-smaller);
-  font-weight: 600;
-  color: var(--text-normal);
-  cursor: pointer;
-  flex-shrink: 0;
-}
+
 
 .study-flow-priority-badge {
   display: inline-flex;
@@ -1171,28 +1163,28 @@
 }
 
 .study-flow-priority-badge.is-high {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background-color: color-mix(in srgb, var(--sf-danger) 15%, transparent);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 35%, transparent);
 }
 
 .study-flow-priority-badge.is-medium {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background-color: color-mix(in srgb, var(--sf-warning) 15%, transparent);
+  color: var(--sf-warning);
+  border: 1px solid color-mix(in srgb, var(--sf-warning) 35%, transparent);
 }
 
 .study-flow-priority-badge.is-low {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.35);
+  background-color: color-mix(in srgb, var(--sf-info) 15%, transparent);
+  color: var(--sf-info);
+  border: 1px solid color-mix(in srgb, var(--sf-info) 35%, transparent);
 }
 
 .study-flow-priority-badge.is-idea,
 .study-flow-priority-badge.is-icebox {
-  background-color: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background-color: color-mix(in srgb, var(--sf-info) 15%, transparent);
+  color: var(--sf-info);
+  border: 1px solid color-mix(in srgb, var(--sf-info) 35%, transparent);
 }
 
 .study-flow-icebox-bullet {
@@ -1201,7 +1193,7 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  color: #38bdf8;
+  color: var(--sf-info);
   opacity: 0.9;
 }
 
@@ -1211,29 +1203,19 @@
 }
 
 .study-flow-badge-stat.is-idea {
-  background-color: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  background-color: color-mix(in srgb, var(--sf-info) 12%, transparent);
+  color: var(--sf-info);
 }
 
-.study-flow-type-select {
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  padding: 8px 10px;
-  font-size: var(--font-ui-smaller);
-  font-weight: 600;
-  color: var(--text-normal);
-  cursor: pointer;
-  flex-shrink: 0;
-}
+
 
 .study-flow-promote-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background-color: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #38bdf8;
+  background-color: color-mix(in srgb, var(--sf-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-info) 35%, transparent);
+  color: var(--sf-info);
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
@@ -1243,22 +1225,12 @@
 }
 
 .study-flow-promote-btn:hover {
-  background-color: #38bdf8;
-  color: #0f172a;
-  border-color: #38bdf8;
+  background-color: var(--sf-info);
+  color: var(--sf-bg-primary);
+  border-color: var(--sf-info);
 }
 
-.study-flow-estimate-select {
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  padding: 8px 10px;
-  font-size: var(--font-ui-smaller);
-  font-weight: 600;
-  color: var(--text-normal);
-  cursor: pointer;
-  flex-shrink: 0;
-}
+
 
 .study-flow-estimate-badge {
   display: inline-flex;
@@ -1269,43 +1241,43 @@
   padding: 2px 8px;
   border-radius: 9999px;
   line-height: 1.2;
-  background-color: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background-color: color-mix(in srgb, var(--sf-danger) 12%, transparent);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 30%, transparent);
 }
 
 .study-flow-estimate-badge.is-met {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.35);
+  background-color: color-mix(in srgb, var(--sf-success) 15%, transparent);
+  color: var(--sf-success);
+  border-color: color-mix(in srgb, var(--sf-success) 35%, transparent);
 }
 
 .study-flow-pomo-step-btn {
   font-size: 11px;
   font-weight: 700;
-  color: #ef4444;
+  color: var(--sf-danger);
 }
 
 .study-flow-pomo-step-btn:hover {
-  background-color: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.35);
+  background-color: color-mix(in srgb, var(--sf-danger) 15%, transparent);
+  border-color: color-mix(in srgb, var(--sf-danger) 35%, transparent);
 }
 
 .study-flow-badge-stat.is-pomo-est {
-  background-color: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background-color: color-mix(in srgb, var(--sf-danger) 12%, transparent);
+  color: var(--sf-danger);
 }
 
 .study-flow-priority-pill.is-pomo {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.25);
+  background-color: color-mix(in srgb, var(--sf-danger) 10%, transparent);
+  color: var(--sf-danger);
+  border-color: color-mix(in srgb, var(--sf-danger) 25%, transparent);
 }
 
 .study-flow-active-task-pomo-hint {
   font-size: 12px;
   font-weight: 700;
-  color: #ef4444;
+  color: var(--sf-danger);
   margin-left: 4px;
 }
 
@@ -1342,7 +1314,7 @@
 .study-flow-heatmap-title svg {
   width: 14px;
   height: 14px;
-  color: #f59e0b;
+  color: var(--sf-warning);
 }
 
 .study-flow-heatmap-grid {
@@ -1358,7 +1330,7 @@
   transition: transform 0.15s ease, filter 0.15s ease;
   cursor: pointer;
   background-color: var(--background-modifier-hover);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--text-on-accent) 4%, transparent);
 }
 
 .study-flow-heatmap-cell:hover {
@@ -1374,24 +1346,24 @@
 }
 
 .study-flow-heatmap-cell.is-level-1 {
-  background-color: rgba(16, 185, 129, 0.35);
-  border-color: rgba(16, 185, 129, 0.4);
+  background-color: color-mix(in srgb, var(--sf-success) 35%, transparent);
+  border-color: color-mix(in srgb, var(--sf-success) 40%, transparent);
 }
 
 .study-flow-heatmap-cell.is-level-2 {
-  background-color: rgba(16, 185, 129, 0.6);
-  border-color: rgba(16, 185, 129, 0.7);
+  background-color: color-mix(in srgb, var(--sf-success) 60%, transparent);
+  border-color: color-mix(in srgb, var(--sf-success) 70%, transparent);
 }
 
 .study-flow-heatmap-cell.is-level-3 {
-  background-color: rgba(16, 185, 129, 0.85);
-  border-color: #10b981;
+  background-color: color-mix(in srgb, var(--sf-success) 85%, transparent);
+  border-color: var(--sf-success);
 }
 
 .study-flow-heatmap-cell.is-level-4 {
-  background-color: #10b981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-  border-color: #34d399;
+  background-color: var(--sf-success);
+  box-shadow: var(--sf-shadow-xs);
+  border-color: var(--sf-success);
 }
 
 .study-flow-heatmap-legend {
@@ -1429,18 +1401,9 @@
   color: var(--text-accent);
 }
 
-.study-flow-open-note-btn {
-  background-color: var(--background-modifier-hover);
-  border: 1px solid var(--interactive-accent);
-  color: var(--interactive-accent);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
 
-.study-flow-open-note-btn:hover {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
+
+
 
 /* =========================================
    10. Study Flow Analytics Dashboard
@@ -1501,7 +1464,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-normal) 5%, transparent);
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1539,23 +1502,23 @@
 }
 
 .study-flow-kpi-icon.is-primary {
-  background: rgba(99, 102, 241, 0.15);
-  color: #6366f1;
+  background: color-mix(in srgb, var(--sf-info) 15%, transparent);
+  color: var(--sf-accent);
 }
 
 .study-flow-kpi-icon.is-accent {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  background: color-mix(in srgb, var(--sf-success) 15%, transparent);
+  color: var(--sf-success);
 }
 
 .study-flow-kpi-icon.is-warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--sf-warning) 15%, transparent);
+  color: var(--sf-warning);
 }
 
 .study-flow-kpi-icon.is-success {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--sf-info) 15%, transparent);
+  color: var(--sf-info);
 }
 
 .study-flow-kpi-value {
@@ -1640,7 +1603,7 @@
 }
 
 .study-flow-bar-col.is-today .study-flow-bar-val {
-  color: #10b981;
+  color: var(--sf-success);
 }
 
 .study-flow-bar-track {
@@ -1657,13 +1620,13 @@
 .study-flow-bar-fill {
   width: 100%;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, var(--interactive-accent), rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4));
+  background: var(--sf-accent);
   transition: height 0.3s ease;
 }
 
 .study-flow-bar-fill.is-today-fill {
-  background: linear-gradient(180deg, #10b981, #059669);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  background: var(--sf-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sf-success) 40%, transparent);
 }
 
 .study-flow-bar-label {
@@ -1687,8 +1650,8 @@
 .study-flow-bar-today-pill {
   font-size: 9px;
   font-weight: 700;
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: color-mix(in srgb, var(--sf-success) 20%, transparent);
+  color: var(--sf-success);
   padding: 1px 5px;
   border-radius: 8px;
   margin-top: 1px;
@@ -1800,15 +1763,15 @@
 }
 
 .study-flow-priority-pill.is-high {
-  border-left: 3px solid #ff4d4f;
+  border-left: 3px solid var(--sf-danger);
 }
 
 .study-flow-priority-pill.is-medium {
-  border-left: 3px solid #fa8c16;
+  border-left: 3px solid var(--sf-warning);
 }
 
 .study-flow-priority-pill.is-low {
-  border-left: 3px solid #52c41a;
+  border-left: 3px solid var(--sf-success);
 }
 
 .study-flow-priority-pill.is-none {
@@ -1841,7 +1804,7 @@
 .study-flow-analytics-streak-badge {
   font-size: 11px;
   font-weight: 700;
-  color: #f59e0b;
+  color: var(--sf-warning);
 }
 
 .study-flow-analytics-today-status {
@@ -1852,8 +1815,8 @@
 }
 
 .study-flow-analytics-today-status.is-done {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  background: color-mix(in srgb, var(--sf-success) 15%, transparent);
+  color: var(--sf-success);
 }
 
 .study-flow-analytics-today-status.is-pending {
@@ -1881,7 +1844,7 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   border-color: var(--interactive-accent);
-  box-shadow: 0 0 10px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.4);
+  box-shadow: var(--sf-shadow-xs);
 }
 
 .study-flow-zen-indicator {
@@ -1894,7 +1857,7 @@
   gap: 10px;
   background-color: var(--background-secondary);
   border: 1px solid var(--interactive-accent);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--sf-shadow-m);
   border-radius: 30px;
   padding: 6px 14px 6px 12px;
   animation: study-flow-float-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2040,7 +2003,7 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-calendar-cell.is-today {
   border-color: var(--interactive-accent);
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
+  background: color-mix(in srgb, var(--sf-accent) 8%, transparent);
 }
 
 .study-flow-calendar-cell.is-today .study-flow-calendar-day-num {
@@ -2051,7 +2014,7 @@ body.is-study-flow-zen .workspace-split {
 .study-flow-calendar-cell.is-selected {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -1px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+  background: color-mix(in srgb, var(--sf-accent) 15%, transparent);
 }
 
 .study-flow-calendar-cell-top {
@@ -2082,25 +2045,25 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-cal-chip.is-deadline {
-  background: rgba(239, 68, 68, 0.16);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--sf-danger) 16%, transparent);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 30%, transparent);
 }
 
 .study-flow-cal-chip.is-deadline.is-overdue {
-  background: #ef4444;
-  color: #ffffff;
+  background: var(--sf-danger);
+  color: var(--text-on-accent);
 }
 
 .study-flow-cal-chip.is-deadline.is-today {
-  background: #f59e0b;
-  color: #ffffff;
+  background: var(--sf-warning);
+  color: var(--text-on-accent);
 }
 
 .study-flow-cal-chip.is-block {
-  background: rgba(59, 130, 246, 0.16);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: color-mix(in srgb, var(--sf-info) 16%, transparent);
+  color: var(--sf-info);
+  border: 1px solid color-mix(in srgb, var(--sf-info) 30%, transparent);
 }
 
 /* Week View */
@@ -2135,12 +2098,12 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-week-day-card.is-today {
   border-color: var(--interactive-accent);
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
+  background: color-mix(in srgb, var(--sf-accent) 8%, transparent);
 }
 
 .study-flow-week-day-card.is-selected {
   outline: 2px solid var(--interactive-accent);
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.14);
+  background: color-mix(in srgb, var(--sf-accent) 14%, transparent);
 }
 
 .study-flow-week-day-header {
@@ -2164,11 +2127,7 @@ body.is-study-flow-zen .workspace-split {
   color: var(--text-normal);
 }
 
-.study-flow-week-badges-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
+
 
 .study-flow-week-blocks-preview {
   display: flex;
@@ -2178,20 +2137,9 @@ body.is-study-flow-zen .workspace-split {
   color: var(--text-muted);
 }
 
-.study-flow-week-mini-block {
-  background: var(--background-primary);
-  border-radius: 3px;
-  padding: 2px 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border: 1px solid var(--background-modifier-border);
-}
 
-.study-flow-week-mini-block.is-completed {
-  opacity: 0.5;
-  text-decoration: line-through;
-}
+
+
 
 .study-flow-week-empty-label {
   font-size: 10px;
@@ -2290,7 +2238,7 @@ body.is-study-flow-zen .workspace-split {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-normal) 10%, transparent);
   animation: study-flow-fade-in 0.15s ease;
 }
 
@@ -2356,8 +2304,8 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(59, 130, 246, 0.14);
-  color: #3b82f6;
+  background: color-mix(in srgb, var(--sf-info) 14%, transparent);
+  color: var(--sf-info);
   white-space: nowrap;
 }
 
@@ -2442,21 +2390,21 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-deadline-badge.is-overdue {
-  background: rgba(239, 68, 68, 0.18);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: color-mix(in srgb, var(--sf-danger) 18%, transparent);
+  color: var(--sf-danger);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 40%, transparent);
 }
 
 .study-flow-deadline-badge.is-today {
-  background: rgba(245, 158, 11, 0.18);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: color-mix(in srgb, var(--sf-warning) 18%, transparent);
+  color: var(--sf-warning);
+  border: 1px solid color-mix(in srgb, var(--sf-warning) 40%, transparent);
 }
 
 .study-flow-deadline-badge.is-soon {
-  background: rgba(59, 130, 246, 0.15);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: color-mix(in srgb, var(--sf-info) 15%, transparent);
+  color: var(--sf-info);
+  border: 1px solid color-mix(in srgb, var(--sf-info) 30%, transparent);
 }
 
 /* Deadlines Master Hub */
@@ -2543,7 +2491,7 @@ body.is-study-flow-zen .workspace-split {
   flex-direction: column;
   gap: 10px;
   margin: 6px 0 10px 0;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--text-normal) 5%, transparent);
   animation: study-flow-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2658,54 +2606,19 @@ body.is-study-flow-zen .workspace-split {
   gap: 12px;
 }
 
-.study-flow-tasks-stats-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 
-.study-flow-stat-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-s);
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  color: var(--text-muted);
-}
 
-.study-flow-stat-pill.is-pending {
-  color: var(--text-accent);
-  border-color: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.08);
-}
 
-.study-flow-stat-pill.is-today-urgent {
-  color: #ff4d4f;
-  border-color: rgba(255, 77, 79, 0.35);
-  background: rgba(255, 77, 79, 0.1);
-  font-weight: 700;
-}
 
-.study-flow-stat-pill.is-today {
-  color: #fa8c16;
-  border-color: rgba(250, 140, 22, 0.3);
-  background: rgba(250, 140, 22, 0.08);
-}
 
-.study-flow-stat-pill.is-idea {
-  color: #eab308;
-  border-color: rgba(234, 179, 8, 0.3);
-  background: rgba(234, 179, 8, 0.08);
-}
 
-.study-flow-stat-pill.is-completed {
-  color: var(--text-muted);
-}
+
+
+
+
+
+
+
 
 /* Search and Sort row */
 .study-flow-tasks-search-row {
@@ -2804,14 +2717,14 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-tasks-nav .study-flow-segmented-btn.is-active {
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.16);
+  background: color-mix(in srgb, var(--sf-accent) 16%, transparent);
   border-color: var(--interactive-accent);
   color: var(--text-accent);
-  box-shadow: 0 0 0 1px rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sf-accent) 20%, transparent);
 }
 
 .study-flow-tasks-nav .study-flow-segmented-btn.is-active .study-flow-count-pill {
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.25);
+  background: color-mix(in srgb, var(--sf-accent) 25%, transparent);
   color: var(--text-accent);
 }
 
@@ -2837,7 +2750,7 @@ body.is-study-flow-zen .workspace-split {
 .study-flow-cloud-trigger-bar:hover {
   border-color: var(--interactive-accent);
   background: var(--background-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text-normal) 12%, transparent);
 }
 
 .study-flow-trigger-left {
@@ -2853,7 +2766,7 @@ body.is-study-flow-zen .workspace-split {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.15);
+  background: color-mix(in srgb, var(--sf-accent) 15%, transparent);
   color: var(--interactive-accent);
 }
 
@@ -2883,8 +2796,8 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
   padding: 4px 10px;
   border-radius: 9999px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
-  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.3);
+  background: color-mix(in srgb, var(--sf-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-accent) 30%, transparent);
   color: var(--text-accent);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -2892,14 +2805,14 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-trigger-cloud-btn:hover {
   background: var(--interactive-accent);
-  color: #fff;
+  color: var(--text-on-accent);
 }
 
 /* Floating Cloud Modal for Tasks */
 .modal:has(.study-flow-cloud-modal) {
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--background-modifier-border);
+  box-shadow: var(--sf-shadow-m), 0 0 0 1px var(--background-modifier-border);
 }
 
 .study-flow-cloud-modal {
@@ -2933,7 +2846,7 @@ body.is-study-flow-zen .workspace-split {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.16);
+  background: color-mix(in srgb, var(--sf-accent) 16%, transparent);
   color: var(--interactive-accent);
   flex-shrink: 0;
 }
@@ -2989,9 +2902,9 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-cloud-type-btn.is-active {
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.18);
+  background: color-mix(in srgb, var(--sf-accent) 18%, transparent);
   color: var(--text-accent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
 /* Body */
@@ -3114,7 +3027,7 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-stepper-val.is-active {
-  color: #ff4d4f;
+  color: var(--sf-danger);
   font-weight: 700;
 }
 
@@ -3155,9 +3068,9 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-priority-btn.is-active {
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.2);
+  background: color-mix(in srgb, var(--sf-accent) 20%, transparent);
   color: var(--text-accent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-normal) 10%, transparent);
 }
 
 .study-flow-prio-icon {
@@ -3275,8 +3188,8 @@ body.is-study-flow-zen .workspace-split {
   justify-content: space-between;
   padding: 6px 12px;
   border-radius: var(--radius-s);
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.12);
-  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.3);
+  background: color-mix(in srgb, var(--sf-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-accent) 30%, transparent);
   font-size: 12px;
   font-weight: 600;
   color: var(--text-accent);
@@ -3341,11 +3254,25 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 9999px;
-  background: rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.16);
-  border: 1px solid rgba(var(--interactive-accent-rgb, 99, 102, 241), 0.35);
+  background: color-mix(in srgb, var(--sf-accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-accent) 35%, transparent);
   color: var(--text-accent);
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.study-flow-subject-chip.has-custom-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.study-flow-subject-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .study-flow-subject-chip:hover {
@@ -3432,15 +3359,15 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 700;
   padding: 2px 6px;
   border-radius: var(--radius-s);
-  background: rgba(255, 77, 79, 0.12);
-  border: 1px solid rgba(255, 77, 79, 0.25);
-  color: #ff4d4f;
+  background: color-mix(in srgb, var(--sf-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-danger) 25%, transparent);
+  color: var(--sf-danger);
   transition: all 0.15s ease;
 }
 
 .study-flow-pomo-step-btn:hover {
-  background: #ff4d4f;
-  color: #fff;
+  background: var(--sf-danger);
+  color: var(--text-on-accent);
 }
 
 .study-flow-pomo-minus-btn {
@@ -3448,21 +3375,384 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 700;
   padding: 2px 6px;
   border-radius: var(--radius-s);
-  background: rgba(250, 140, 22, 0.12);
-  border: 1px solid rgba(250, 140, 22, 0.25);
-  color: #fa8c16;
+  background: color-mix(in srgb, var(--sf-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sf-warning) 25%, transparent);
+  color: var(--sf-warning);
   transition: all 0.15s ease;
 }
 
 .study-flow-pomo-minus-btn:hover {
-  background: #fa8c16;
-  color: #fff;
+  background: var(--sf-warning);
+  color: var(--text-on-accent);
 }
 
 .study-flow-delete-btn:hover {
-  color: var(--text-error, #e53e3e);
+  color: var(--sf-danger);
 }
 
 
+
+
+
+
+/* ==========================================================================
+   Mobile & Narrow Sidebar (<400px) Layout & Touch Controls
+   ========================================================================== */
+.study-flow-container {
+  container-type: inline-size;
+}
+
+@container (max-width: 400px) {
+  .study-flow-nav-pill .study-flow-nav-pill-label {
+    display: none !important;
+  }
+  .study-flow-nav-pill {
+    padding: 8px 4px !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  .study-flow-segmented-btn .study-flow-segmented-label {
+    display: none !important;
+  }
+  .study-flow-nav-pill,
+  .study-flow-icon-action-btn,
+  .study-flow-header-icon-btn,
+  .study-flow-preset-chip,
+  .study-flow-segmented-btn,
+  .study-flow-stepper-btn,
+  .study-flow-btn,
+  .mod-cta {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .study-flow-nav-pill .study-flow-nav-pill-label {
+    display: none !important;
+  }
+  .study-flow-nav-pill {
+    padding: 8px 4px !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  .study-flow-segmented-btn .study-flow-segmented-label {
+    display: none !important;
+  }
+  .study-flow-nav-pill,
+  .study-flow-icon-action-btn,
+  .study-flow-header-icon-btn,
+  .study-flow-preset-chip,
+  .study-flow-segmented-btn,
+  .study-flow-stepper-btn,
+  .study-flow-btn,
+  .mod-cta {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+}
+
+.is-phone .study-flow-nav-pill .study-flow-nav-pill-label {
+  display: none !important;
+}
+.is-phone .study-flow-nav-pill,
+.is-phone .study-flow-icon-action-btn,
+.is-phone .study-flow-header-icon-btn,
+.is-phone .study-flow-preset-chip,
+.is-phone .study-flow-segmented-btn,
+.is-phone .study-flow-stepper-btn,
+.is-phone .study-flow-btn,
+.is-phone .mod-cta {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+/* Active Subject & Pomodoro Selection */
+.study-flow-active-subject-banner {
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.study-flow-subject-tag-hint {
+  font-size: 11px;
+}
+
+.study-flow-link-buttons-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.study-flow-link-subject-btn {
+  background: var(--background-secondary);
+}
+
+/* Weekly Subject Progress (Analytics) */
+.study-flow-subjects-card {
+  margin-top: 16px;
+}
+
+.study-flow-subjects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.study-flow-subject-progress-item {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-subject-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.study-flow-subject-item-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-subject-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.study-flow-subject-item-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.study-flow-subject-streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-warning) 15%, transparent);
+  color: var(--text-warning);
+}
+
+.study-flow-subject-streak-badge.is-zero {
+  background: var(--background-modifier-form-field);
+  color: var(--text-muted);
+}
+
+.study-flow-subject-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.study-flow-subject-time-text {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.study-flow-subject-goal-met-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-success);
+  font-weight: 600;
+}
+
+.study-flow-subject-track {
+  width: 100%;
+  height: 8px;
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.study-flow-subject-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.study-flow-subject-pomo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Spaced Repetition Card in Tasks Tab */
+.study-flow-spaced-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-flow-spaced-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.study-flow-spaced-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-spaced-header-left h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-spaced-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.study-flow-spaced-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-spaced-item {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.study-flow-spaced-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.study-flow-spaced-doc-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.study-flow-spaced-title-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.study-flow-spaced-title-link:hover {
+  color: var(--interactive-accent);
+  text-decoration: underline;
+}
+
+.study-flow-spaced-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+
+.study-flow-spaced-interval-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--background-modifier-form-field);
+  color: var(--text-muted);
+}
+
+.study-flow-spaced-today-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  color: var(--interactive-accent);
+}
+
+.study-flow-spaced-overdue-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--text-error) 20%, transparent);
+  color: var(--text-error);
+}
+
+.study-flow-spaced-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-spaced-btn-hard {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+}
+
+.study-flow-spaced-btn-hard:hover {
+  color: var(--text-warning);
+  border-color: var(--text-warning);
+}
+
+.study-flow-spaced-btn-easy {
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.study-flow-spaced-empty {
+  padding: 8px 0;
+  text-align: center;
+}
+
+.study-flow-spaced-empty-title {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 
 

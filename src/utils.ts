@@ -52,24 +52,48 @@ export async function getOrCreateFile(
 }
 
 /**
- * Returns formatted daily note path based on settings and offset from today.
- * e.g. offsetDays = 0 for today, 1 for tomorrow.
+ * Returns formatted daily note path based on settings and offset from today,
+ * or an explicit date string (YYYY-MM-DD) / Date object.
  */
 export function getDailyNotePath(
   settings: StudyFlowSettings,
-  offsetDays: number = 0
+  targetDateOrOffset: number | string | Date = 0
 ): string {
-  const momentFn = (window as unknown as { moment?: (d?: Date) => { add: (n: number, u: string) => { format: (f: string) => string }; format: (f: string) => string } }).moment;
+  const momentFn = (
+    window as unknown as {
+      moment?: (d?: unknown) => {
+        add: (n: number, u: string) => { format: (f: string) => string };
+        format: (f: string) => string;
+      };
+    }
+  ).moment;
   let fileName: string;
 
   if (typeof momentFn === 'function') {
-    const m = momentFn();
-    const formatted = offsetDays !== 0
-      ? m.add(offsetDays, 'days').format(settings.dailyNoteDateFormat)
-      : m.format(settings.dailyNoteDateFormat);
-    fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
+    if (typeof targetDateOrOffset === 'number') {
+      const m = momentFn();
+      const formatted =
+        targetDateOrOffset !== 0
+          ? m.add(targetDateOrOffset, 'days').format(settings.dailyNoteDateFormat)
+          : m.format(settings.dailyNoteDateFormat);
+      fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
+    } else {
+      let targetDate: Date;
+      if (typeof targetDateOrOffset === 'string') {
+        const clean = targetDateOrOffset.replace(/\.md$/, '').trim();
+        const parts = clean.split('-').map(Number);
+        targetDate =
+          parts.length === 3 && !parts.some(isNaN)
+            ? new Date(parts[0], parts[1] - 1, parts[2])
+            : new Date(clean);
+      } else {
+        targetDate = targetDateOrOffset;
+      }
+      const formatted = momentFn(targetDate).format(settings.dailyNoteDateFormat);
+      fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
+    }
   } else {
-    fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, offsetDays);
+    fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, targetDateOrOffset);
   }
 
   const folder = settings.dailyNotesFolder.trim();

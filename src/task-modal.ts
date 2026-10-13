@@ -9,6 +9,7 @@ import {
   TaskPriority,
 } from './markdown-utils';
 import { getOrCreateFile } from './utils';
+import { t } from './i18n/index.ts';
 
 export class TaskCreateModal extends Modal {
   private plugin: StudyFlowPlugin;
@@ -49,9 +50,9 @@ export class TaskCreateModal extends Modal {
     setIcon(iconSpan, 'sparkles');
 
     const titleCol = headerLeft.createDiv({ cls: 'study-flow-cloud-header-titles' });
-    titleCol.createEl('h3', { text: 'Nueva Tarea Académica', cls: 'study-flow-cloud-modal-title' });
+    titleCol.createEl('h3', { text: t('tasks.cloudModalTitle'), cls: 'study-flow-cloud-modal-title' });
     titleCol.createEl('p', {
-      text: 'Organizá tus metas de estudio, materia y plazos',
+      text: t('tasks.cloudModalSub'),
       cls: 'study-flow-cloud-modal-sub',
     });
 
@@ -59,12 +60,19 @@ export class TaskCreateModal extends Modal {
     const typeSwitch = header.createDiv({ cls: 'study-flow-cloud-type-segmented' });
     const taskBtn = typeSwitch.createEl('button', {
       cls: 'study-flow-cloud-type-btn is-active',
-      text: '📋 Tarea',
+      attr: { 'aria-label': t('tasks.typeTaskAria') },
     });
+    const taskBtnIcon = taskBtn.createSpan({ cls: 'study-flow-btn-icon' });
+    setIcon(taskBtnIcon, 'check-square');
+    taskBtn.createSpan({ text: t('tasks.typeTask') });
+
     const ideaBtn = typeSwitch.createEl('button', {
       cls: 'study-flow-cloud-type-btn',
-      text: '🧊 Icebox',
+      attr: { 'aria-label': t('tasks.typeIceboxAria') },
     });
+    const ideaBtnIcon = ideaBtn.createSpan({ cls: 'study-flow-btn-icon' });
+    setIcon(ideaBtnIcon, 'archive');
+    ideaBtn.createSpan({ text: t('tasks.typeIcebox') });
 
     // 2. Body
     const body = contentEl.createDiv({ cls: 'study-flow-cloud-modal-body' });
@@ -74,7 +82,7 @@ export class TaskCreateModal extends Modal {
     const titleInput = titleInputWrap.createEl('input', {
       type: 'text',
       cls: 'study-flow-cloud-title-input',
-      placeholder: '¿Qué necesitás hacer o estudiar? (ej: Resolver guía de álgebra...)',
+      placeholder: t('tasks.cloudTitlePlaceholder'),
     });
     titleInput.value = this.initialText;
     titleInput.focus();
@@ -84,19 +92,19 @@ export class TaskCreateModal extends Modal {
 
     // Cell 1: Materia
     const subjectField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    subjectField.createEl('span', { text: '📚 Materia', cls: 'study-flow-cloud-label' });
+    subjectField.createEl('span', { text: t('tasks.subjectLabel'), cls: 'study-flow-cloud-label' });
     const subjectSelect = subjectField.createEl('select', { cls: 'study-flow-cloud-control' });
-    subjectSelect.createEl('option', { value: '', text: '— Sin materia (Inbox) —' });
+    subjectSelect.createEl('option', { value: '', text: t('tasks.subjectNoneOption') });
 
     this.knownSubjects.forEach((subj) => {
       const cleanSubj = subj.startsWith('#') ? subj : `#${subj}`;
       subjectSelect.createEl('option', { value: cleanSubj, text: cleanSubj });
     });
-    subjectSelect.createEl('option', { value: '__custom__', text: '➕ Otra / nueva materia...' });
+    subjectSelect.createEl('option', { value: '__custom__', text: t('tasks.subjectCustomOption') });
 
     const customSubjectInput = subjectField.createEl('input', {
       type: 'text',
-      placeholder: 'Ingresá #materia...',
+      placeholder: t('tasks.customSubjectPlaceholder'),
       cls: 'study-flow-cloud-control study-flow-cloud-custom-input',
     });
     customSubjectInput.style.display = 'none';
@@ -126,10 +134,14 @@ export class TaskCreateModal extends Modal {
 
     // Cell 2: Fecha Límite (Deadline)
     const deadlineField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    deadlineField.createEl('span', { text: '📅 Fecha límite', cls: 'study-flow-cloud-label' });
+    const dlLabel = deadlineField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const dlIcon = dlLabel.createSpan({ cls: 'study-flow-label-icon' });
+    setIcon(dlIcon, 'calendar');
+    dlLabel.createSpan({ text: t('tasks.deadlineLabel') });
     const deadlineInput = deadlineField.createEl('input', {
       type: 'date',
       cls: 'study-flow-cloud-control',
+      attr: { 'aria-label': t('tasks.deadlineAria') },
     });
     deadlineInput.addEventListener('change', () => {
       this.selectedDeadline = deadlineInput.value;
@@ -137,19 +149,34 @@ export class TaskCreateModal extends Modal {
 
     // Cell 3: Estimación Pomodoro
     const estimateField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    estimateField.createEl('span', { text: '🍅 Estimación Pomodoro', cls: 'study-flow-cloud-label' });
+    const estLabel = estimateField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const estIcon = estLabel.createSpan({ cls: 'study-flow-label-icon' });
+    setIcon(estIcon, 'timer');
+    estLabel.createSpan({ text: t('tasks.estimateLabel') });
     const stepperRow = estimateField.createDiv({ cls: 'study-flow-cloud-stepper' });
-    const minusBtn = stepperRow.createEl('button', { text: '−', cls: 'study-flow-stepper-btn' });
-    const estimateDisplay = stepperRow.createSpan({ text: 'Sin estimar', cls: 'study-flow-stepper-val' });
-    const plusBtn = stepperRow.createEl('button', { text: '+', cls: 'study-flow-stepper-btn' });
+    const minusBtn = stepperRow.createEl('button', {
+      text: '−',
+      cls: 'study-flow-stepper-btn',
+      attr: { 'aria-label': t('tasks.decreasePomodoros') },
+    });
+    const estimateDisplay = stepperRow.createSpan({ text: t('tasks.unestimated'), cls: 'study-flow-stepper-val' });
+    const plusBtn = stepperRow.createEl('button', {
+      text: '+',
+      cls: 'study-flow-stepper-btn',
+      attr: { 'aria-label': t('tasks.increasePomodoros') },
+    });
 
     const updateEstimateDisplay = () => {
       if (this.pomodoroEstimate === 0) {
-        estimateDisplay.setText('Sin estimar');
+        estimateDisplay.empty();
+        estimateDisplay.setText(t('tasks.unestimated'));
         estimateDisplay.removeClass('is-active');
       } else {
         const mins = this.pomodoroEstimate * (this.plugin.settings.pomodoroWorkDuration || 25);
-        estimateDisplay.setText(`🍅 ${this.pomodoroEstimate} (${mins}m)`);
+        estimateDisplay.empty();
+        const iconSpan = estimateDisplay.createSpan();
+        setIcon(iconSpan, 'timer');
+        estimateDisplay.createSpan({ text: ` ${this.pomodoroEstimate} (${mins}m)` });
         estimateDisplay.addClass('is-active');
       }
     };
@@ -170,25 +197,30 @@ export class TaskCreateModal extends Modal {
 
     // Cell 4: Prioridad (Segmented row with NO wrapping)
     const priorityField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    priorityField.createEl('span', { text: '⚡ Prioridad', cls: 'study-flow-cloud-label' });
+    const prioLabel = priorityField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const prioIcon = prioLabel.createSpan({ cls: 'study-flow-label-icon' });
+    setIcon(prioIcon, 'zap');
+    prioLabel.createSpan({ text: t('tasks.priorityLabel') });
     const prioritySegment = priorityField.createDiv({ cls: 'study-flow-cloud-priority-segment' });
 
     const priorities: Array<{ id: TaskPriority; label: string; icon: string }> = [
-      { id: 'none', label: 'Normal', icon: '' },
-      { id: 'low', label: 'Baja', icon: '🔽' },
-      { id: 'medium', label: 'Media', icon: '🔼' },
-      { id: 'high', label: 'Alta', icon: '⏫' },
+      { id: 'none', label: t('priority.none'), icon: '' },
+      { id: 'low', label: t('priority.low'), icon: 'chevron-down' },
+      { id: 'medium', label: t('priority.medium'), icon: 'chevron-up' },
+      { id: 'high', label: t('priority.high'), icon: 'chevrons-up' },
     ];
 
     const priorityBtns: HTMLButtonElement[] = [];
     priorities.forEach((p) => {
       const btn = prioritySegment.createEl('button', {
         cls: `study-flow-priority-btn ${this.selectedPriority === p.id ? 'is-active' : ''}`,
+        attr: { 'aria-label': t('tasks.priorityAria', { label: p.label }) },
       });
       if (p.icon) {
-        btn.createSpan({ text: p.icon, cls: 'study-flow-prio-icon' });
+        const pIcon = btn.createSpan({ cls: 'study-flow-prio-icon' });
+        setIcon(pIcon, p.icon);
       }
-      btn.createSpan({ text: p.label });
+      btn.createSpan({ text: ` ${p.label}` });
       btn.addEventListener('click', () => {
         this.selectedPriority = p.id;
         priorityBtns.forEach((b) => b.removeClass('is-active'));
@@ -200,18 +232,18 @@ export class TaskCreateModal extends Modal {
     // 4. Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-cloud-modal-footer' });
     const hint = footer.createEl('span', {
-      text: '↵ Guardar  •  Esc Cancelar',
+      text: t('tasks.cloudShortcutHint'),
       cls: 'study-flow-shortcut-hint',
     });
 
     const btnRow = footer.createDiv({ cls: 'study-flow-cloud-footer-actions' });
-    const cancelBtn = btnRow.createEl('button', { text: 'Cancelar', cls: 'study-flow-cloud-cancel-btn' });
+    const cancelBtn = btnRow.createEl('button', { text: t('common.cancel'), cls: 'study-flow-cloud-cancel-btn' });
     cancelBtn.addEventListener('click', () => this.close());
 
     const submitBtn = btnRow.createEl('button', { cls: 'mod-cta study-flow-cloud-submit-btn' });
     const sIcon = submitBtn.createSpan();
     setIcon(sIcon, 'plus');
-    const submitTextSpan = submitBtn.createSpan({ text: 'Añadir Tarea' });
+    const submitTextSpan = submitBtn.createSpan({ text: t('tasks.addTaskBtn') });
 
     // Sync Type Switch
     const syncItemType = (type: 'task' | 'idea') => {
@@ -223,8 +255,8 @@ export class TaskCreateModal extends Modal {
         estimateField.style.display = 'none';
         priorityField.style.display = 'none';
         metaGrid.addClass('is-idea-mode');
-        titleInput.placeholder = '¿Qué tema o recurso querés guardar sin fecha? (ej: Libro recomendado, tema a investigar...)';
-        submitTextSpan.setText('Guardar en Icebox');
+        titleInput.placeholder = t('tasks.cloudIdeaPlaceholder');
+        submitTextSpan.setText(t('tasks.saveInIceboxBtn'));
       } else {
         ideaBtn.removeClass('is-active');
         taskBtn.addClass('is-active');
@@ -232,8 +264,8 @@ export class TaskCreateModal extends Modal {
         estimateField.style.display = '';
         priorityField.style.display = '';
         metaGrid.removeClass('is-idea-mode');
-        titleInput.placeholder = '¿Qué necesitás hacer o estudiar? (ej: Resolver guía de álgebra...)';
-        submitTextSpan.setText('Añadir Tarea');
+        titleInput.placeholder = t('tasks.cloudTitlePlaceholder');
+        submitTextSpan.setText(t('tasks.addTaskBtn'));
       }
     };
 
@@ -243,7 +275,7 @@ export class TaskCreateModal extends Modal {
     const doSubmit = async () => {
       const text = titleInput.value.trim();
       if (!text) {
-        new Notice('Ingresá una descripción o título para la tarea');
+        new Notice(t('tasks.enterTitleNotice'));
         titleInput.focus();
         return;
       }
@@ -269,9 +301,6 @@ export class TaskCreateModal extends Modal {
   private async saveAndClose(): Promise<void> {
     try {
       const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Icebox\n\n');
-      const content = await this.app.vault.read(file);
-
       let finalLine = this.taskTitle;
 
       // Append Subject if provided
@@ -282,11 +311,17 @@ export class TaskCreateModal extends Modal {
         }
       }
 
+      const tasksH = this.plugin.settings.tasksSectionHeader || '## Tareas';
+      const iceboxH = this.plugin.settings.iceboxSectionHeader || '## Icebox';
+
+      const file = await getOrCreateFile(this.app, inboxPath, `# Inbox\n\n${tasksH}\n\n${iceboxH}\n\n`);
+
       if (this.itemType === 'idea') {
         const iceboxLine = finalLine.startsWith('🧊') ? finalLine : `🧊 ${finalLine}`;
-        const updated = appendIceboxItemToMarkdownSection(content, iceboxLine, '## Icebox');
-        await this.app.vault.modify(file, updated);
-        new Notice(`🧊 Guardado en Icebox`);
+        await this.app.vault.process(file, (content) => {
+          return appendIceboxItemToMarkdownSection(content, iceboxLine, iceboxH);
+        });
+        new Notice(t('tasks.savedInIceboxNotice'));
       } else {
         if (this.selectedPriority !== 'none') {
           finalLine = formatTaskWithPriority(finalLine, this.selectedPriority);
@@ -298,9 +333,10 @@ export class TaskCreateModal extends Modal {
           finalLine = formatTaskWithDeadline(finalLine, this.selectedDeadline);
         }
 
-        const updated = appendTaskToMarkdownSection(content, finalLine, '## Tareas');
-        await this.app.vault.modify(file, updated);
-        new Notice(`✓ Tarea añadida exitosamente`);
+        await this.app.vault.process(file, (content) => {
+          return appendTaskToMarkdownSection(content, finalLine, tasksH);
+        });
+        new Notice(t('tasks.taskAddedNotice'));
       }
 
       if (this.onCreated) {
@@ -309,7 +345,7 @@ export class TaskCreateModal extends Modal {
 
       this.close();
     } catch (err) {
-      new Notice('Error al guardar la tarea en el archivo Markdown');
+      new Notice(t('tasks.saveMarkdownError'));
     }
   }
 }

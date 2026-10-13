@@ -3,8 +3,8 @@
   "name": "Study Flow Assistant",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Pomodoro timer, lightweight task management, and daily planning assistant.",
-  "author": "Antigravity",
+  "description": "Pomodoro timer, tasks, habits tracker, calendar, metrics, and zen mode for Obsidian. / Temporizador Pomodoro, tareas, hábitos, calendario, métricas y modo zen para Obsidian.",
+  "author": "dalt",
   "authorUrl": "",
   "isDesktopOnly": false
 }

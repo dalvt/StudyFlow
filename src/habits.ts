@@ -1,6 +1,10 @@
 import { App, Modal, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { getOrCreateFile } from './utils';
+import { getOrCreateFile, getLocalDateString } from './utils';
+import { formatHabitsToMarkdown, createHabitId, syncHabitsToMarkdown } from './markdown-utils';
+import { t } from './i18n/index.ts';
+
+export { createHabitId, syncHabitsToMarkdown };
 
 export interface HabitItem {
   id: string;
@@ -12,13 +16,13 @@ export interface HabitItem {
 }
 
 function getTodayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateString();
 }
 
 function getYesterdayString(): string {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return getLocalDateString(d);
 }
 
 /**
@@ -56,7 +60,7 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
       const completedToday = statusChar.toLowerCase() === 'x' && lastCompletedDate === today;
 
       habits.push({
-        id: `habit-${i}-${name}`,
+        id: createHabitId(name),
         name,
         completedToday,
         streak,
@@ -70,20 +74,14 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
 }
 
 /**
- * Saves habits array back to Habits.md
+ * Saves habits array back to Habits.md modifying ONLY habit lines
+ * and preserving any other content in the file.
  */
 export async function saveHabitsToFile(app: App, filePath: string, habits: HabitItem[]): Promise<void> {
   const file = await getOrCreateFile(app, filePath || 'Habits.md', '# Registro de Hábitos\n\n');
-  const lines: string[] = ['# Registro de Hábitos', ''];
-
-  for (const h of habits) {
-    const check = h.completedToday ? 'x' : ' ';
-    const histStr = (h.history || []).slice(-60).join(',');
-    lines.push(`- [${check}] ${h.name} <!-- streak: ${h.streak} | last: ${h.lastCompletedDate} | history: ${histStr} -->`);
-  }
-  lines.push('');
-
-  await app.vault.modify(file, lines.join('\n'));
+  await app.vault.process(file, (content) => {
+    return syncHabitsToMarkdown(content, habits);
+  });
 }
 
 /**
@@ -136,7 +134,7 @@ export async function toggleHabitStatus(
 export async function addHabitToFile(app: App, filePath: string, name: string): Promise<HabitItem[]> {
   const habits = await loadHabitsFromFile(app, filePath);
   habits.push({
-    id: `habit-${Date.now()}-${name}`,
+    id: createHabitId(name),
     name: name.trim(),
     completedToday: false,
     streak: 0,
@@ -177,7 +175,7 @@ export function computeHabitHeatmap(habits: HabitItem[], numDays: number = 35): 
   for (let i = numDays - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = getLocalDateString(d);
     const completedCount = habits.filter((h) => h.history && h.history.includes(dateStr)).length;
     const ratio = total > 0 ? completedCount / total : 0;
 
@@ -210,7 +208,7 @@ export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]):
   const title = header.createSpan({ cls: 'study-flow-heatmap-title' });
   const iconSpan = title.createSpan();
   setIcon(iconSpan, 'flame');
-  title.createSpan({ text: 'Consistencia de Hábitos (Últimas 5 semanas)' });
+  title.createSpan({ text: t('habits.heatmapTitle') });
 
   const grid = card.createDiv({ cls: 'study-flow-heatmap-grid' });
   const days = computeHabitHeatmap(habits, 35);
@@ -220,15 +218,23 @@ export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]):
       cls: `study-flow-heatmap-cell is-level-${day.intensity}`,
     });
     const pct = day.totalHabits > 0 ? Math.round((day.completedCount / day.totalHabits) * 100) : 0;
-    cell.setAttribute('title', `${day.date}: ${day.completedCount}/${day.totalHabits} hábitos (${pct}%)`);
+    cell.setAttribute(
+      'title',
+      t('habits.heatmapCellTooltip', {
+        date: day.date,
+        completed: day.completedCount,
+        total: day.totalHabits,
+        pct,
+      })
+    );
   });
 
   const legend = card.createDiv({ cls: 'study-flow-heatmap-legend' });
-  legend.createSpan({ text: 'Menos', cls: 'study-flow-legend-label' });
+  legend.createSpan({ text: t('habits.heatmapLess'), cls: 'study-flow-legend-label' });
   for (let lvl = 0; lvl <= 4; lvl++) {
     legend.createDiv({ cls: `study-flow-heatmap-cell is-level-${lvl}` });
   }
-  legend.createSpan({ text: 'Más', cls: 'study-flow-legend-label' });
+  legend.createSpan({ text: t('habits.heatmapMore'), cls: 'study-flow-legend-label' });
 
   return card;
 }
@@ -265,7 +271,7 @@ export class HabitsModal extends Modal {
 
     // Header
     const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
-    const title = header.createEl('h2', { text: 'Hábitos y Rutinas Diarias' });
+    const title = header.createEl('h2', { text: t('habits.modalTitle') });
     const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
     setIcon(iconSpan, 'sparkles');
 
@@ -273,7 +279,7 @@ export class HabitsModal extends Modal {
     const completedCount = this.habits.filter((h) => h.completedToday).length;
     const statsBar = contentEl.createDiv({ cls: 'study-flow-stats-bar' });
     statsBar.createSpan({
-      text: `${completedCount}/${this.habits.length} completados hoy`,
+      text: t('habits.completedToday', { count: completedCount, total: this.habits.length }),
       cls: 'study-flow-badge-stat is-pending',
     });
 
@@ -281,13 +287,17 @@ export class HabitsModal extends Modal {
     const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
-      placeholder: 'Nuevo hábito diario (ej. 🏃‍♂️ 15 min ejercicio)...',
+      placeholder: t('habits.modalNewPlaceholder'),
       cls: 'study-flow-task-input',
+      attr: { 'aria-label': t('habits.newHabitLabel') },
     });
-    const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
+    const addBtn = addSection.createEl('button', {
+      cls: 'mod-cta',
+      attr: { 'aria-label': t('habits.addHabitTooltip') },
+    });
     const aIcon = addBtn.createSpan();
     setIcon(aIcon, 'plus');
-    addBtn.createSpan({ text: 'Añadir' });
+    addBtn.createSpan({ text: t('common.add') });
 
     const handleAdd = async () => {
       const val = addInput.value.trim();
@@ -295,7 +305,7 @@ export class HabitsModal extends Modal {
       const path = this.plugin.settings.habitsFilePath || 'Habits.md';
       this.habits = await addHabitToFile(this.app, path, val);
       addInput.value = '';
-      new Notice(`Hábito añadido: ${val}`);
+      new Notice(t('habits.habitAddedNotice', { name: val }));
       this.renderUI();
     };
 
@@ -314,8 +324,8 @@ export class HabitsModal extends Modal {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
       setIcon(emptyIcon, 'flame');
-      emptyState.createEl('h4', { text: 'No tienes hábitos registrados' });
-      emptyState.createEl('p', { text: 'Crea tu primer hábito arriba para construir tu racha.' });
+      emptyState.createEl('h4', { text: t('habits.modalEmptyTitle') });
+      emptyState.createEl('p', { text: t('habits.modalEmptyDesc') });
     } else {
       this.habits.forEach((habit) => {
         const card = listContainer.createDiv({
@@ -329,7 +339,11 @@ export class HabitsModal extends Modal {
         cb.addEventListener('change', async () => {
           const path = this.plugin.settings.habitsFilePath || 'Habits.md';
           this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
-          new Notice(cb.checked ? `🔥 ¡Hábito cumplido! Racha: ${habit.streak + 1}` : 'Hábito desmarcado');
+          new Notice(
+            cb.checked
+              ? t('habits.habitFulfilledNotice', { streak: habit.streak + 1 })
+              : t('habits.habitUnmarkedNotice')
+          );
           this.renderUI();
         });
 
@@ -346,19 +360,19 @@ export class HabitsModal extends Modal {
         const streakBadge = card.createDiv({ cls: 'study-flow-streak-badge' });
         const fIcon = streakBadge.createSpan({ cls: 'study-flow-flame-icon' });
         setIcon(fIcon, 'flame');
-        streakBadge.createSpan({ text: `${habit.streak} d` });
+        streakBadge.createSpan({ text: t('habits.daysStreak', { count: habit.streak }) });
 
         // Delete button
         const delBtn = card.createEl('button', {
           cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Eliminar hábito' },
+          attr: { 'aria-label': t('habits.deleteTooltip') },
         });
         setIcon(delBtn, 'trash-2');
         delBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           const path = this.plugin.settings.habitsFilePath || 'Habits.md';
           this.habits = await deleteHabitFromFile(this.app, path, habit.id);
-          new Notice('Hábito eliminado');
+          new Notice(t('habits.habitDeletedNotice'));
           this.renderUI();
         });
       });
@@ -369,7 +383,7 @@ export class HabitsModal extends Modal {
 
     // Modal Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
-    const closeBtn = footer.createEl('button', { text: 'Cerrar' });
+    const closeBtn = footer.createEl('button', { text: t('common.close') });
     closeBtn.addEventListener('click', () => this.close());
   }
 

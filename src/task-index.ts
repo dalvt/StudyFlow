@@ -1,0 +1,317 @@
+import { App, TFile } from 'obsidian';
+import type StudyFlowPlugin from './main';
+import {
+  compareTasksByPriority,
+  computeDeadlinesFromTasks,
+  DeadlineItem,
+  extractAllTasksFromContent,
+  isPathIndexed,
+  TaskRecord,
+} from './markdown-utils';
+
+export { isPathIndexed };
+
+export class TaskIndex {
+  private plugin: StudyFlowPlugin;
+  private app: App;
+  private tasksByFile: Map<string, TaskRecord[]> = new Map();
+  private allTasksCache: TaskRecord[] | null = null;
+  private allDeadlinesCache: DeadlineItem[] | null = null;
+  private dirtyFiles: Set<string> = new Set();
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private listeners: Set<() => void> = new Set();
+  private initialized: boolean = false;
+
+  constructor(plugin: StudyFlowPlugin) {
+    this.plugin = plugin;
+    this.app = plugin.app;
+  }
+
+  /**
+   * Initializes the task index, registers vault and metadataCache event listeners,
+   * and performs initial vault scanning.
+   */
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
+
+    this.registerVaultEvents();
+
+    this.plugin.registerEvent(
+      this.app.metadataCache.on('resolved', async () => {
+        await this.scanVault();
+      })
+    );
+
+    // Initial scan on already loaded files
+    await this.scanVault();
+  }
+
+  /**
+   * Scans all markdown files in vault matching inclusion/exclusion settings.
+   */
+  async scanVault(): Promise<void> {
+    const files = this.app.vault.getMarkdownFiles();
+    const { taskIncludedFolders, taskExcludedFolders, tasksSectionHeader, iceboxSectionHeader } =
+      this.plugin.settings;
+
+    for (const file of files) {
+      if (!isPathIndexed(file.path, taskIncludedFolders, taskExcludedFolders)) {
+        continue;
+      }
+      await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
+    }
+
+    this.invalidateCaches();
+    this.emitChange();
+  }
+
+  /**
+   * Indexes tasks for a single file using metadataCache.listItems check and cachedRead.
+   */
+  async indexFile(
+    file: TFile,
+    options?: { tasksSectionHeader?: string; iceboxSectionHeader?: string }
+  ): Promise<void> {
+    try {
+      const cache = this.app.metadataCache.getFileCache(file);
+      // Quick check: if cache has listItems array and it's empty, file has no list items or tasks
+      if (cache && Array.isArray(cache.listItems) && cache.listItems.length === 0) {
+        if (this.tasksByFile.has(file.path)) {
+          this.tasksByFile.delete(file.path);
+          this.invalidateCaches();
+        }
+        return;
+      }
+
+      const content = await this.app.vault.cachedRead(file);
+      const tasks = extractAllTasksFromContent(content, file.path, options);
+      if (tasks.length > 0) {
+        this.tasksByFile.set(file.path, tasks);
+      } else {
+        this.tasksByFile.delete(file.path);
+      }
+      this.invalidateCaches();
+    } catch (err) {
+      console.error('TaskIndex: error indexing file', file.path, err);
+    }
+  }
+
+  private registerVaultEvents(): void {
+    // 1. vault.modify
+    this.plugin.registerEvent(
+      this.app.vault.on('modify', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.queueFile(file.path);
+        }
+      })
+    );
+
+    // 2. vault.create
+    this.plugin.registerEvent(
+      this.app.vault.on('create', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.queueFile(file.path);
+        }
+      })
+    );
+
+    // 3. vault.delete
+    this.plugin.registerEvent(
+      this.app.vault.on('delete', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.handleFileDeleted(file.path);
+        }
+      })
+    );
+
+    // 4. vault.rename
+    this.plugin.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.handleFileRenamed(file, oldPath);
+        }
+      })
+    );
+
+    // 5. metadataCache.changed
+    this.plugin.registerEvent(
+      this.app.metadataCache.on('changed', (file) => {
+        if (file instanceof TFile && file.extension === 'md') {
+          this.queueFile(file.path);
+        }
+      })
+    );
+  }
+
+  private queueFile(filePath: string): void {
+    const { taskIncludedFolders, taskExcludedFolders } = this.plugin.settings;
+    if (!isPathIndexed(filePath, taskIncludedFolders, taskExcludedFolders)) {
+      if (this.tasksByFile.has(filePath)) {
+        this.tasksByFile.delete(filePath);
+        this.invalidateCaches();
+        this.triggerDebouncedNotify();
+      }
+      return;
+    }
+
+    this.dirtyFiles.add(filePath);
+    this.triggerDebouncedProcessing();
+  }
+
+  private handleFileDeleted(filePath: string): void {
+    this.dirtyFiles.delete(filePath);
+    if (this.tasksByFile.has(filePath)) {
+      this.tasksByFile.delete(filePath);
+      this.invalidateCaches();
+      this.triggerDebouncedNotify();
+    }
+  }
+
+  private handleFileRenamed(file: TFile, oldPath: string): void {
+    this.tasksByFile.delete(oldPath);
+    this.dirtyFiles.delete(oldPath);
+    this.invalidateCaches();
+    this.queueFile(file.path);
+  }
+
+  private triggerDebouncedProcessing(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(async () => {
+      this.debounceTimer = null;
+      await this.processDirtyFiles();
+    }, 300);
+  }
+
+  private triggerDebouncedNotify(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      this.emitChange();
+    }, 300);
+  }
+
+  private async processDirtyFiles(): Promise<void> {
+    if (this.dirtyFiles.size === 0) return;
+    const pathsToProcess = Array.from(this.dirtyFiles);
+    this.dirtyFiles.clear();
+
+    const { tasksSectionHeader, iceboxSectionHeader } = this.plugin.settings;
+    for (const path of pathsToProcess) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) {
+        await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
+      } else {
+        this.tasksByFile.delete(path);
+      }
+    }
+
+    this.invalidateCaches();
+    this.emitChange();
+  }
+
+  /**
+   * Returns all tasks across all indexed files, sorted by priority and deadline.
+   */
+  getAllTasks(): TaskRecord[] {
+    if (this.allTasksCache === null) {
+      const all: TaskRecord[] = [];
+      for (const tasks of this.tasksByFile.values()) {
+        all.push(...tasks);
+      }
+      all.sort(compareTasksByPriority);
+      this.allTasksCache = all;
+    }
+    return this.allTasksCache;
+  }
+
+  /**
+   * Returns tasks belonging to a specific file.
+   */
+  getTasksForFile(filePath: string): TaskRecord[] {
+    return this.tasksByFile.get(filePath) || [];
+  }
+
+  /**
+   * Returns all actionable pending tasks (!completed && !isIdea).
+   */
+  getPendingTasks(): TaskRecord[] {
+    return this.getAllTasks().filter((t) => !t.completed && !t.isIdea);
+  }
+
+  /**
+   * Returns all icebox / passive idea items (isIdea).
+   */
+  getIceboxTasks(): TaskRecord[] {
+    return this.getAllTasks().filter((t) => !t.completed && t.isIdea);
+  }
+
+  /**
+   * Returns all completed tasks (completed && !isIdea).
+   */
+  getCompletedTasks(): TaskRecord[] {
+    return this.getAllTasks().filter((t) => t.completed && !t.isIdea);
+  }
+
+  /**
+   * Returns all deadline items computed from indexed tasks in memory.
+   */
+  getAllDeadlines(): DeadlineItem[] {
+    if (this.allDeadlinesCache === null) {
+      this.allDeadlinesCache = computeDeadlinesFromTasks(this.getAllTasks());
+    }
+    return this.allDeadlinesCache;
+  }
+
+  /**
+   * Subscribes to index changes. Returns an unsubscribe function.
+   */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emitChange(): void {
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (err) {
+        console.error('TaskIndex listener error:', err);
+      }
+    }
+  }
+
+  private invalidateCaches(): void {
+    this.allTasksCache = null;
+    this.allDeadlinesCache = null;
+  }
+
+  /**
+   * Re-indexes all vault files according to current settings.
+   */
+  async reindexAll(): Promise<void> {
+    this.tasksByFile.clear();
+    this.invalidateCaches();
+    await this.scanVault();
+  }
+
+  /**
+   * Cleans up all pending timers and listeners.
+   */
+  destroy(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.listeners.clear();
+    this.dirtyFiles.clear();
+    this.tasksByFile.clear();
+    this.invalidateCaches();
+  }
+}

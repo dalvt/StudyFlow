@@ -1,5 +1,7 @@
 import { Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
+import { shouldZenIgnoreEscape } from './utils';
+import { t } from './i18n/index.ts';
 
 export type ZenListener = (isActive: boolean) => void;
 
@@ -75,6 +77,10 @@ export class ZenModeManager {
     // 5. Register escape key listener
     this.keydownHandler = (evt: KeyboardEvent) => {
       if (evt.key === 'Escape') {
+        const isModalOpen = !!document.querySelector('.modal-container, .modal, .prompt, .menu');
+        if (shouldZenIgnoreEscape(document.activeElement, isModalOpen)) {
+          return;
+        }
         evt.preventDefault();
         this.disableZen();
       }
@@ -85,7 +91,7 @@ export class ZenModeManager {
     this.notify();
 
     if (!silent) {
-      new Notice('🧘 Modo Zen activado (Presioná Esc para salir)');
+      new Notice(t('zen.activatedNotice'));
     }
   }
 
@@ -120,7 +126,7 @@ export class ZenModeManager {
     this.notify();
 
     if (!silent) {
-      new Notice('Modo Zen desactivado');
+      new Notice(t('zen.deactivatedNotice'));
     }
   }
 
@@ -137,12 +143,12 @@ export class ZenModeManager {
 
     const labelSpan = document.createElement('span');
     labelSpan.className = 'study-flow-zen-indicator-text';
-    labelSpan.textContent = 'Modo Zen Activo';
+    labelSpan.textContent = t('zen.indicatorActive');
     indicator.appendChild(labelSpan);
 
     const exitBtn = document.createElement('button');
     exitBtn.className = 'study-flow-zen-indicator-btn';
-    exitBtn.textContent = 'Salir (Esc)';
+    exitBtn.textContent = t('zen.exitButton');
     exitBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.disableZen();

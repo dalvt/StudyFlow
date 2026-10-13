@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import type { HabitItem } from './habits';
 import type { TaskRecord } from './tasks';
 import type { StudyFlowSettings } from './settings';
+export * from './subject-analytics.ts';
 
 export interface FocusSessionRecord {
   id: string;
@@ -10,6 +11,7 @@ export interface FocusSessionRecord {
   durationMinutes: number;
   taskText?: string;
   tags: string[];
+  interrupted?: boolean;
 }
 
 export interface DayFocusStat {
@@ -63,36 +65,8 @@ export interface AnalyticsSummary {
   tasks: TasksOverviewStat;
 }
 
-/**
- * Extracts hashtags (#materia) and wikilinks ([[Nota]]) from text.
- */
-export function extractTagsFromText(text: string): string[] {
-  if (!text) return [];
-  const tags: string[] = [];
-
-  // Match hashtags (including accented characters)
-  const hashMatches = text.match(/#[\w\u00C0-\u017F-]+/g);
-  if (hashMatches) {
-    hashMatches.forEach((t) => {
-      const clean = t.toLowerCase();
-      if (!tags.includes(clean)) tags.push(clean);
-    });
-  }
-
-  // Match wikilinks [[Page Name]]
-  const linkMatches = text.match(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g);
-  if (linkMatches) {
-    linkMatches.forEach((linkStr) => {
-      const match = linkStr.match(/\[\[([^\]|]+)/);
-      if (match && match[1]) {
-        const link = `[[${match[1].trim()}]]`;
-        if (!tags.includes(link)) tags.push(link);
-      }
-    });
-  }
-
-  return tags;
-}
+import { extractTagsFromText, getLocalDateString } from './markdown-utils.ts';
+export { extractTagsFromText, getLocalDateString };
 
 /**
  * Formats a duration in minutes into a human-readable string (e.g. "2h 30m" or "45m").
@@ -109,16 +83,6 @@ export function formatMinutesHuman(totalMinutes: number): string {
     return `${hours}h`;
   }
   return `${remaining}m`;
-}
-
-/**
- * Helper to get local date ISO string YYYY-MM-DD.
- */
-export function getLocalDateString(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 const DAY_NAMES_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -370,67 +334,4 @@ export function buildAnalyticsSummary(
     habits: habitsStat,
     tasks: tasksStat,
   };
-}
-
-/**
- * Scans daily notes for past pomodoro logs and imports them into settings.focusHistory.
- */
-export async function syncHistoricalSessionsFromVault(
-  app: App,
-  settings: StudyFlowSettings
-): Promise<number> {
-  const files = app.vault.getMarkdownFiles();
-  if (!settings.focusHistory) {
-    settings.focusHistory = [];
-  }
-
-  const existingKeys = new Set(
-    settings.focusHistory.map((s) => `${s.date}_${(s.taskText || '').trim()}_${s.durationMinutes}`)
-  );
-  let addedCount = 0;
-
-  for (const file of files) {
-    const dateMatch = file.basename.match(/^(\d{4}-\d{2}-\d{2})$/);
-    if (!dateMatch) continue;
-    const fileDate = dateMatch[1];
-
-    try {
-      const content = await app.vault.read(file);
-      // Matches: - [x] Pomodoro completado a las HH:mm (— *task text*)?
-      const pomodoroRegex = /^[-*]\s+\[x\]\s+Pomodoro completado(?:\s+a las\s+(\d{2}:\d{2}))?(?:\s*—\s*\*?(.*?)\*?)?$/gim;
-      let match: RegExpExecArray | null;
-
-      while ((match = pomodoroRegex.exec(content)) !== null) {
-        const timeStr = match[1] || '12:00';
-        const taskText = (match[2] || '').trim();
-        const duration = settings.pomodoroWorkDuration || 25;
-        const key = `${fileDate}_${taskText}_${duration}`;
-
-        if (!existingKeys.has(key)) {
-          existingKeys.add(key);
-          const [hh, mm] = timeStr.split(':').map(Number);
-          const dateObj = new Date(`${fileDate}T${String(hh || 12).padStart(2, '0')}:${String(mm || 0).padStart(2, '0')}:00`);
-          const timestamp = isNaN(dateObj.getTime()) ? new Date(fileDate).getTime() : dateObj.getTime();
-
-          settings.focusHistory.push({
-            id: `imported-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
-            timestamp,
-            date: fileDate,
-            durationMinutes: duration,
-            taskText,
-            tags: extractTagsFromText(taskText),
-          });
-          addedCount++;
-        }
-      }
-    } catch (err) {
-      console.error(`Error leyendo nota diaria para sincronizar métricas: ${file.path}`, err);
-    }
-  }
-
-  if (addedCount > 0) {
-    settings.focusHistory.sort((a, b) => a.timestamp - b.timestamp);
-  }
-
-  return addedCount;
 }

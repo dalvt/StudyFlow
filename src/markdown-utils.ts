@@ -1,3 +1,5 @@
+import { t } from './i18n/index.ts';
+
 /**
  * Extracts hashtags (#materia) and wikilinks ([[Nota]]) from text.
  */
@@ -31,11 +33,38 @@ export function extractTagsFromText(text: string): string[] {
 
 export type TaskPriority = 'high' | 'medium' | 'low' | 'none';
 
+/**
+ * Fast deterministic 32-bit hash of a line string.
+ */
+export function computeLineHash(line: string): string {
+  const normalized = line.replace(/\r$/, '');
+  let h1 = 0xdeadbeef ^ 0;
+  let h2 = 0x41c6ce57 ^ 0;
+  for (let i = 0; i < normalized.length; i++) {
+    const ch = normalized.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(8, '0');
+}
+
+export interface TaskLocator {
+  sourceFile: string;
+  lineNumber?: number;
+  lineHash?: string;
+  originalLine?: string;
+  text?: string;
+}
+
 export interface PendingTaskItem {
   id: string;
   originalLine: string;
   text: string;
   sourceFile: string;
+  lineNumber?: number;
+  lineHash?: string;
   priority?: TaskPriority;
   isIdea?: boolean;
   estimatedPomodoros?: number;
@@ -43,12 +72,42 @@ export interface PendingTaskItem {
   dueDate?: string; // YYYY-MM-DD
   dueTime?: string; // HH:mm
   daysRemaining?: number;
+  scheduledDate?: string; // ⏳ YYYY-MM-DD
+  startDate?: string; // 🛫 YYYY-MM-DD
+  completedDate?: string; // ✅ YYYY-MM-DD
+  recurrence?: string; // 🔁 rule
 }
 
 export interface TaskDeadline {
   dueDate?: string;
   dueTime?: string;
   cleanTitle: string;
+}
+
+export interface TaskScheduledDate {
+  scheduledDate?: string;
+  cleanTitle: string;
+}
+
+export interface TaskStartDate {
+  startDate?: string;
+  cleanTitle: string;
+}
+
+export interface TaskCompletionDate {
+  completedDate?: string;
+  cleanTitle: string;
+}
+
+export interface TaskRecurrence {
+  recurrence?: string;
+  cleanTitle: string;
+}
+
+export interface ParsedRecurrence {
+  raw: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'weekday';
+  interval: number;
 }
 
 /**
@@ -68,11 +127,11 @@ export function calculateDaysRemaining(dateStr: string, referenceDate: Date = ne
  * Returns human readable status for days remaining.
  */
 export function formatDeadlineHuman(daysRemaining: number, dateStr: string): string {
-  if (daysRemaining < -1) return `Venció hace ${Math.abs(daysRemaining)} días (${dateStr})`;
-  if (daysRemaining === -1) return `Venció ayer (${dateStr})`;
-  if (daysRemaining === 0) return 'Vence hoy';
-  if (daysRemaining === 1) return 'Vence mañana';
-  if (daysRemaining <= 7) return `Vence en ${daysRemaining} días (${dateStr})`;
+  if (daysRemaining < -1) return t('deadline.overdueDays', { days: Math.abs(daysRemaining), date: dateStr });
+  if (daysRemaining === -1) return t('deadline.overdueYesterday', { date: dateStr });
+  if (daysRemaining === 0) return t('deadline.dueToday');
+  if (daysRemaining === 1) return t('deadline.dueTomorrow');
+  if (daysRemaining <= 7) return t('deadline.dueInDays', { days: daysRemaining, date: dateStr });
   return dateStr;
 }
 
@@ -101,6 +160,240 @@ export function formatTaskWithDeadline(text: string, date: string, time?: string
   const { cleanTitle } = parseTaskDeadline(text);
   const timeSuffix = time ? ` ${time}` : '';
   return `${cleanTitle} 📅 ${date}${timeSuffix}`.trim();
+}
+
+/**
+ * Parses scheduled date (⏳ 2026-10-18).
+ */
+export function parseTaskScheduledDate(text: string): TaskScheduledDate {
+  const match = text.match(/(?:⏳|#scheduled\/)\s*(\d{4}-\d{2}-\d{2})/i);
+  if (!match) {
+    return { cleanTitle: text };
+  }
+  const scheduledDate = match[1];
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return { scheduledDate, cleanTitle: cleanTitle || text };
+}
+
+/**
+ * Formats task text with an explicit scheduled date (⏳ YYYY-MM-DD).
+ */
+export function formatTaskWithScheduledDate(text: string, date: string): string {
+  const { cleanTitle } = parseTaskScheduledDate(text);
+  return `${cleanTitle} ⏳ ${date}`.trim();
+}
+
+/**
+ * Parses start date (🛫 2026-10-18).
+ */
+export function parseTaskStartDate(text: string): TaskStartDate {
+  const match = text.match(/(?:🛫|#start\/)\s*(\d{4}-\d{2}-\d{2})/i);
+  if (!match) {
+    return { cleanTitle: text };
+  }
+  const startDate = match[1];
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return { startDate, cleanTitle: cleanTitle || text };
+}
+
+/**
+ * Formats task text with an explicit start date (🛫 YYYY-MM-DD).
+ */
+export function formatTaskWithStartDate(text: string, date: string): string {
+  const { cleanTitle } = parseTaskStartDate(text);
+  return `${cleanTitle} 🛫 ${date}`.trim();
+}
+
+/**
+ * Parses completion date (✅ 2026-10-18).
+ */
+export function parseTaskCompletionDate(text: string): TaskCompletionDate {
+  const match = text.match(/(?:✅|#completed\/)\s*(\d{4}-\d{2}-\d{2})/i);
+  if (!match) {
+    return { cleanTitle: text };
+  }
+  const completedDate = match[1];
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return { completedDate, cleanTitle: cleanTitle || text };
+}
+
+/**
+ * Formats task text with an explicit completion date (✅ YYYY-MM-DD).
+ */
+export function formatTaskWithCompletionDate(text: string, date: string): string {
+  const { cleanTitle } = parseTaskCompletionDate(text);
+  return `${cleanTitle} ✅ ${date}`.trim();
+}
+
+/**
+ * Parses recurrence rule string into structured definition.
+ */
+export function parseRecurrenceRule(ruleStr: string): ParsedRecurrence | null {
+  const trimmed = ruleStr.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  // Weekday
+  if (trimmed.includes('weekday') || trimmed.includes('dia de semana') || trimmed.includes('días de semana')) {
+    return { raw: ruleStr.trim(), frequency: 'weekday', interval: 1 };
+  }
+
+  // Daily
+  if (
+    trimmed === 'daily' ||
+    trimmed === 'diario' ||
+    trimmed === 'diaria' ||
+    trimmed === 'every day' ||
+    trimmed === 'cada dia' ||
+    trimmed === 'cada día'
+  ) {
+    return { raw: ruleStr.trim(), frequency: 'daily', interval: 1 };
+  }
+  const dayMatch = trimmed.match(/(?:every|cada)\s+(\d+)\s+(?:days?|d[ií]as?)/);
+  if (dayMatch) {
+    return { raw: ruleStr.trim(), frequency: 'daily', interval: parseInt(dayMatch[1], 10) || 1 };
+  }
+
+  // Weekly
+  if (
+    trimmed === 'weekly' ||
+    trimmed === 'semanal' ||
+    trimmed === 'every week' ||
+    trimmed === 'cada semana'
+  ) {
+    return { raw: ruleStr.trim(), frequency: 'weekly', interval: 1 };
+  }
+  const weekMatch = trimmed.match(/(?:every|cada)\s+(\d+)\s+(?:weeks?|semanas?)/);
+  if (weekMatch) {
+    return { raw: ruleStr.trim(), frequency: 'weekly', interval: parseInt(weekMatch[1], 10) || 1 };
+  }
+
+  // Monthly
+  if (
+    trimmed === 'monthly' ||
+    trimmed === 'mensual' ||
+    trimmed === 'every month' ||
+    trimmed === 'cada mes'
+  ) {
+    return { raw: ruleStr.trim(), frequency: 'monthly', interval: 1 };
+  }
+  const monthMatch = trimmed.match(/(?:every|cada)\s+(\d+)\s+(?:months?|meses)/);
+  if (monthMatch) {
+    return { raw: ruleStr.trim(), frequency: 'monthly', interval: parseInt(monthMatch[1], 10) || 1 };
+  }
+
+  // Yearly
+  if (
+    trimmed === 'yearly' ||
+    trimmed === 'anual' ||
+    trimmed === 'every year' ||
+    trimmed === 'cada año'
+  ) {
+    return { raw: ruleStr.trim(), frequency: 'yearly', interval: 1 };
+  }
+  const yearMatch = trimmed.match(/(?:every|cada)\s+(\d+)\s+(?:years?|a[ñn]os?)/);
+  if (yearMatch) {
+    return { raw: ruleStr.trim(), frequency: 'yearly', interval: parseInt(yearMatch[1], 10) || 1 };
+  }
+
+  if (/days?|d[ií]as?/i.test(trimmed)) {
+    return { raw: ruleStr.trim(), frequency: 'daily', interval: 1 };
+  }
+  if (/weeks?|semanas?/i.test(trimmed)) {
+    return { raw: ruleStr.trim(), frequency: 'weekly', interval: 1 };
+  }
+  if (/months?|mes(?:es)?/i.test(trimmed)) {
+    return { raw: ruleStr.trim(), frequency: 'monthly', interval: 1 };
+  }
+
+  return { raw: ruleStr.trim(), frequency: 'daily', interval: 1 };
+}
+
+/**
+ * Parses recurrence rule from task text (🔁 every week or 🔁 daily).
+ */
+export function parseTaskRecurrence(text: string): TaskRecurrence {
+  const match = text.match(/🔁\s*([a-zA-Z0-9_\-\u00C0-\u017F ]+?)(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/i);
+  if (!match) {
+    return { cleanTitle: text };
+  }
+  const recurrence = match[1].trim();
+  const cleanTitle = text.replace(match[0], '').replace(/\s{2,}/g, ' ').trim();
+  return { recurrence, cleanTitle: cleanTitle || text };
+}
+
+/**
+ * Formats task text with a recurrence rule (🔁 rule).
+ */
+export function formatTaskWithRecurrence(text: string, recurrenceRule: string): string {
+  const { cleanTitle } = parseTaskRecurrence(text);
+  return `${cleanTitle} 🔁 ${recurrenceRule.trim()}`.trim();
+}
+
+/**
+ * Calculates the next recurrence date given an existing YYYY-MM-DD and recurrence rule.
+ */
+export function calculateNextRecurrenceDate(
+  currentDateStr: string,
+  recurrenceRule: string,
+  referenceDate?: Date
+): string {
+  const parsed = parseRecurrenceRule(recurrenceRule);
+  const parts = currentDateStr.split('-').map(Number);
+  let base: Date;
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    base = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+  } else if (referenceDate) {
+    base = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12, 0, 0);
+  } else {
+    const now = new Date();
+    base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  }
+
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const day = base.getDate();
+
+  let next: Date;
+  if (!parsed) {
+    next = new Date(year, month, day + 1, 12, 0, 0);
+  } else {
+    switch (parsed.frequency) {
+      case 'daily':
+        next = new Date(year, month, day + parsed.interval, 12, 0, 0);
+        break;
+      case 'weekday': {
+        next = new Date(year, month, day, 12, 0, 0);
+        for (let i = 0; i < parsed.interval; i++) {
+          next.setDate(next.getDate() + 1);
+          while (next.getDay() === 0 || next.getDay() === 6) {
+            next.setDate(next.getDate() + 1);
+          }
+        }
+        break;
+      }
+      case 'weekly':
+        next = new Date(year, month, day + (parsed.interval * 7), 12, 0, 0);
+        break;
+      case 'monthly': {
+        next = new Date(year, month + parsed.interval, day, 12, 0, 0);
+        if (next.getDate() !== day) {
+          next.setDate(0); // Set to last day of target month if day overflowed
+        }
+        break;
+      }
+      case 'yearly':
+        next = new Date(year + parsed.interval, month, day, 12, 0, 0);
+        break;
+      default:
+        next = new Date(year, month, day + 1, 12, 0, 0);
+        break;
+    }
+  }
+
+  const ny = next.getFullYear();
+  const nm = String(next.getMonth() + 1).padStart(2, '0');
+  const nd = String(next.getDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
 }
 
 export interface TaskPomodoroEstimate {
@@ -168,6 +461,10 @@ export function getCleanTaskDisplayTitle(text: string): string {
   clean = clean.replace(/(?:⏫|🔼|🔽|#p[1-3]\b|#alta\b|#media\b|#baja\b)/gi, '');
   clean = clean.replace(/(?:🍅|:tomato:)\s*\d+(?:\s*\/\s*\d+)?/gi, '');
   clean = clean.replace(/📅\s*\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?/gi, '');
+  clean = clean.replace(/(?:⏳|#scheduled\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
+  clean = clean.replace(/(?:🛫|#start\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
+  clean = clean.replace(/(?:✅|#completed\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
+  clean = clean.replace(/🔁\s*[a-zA-Z0-9_\-\u00C0-\u017F ]+?(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/gi, '');
   clean = clean.replace(/#[\w\u00C0-\u017F-]+/g, '');
   clean = clean.replace(/^(?:💡|🧊|#ideas?\b|#icebox\b)\s*/i, '');
   clean = clean.replace(/\s{2,}/g, ' ').trim();
@@ -327,11 +624,16 @@ export function appendIceboxItemToMarkdownSection(
  */
 export function extractPendingTasksFromContent(
   content: string,
-  sourceFile: string
+  sourceFile: string,
+  options?: { tasksSectionHeader?: string; iceboxSectionHeader?: string }
 ): PendingTaskItem[] {
   const tasks: PendingTaskItem[] = [];
   const lines = content.split(/\r?\n/);
   let currentSection = '';
+
+  const iceboxHeaderClean = options?.iceboxSectionHeader
+    ? options.iceboxSectionHeader.replace(/^#+\s*/, '').trim().toLowerCase()
+    : 'icebox';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -346,13 +648,26 @@ export function extractPendingTasksFromContent(
       const { priority } = parseTaskPriority(taskText);
       const { estimated, completed } = parseTaskPomodoroEstimate(taskText);
       const { dueDate, dueTime } = parseTaskDeadline(taskText);
+      const { scheduledDate } = parseTaskScheduledDate(taskText);
+      const { startDate } = parseTaskStartDate(taskText);
+      const { completedDate } = parseTaskCompletionDate(taskText);
+      const { recurrence } = parseTaskRecurrence(taskText);
       const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
-      const isIdea = currentSection.includes('idea') || /#ideas?\b/i.test(taskText) || taskText.startsWith('💡');
+      const isIdea =
+        currentSection.includes(iceboxHeaderClean) ||
+        currentSection.includes('icebox') ||
+        currentSection.includes('idea') ||
+        /#(?:ideas?|icebox)\b/i.test(taskText) ||
+        taskText.startsWith('💡') ||
+        taskText.startsWith('🧊');
+      const lineHash = computeLineHash(line);
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
         text: taskText,
         sourceFile,
+        lineNumber: i + 1,
+        lineHash,
         priority,
         isIdea,
         estimatedPomodoros: estimated,
@@ -360,6 +675,10 @@ export function extractPendingTasksFromContent(
         dueDate,
         dueTime,
         daysRemaining,
+        scheduledDate,
+        startDate,
+        completedDate,
+        recurrence,
       });
     }
   }
@@ -368,15 +687,41 @@ export function extractPendingTasksFromContent(
 }
 
 /**
- * Formats daily note file name using given offset.
+ * Formats a Date into a local YYYY-MM-DD string without UTC timezone skew.
+ */
+export function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Formats daily note file name using given offset, date string, or Date object.
  */
 export function formatDailyNoteFileName(
   dateFormat: string,
-  offsetDays: number = 0,
+  targetDateOrOffset: number | string | Date = 0,
   referenceDate: Date = new Date()
 ): string {
-  const targetDate = new Date(referenceDate);
-  targetDate.setDate(targetDate.getDate() + offsetDays);
+  let targetDate: Date;
+
+  if (typeof targetDateOrOffset === 'number') {
+    targetDate = new Date(referenceDate);
+    targetDate.setDate(targetDate.getDate() + targetDateOrOffset);
+  } else if (targetDateOrOffset instanceof Date) {
+    targetDate = targetDateOrOffset;
+  } else if (typeof targetDateOrOffset === 'string') {
+    const cleanStr = targetDateOrOffset.replace(/\.md$/, '').trim();
+    const parts = cleanStr.split('-').map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    } else {
+      targetDate = new Date(cleanStr);
+    }
+  } else {
+    targetDate = new Date(referenceDate);
+  }
 
   const yyyy = String(targetDate.getFullYear());
   const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
@@ -395,6 +740,9 @@ export interface SubtaskItem {
   text: string;
   completed: boolean;
   originalLine: string;
+  lineNumber?: number;
+  lineHash?: string;
+  sourceFile?: string;
 }
 
 export interface TaskRecord extends PendingTaskItem {
@@ -436,10 +784,18 @@ export function compareTasksByPriority(a: TaskRecord, b: TaskRecord): number {
   return a.text.localeCompare(b.text);
 }
 
-export function extractAllTasksFromContent(content: string, sourceFile: string): TaskRecord[] {
+export function extractAllTasksFromContent(
+  content: string,
+  sourceFile: string,
+  options?: { tasksSectionHeader?: string; iceboxSectionHeader?: string }
+): TaskRecord[] {
   const tasks: TaskRecord[] = [];
   const lines = content.split(/\r?\n/);
   let currentSection = '';
+
+  const iceboxHeaderClean = options?.iceboxSectionHeader
+    ? options.iceboxSectionHeader.replace(/^#+\s*/, '').trim().toLowerCase()
+    : 'icebox';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -452,10 +808,14 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
     if (subtaskMatch && tasks.length > 0) {
       const parent = tasks[tasks.length - 1];
       if (!parent.subtasks) parent.subtasks = [];
+      const lineHash = computeLineHash(line);
       parent.subtasks.push({
         text: subtaskMatch[3].trim(),
         completed: subtaskMatch[2].toLowerCase() === 'x',
         originalLine: line,
+        lineNumber: i + 1,
+        lineHash,
+        sourceFile,
       });
       continue;
     }
@@ -468,19 +828,27 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
       const { priority } = parseTaskPriority(taskText);
       const { estimated, completed: pomodoroCompleted } = parseTaskPomodoroEstimate(taskText);
       const { dueDate, dueTime } = parseTaskDeadline(taskText);
+      const { scheduledDate } = parseTaskScheduledDate(taskText);
+      const { startDate } = parseTaskStartDate(taskText);
+      const { completedDate } = parseTaskCompletionDate(taskText);
+      const { recurrence } = parseTaskRecurrence(taskText);
       const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
       const isIdea =
+        currentSection.includes(iceboxHeaderClean) ||
         currentSection.includes('icebox') ||
         currentSection.includes('idea') ||
         /#(?:ideas?|icebox)\b/i.test(taskText) ||
         taskText.startsWith('💡') ||
         taskText.startsWith('🧊');
       const tags = extractTagsFromText(taskText);
+      const lineHash = computeLineHash(line);
       tasks.push({
         id: `${sourceFile}#L${i + 1}:${taskText}`,
         originalLine: line,
         text: taskText,
         sourceFile,
+        lineNumber: i + 1,
+        lineHash,
         completed,
         statusChar,
         priority,
@@ -490,6 +858,10 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
         dueDate,
         dueTime,
         daysRemaining,
+        scheduledDate,
+        startDate,
+        completedDate,
+        recurrence,
         tags,
       });
       continue;
@@ -497,15 +869,23 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
 
     // Passive bullet under Icebox / Ideas section (- bullet)
     const bulletMatch = line.match(/^\s*-\s+(?!\[[ xX]\])(.*)$/);
-    if (bulletMatch && (currentSection.includes('icebox') || currentSection.includes('idea'))) {
+    if (
+      bulletMatch &&
+      (currentSection.includes(iceboxHeaderClean) ||
+        currentSection.includes('icebox') ||
+        currentSection.includes('idea'))
+    ) {
       const itemText = bulletMatch[1].trim();
       if (itemText) {
         const tags = extractTagsFromText(itemText);
+        const lineHash = computeLineHash(line);
         tasks.push({
           id: `${sourceFile}#L${i + 1}:${itemText}`,
           originalLine: line,
           text: itemText,
           sourceFile,
+          lineNumber: i + 1,
+          lineHash,
           completed: false,
           statusChar: ' ',
           priority: 'none',
@@ -518,4 +898,798 @@ export function extractAllTasksFromContent(content: string, sourceFile: string):
 
   return tasks.sort(compareTasksByPriority);
 }
+
+/**
+ * Pure functions for manipulating task content inside markdown strings
+ */
+export type TaskMutationAction =
+  | 'toggle'
+  | 'update'
+  | 'delete'
+  | 'increment'
+  | 'decrement'
+  | 'subtask'
+  | 'promote';
+
+export interface TaskMutationOptions {
+  action: TaskMutationAction;
+  completed?: boolean;
+  newText?: string;
+  subtaskText?: string;
+  subtaskAction?: 'add' | 'toggle';
+  priority?: TaskPriority;
+  tasksSectionHeader?: string;
+  iceboxSectionHeader?: string;
+}
+
+export interface TaskMutationResult {
+  updatedContent: string;
+  success: boolean;
+  error?: 'ambiguous' | 'not_found' | 'no_op' | 'invalid_action';
+  errorMessage?: string;
+  updatedText?: string;
+}
+
+export interface LocateResult {
+  index: number;
+  status: 'exact_position' | 'unique_match' | 'ambiguous' | 'not_found';
+  matchingIndices: number[];
+}
+
+/**
+ * Robust locator for task lines within file content:
+ * 1. Checks if the line at locator.lineNumber matches locator.lineHash / originalLine.
+ * 2. If it does not match, scans content for unique exact matches.
+ * 3. If multiple exact matches are found, returns ambiguous.
+ * 4. If no matches, returns not_found.
+ */
+export function locateTaskLineIndex(lines: string[], locator: TaskLocator): LocateResult {
+  // 1. Verify exact position if lineNumber is provided (1-indexed)
+  if (
+    typeof locator.lineNumber === 'number' &&
+    locator.lineNumber >= 1 &&
+    locator.lineNumber <= lines.length
+  ) {
+    const candidateIdx = locator.lineNumber - 1;
+    const candidateLine = lines[candidateIdx];
+
+    let matchesPosition = false;
+    if (locator.lineHash) {
+      matchesPosition = computeLineHash(candidateLine) === locator.lineHash;
+    } else if (locator.originalLine !== undefined) {
+      matchesPosition = candidateLine === locator.originalLine;
+    } else if (locator.text) {
+      const match = candidateLine.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+      if (match) {
+        const lineTitle = match[2].trim();
+        const cleanLineTitle = lineTitle.replace(/^[💡🧊]\s*/u, '').trim();
+        const cleanLocatorText = locator.text.trim().replace(/^[💡🧊]\s*/u, '').trim();
+        matchesPosition =
+          lineTitle === locator.text.trim() ||
+          cleanLineTitle === cleanLocatorText ||
+          getCleanTaskDisplayTitle(cleanLineTitle) === getCleanTaskDisplayTitle(cleanLocatorText);
+      }
+    }
+
+    if (matchesPosition) {
+      return { index: candidateIdx, status: 'exact_position', matchingIndices: [candidateIdx] };
+    }
+  }
+
+  // 2. Exact position did not match. Search entire file for exact match.
+  const matchingIndices: number[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let isMatch = false;
+
+    if (locator.lineHash) {
+      if (computeLineHash(line) === locator.lineHash) {
+        if (locator.originalLine !== undefined) {
+          isMatch = (line === locator.originalLine);
+        } else {
+          isMatch = true;
+        }
+      }
+    } else if (locator.originalLine !== undefined) {
+      isMatch = (line === locator.originalLine);
+    } else if (locator.text) {
+      const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+      if (match) {
+        const lineTitle = match[2].trim();
+        const cleanLineTitle = lineTitle.replace(/^[💡🧊]\s*/u, '').trim();
+        const cleanLocatorText = locator.text.trim().replace(/^[💡🧊]\s*/u, '').trim();
+        isMatch =
+          lineTitle === locator.text.trim() ||
+          cleanLineTitle === cleanLocatorText ||
+          getCleanTaskDisplayTitle(cleanLineTitle) === getCleanTaskDisplayTitle(cleanLocatorText);
+      }
+    }
+
+    if (isMatch) {
+      matchingIndices.push(i);
+    }
+  }
+
+  if (matchingIndices.length === 1) {
+    return { index: matchingIndices[0], status: 'unique_match', matchingIndices };
+  }
+  if (matchingIndices.length > 1) {
+    return { index: -1, status: 'ambiguous', matchingIndices };
+  }
+  return { index: -1, status: 'not_found', matchingIndices: [] };
+}
+
+/**
+ * Unified pure function to mutate a task line inside markdown content.
+ */
+export function mutateTaskLineInContent(
+  content: string,
+  locator: TaskLocator,
+  options: TaskMutationOptions
+): TaskMutationResult {
+  const lines = content.split(/\r?\n/);
+  const locateRes = locateTaskLineIndex(lines, locator);
+
+  if (locateRes.status === 'ambiguous') {
+    return {
+      updatedContent: content,
+      success: false,
+      error: 'ambiguous',
+      errorMessage: `Ambigüedad: se encontraron ${locateRes.matchingIndices.length} tareas idénticas y la línea cambió.`,
+    };
+  }
+
+  if (locateRes.status === 'not_found' || locateRes.index === -1) {
+    return {
+      updatedContent: content,
+      success: false,
+      error: 'not_found',
+      errorMessage: 'No se encontró la tarea especificada en el archivo.',
+    };
+  }
+
+  const targetIndex = locateRes.index;
+  const targetLine = lines[targetIndex];
+
+  switch (options.action) {
+    case 'toggle': {
+      const match = targetLine.match(/^(\s*-\s+\[)(.)(\]\s+)(.*)$/);
+      if (match) {
+        const indentAndDash = match[1];
+        const currentStatus = match[2];
+        const bracketAndSpace = match[3];
+        const lineBody = match[4];
+
+        const isCurrentlyCompleted = currentStatus.toLowerCase() === 'x';
+        const willBeCompleted = options.completed !== undefined
+          ? options.completed
+          : !isCurrentlyCompleted;
+
+        const newChar = willBeCompleted ? 'x' : ' ';
+        let newLineBody = lineBody;
+        const todayStr = getLocalDateString(new Date());
+
+        if (willBeCompleted) {
+          const { completedDate } = parseTaskCompletionDate(newLineBody);
+          if (!completedDate) {
+            newLineBody = formatTaskWithCompletionDate(newLineBody, todayStr);
+          }
+        } else {
+          const { cleanTitle } = parseTaskCompletionDate(newLineBody);
+          newLineBody = cleanTitle;
+        }
+
+        lines[targetIndex] = `${indentAndDash}${newChar}${bracketAndSpace}${newLineBody}`;
+
+        // If completing a recurring task, clone next occurrence uncompleted
+        if (willBeCompleted) {
+          const { recurrence } = parseTaskRecurrence(lineBody);
+          if (recurrence) {
+            let nextLineBody = parseTaskCompletionDate(lineBody).cleanTitle;
+            const { dueDate, dueTime } = parseTaskDeadline(nextLineBody);
+            const { scheduledDate } = parseTaskScheduledDate(nextLineBody);
+            const { startDate } = parseTaskStartDate(nextLineBody);
+
+            if (dueDate) {
+              const nextDue = calculateNextRecurrenceDate(dueDate, recurrence);
+              nextLineBody = formatTaskWithDeadline(nextLineBody, nextDue, dueTime);
+            }
+            if (scheduledDate) {
+              const nextSched = calculateNextRecurrenceDate(scheduledDate, recurrence);
+              nextLineBody = formatTaskWithScheduledDate(nextLineBody, nextSched);
+            }
+            if (startDate) {
+              const nextStart = calculateNextRecurrenceDate(startDate, recurrence);
+              nextLineBody = formatTaskWithStartDate(nextLineBody, nextStart);
+            }
+            if (!dueDate && !scheduledDate && !startDate) {
+              const nextDue = calculateNextRecurrenceDate(todayStr, recurrence);
+              nextLineBody = formatTaskWithDeadline(nextLineBody, nextDue);
+            }
+
+            const nextTaskLine = `${indentAndDash} ${bracketAndSpace}${nextLineBody}`;
+            lines.splice(targetIndex + 1, 0, nextTaskLine);
+          }
+        }
+
+        return { updatedContent: lines.join('\n'), success: true };
+      }
+      const bulletMatch = targetLine.match(/^(\s*-\s+)(.*)$/);
+      if (bulletMatch) {
+        const willBeCompleted = options.completed !== undefined ? options.completed : true;
+        const newChar = willBeCompleted ? 'x' : ' ';
+        let itemBody = bulletMatch[2];
+        if (willBeCompleted) {
+          const todayStr = getLocalDateString(new Date());
+          const { completedDate } = parseTaskCompletionDate(itemBody);
+          if (!completedDate) {
+            itemBody = formatTaskWithCompletionDate(itemBody, todayStr);
+          }
+        }
+        lines[targetIndex] = `${bulletMatch[1]}[${newChar}] ${itemBody}`;
+        return { updatedContent: lines.join('\n'), success: true };
+      }
+      return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'La línea no es un elemento de lista.' };
+    }
+
+    case 'update': {
+      const newText = (options.newText !== undefined ? options.newText : '').trim();
+      const match = targetLine.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+      if (match) {
+        lines[targetIndex] = `${match[1]}${newText}`;
+        return { updatedContent: lines.join('\n'), success: true, updatedText: newText };
+      }
+      return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'No se pudo actualizar el texto de la línea.' };
+    }
+
+    case 'delete': {
+      let count = 1;
+      while (targetIndex + count < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[targetIndex + count])) {
+        count++;
+      }
+      lines.splice(targetIndex, count);
+      return { updatedContent: lines.join('\n'), success: true };
+    }
+
+    case 'increment': {
+      const match = targetLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+      if (!match) return { updatedContent: content, success: false, error: 'no_op' };
+      const prefix = match[1];
+      const oldText = match[2].trim();
+      const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
+      const newCompleted = (completed || 0) + 1;
+      const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
+      lines[targetIndex] = `${prefix}${newText}`;
+      return { updatedContent: lines.join('\n'), success: true, updatedText: newText };
+    }
+
+    case 'decrement': {
+      const match = targetLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
+      if (!match) return { updatedContent: content, success: false, error: 'no_op' };
+      const prefix = match[1];
+      const oldText = match[2].trim();
+      const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
+      if (!completed || completed <= 0) {
+        return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'No hay pomodoros para decrementar.' };
+      }
+      const newCompleted = Math.max(0, completed - 1);
+      const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
+      lines[targetIndex] = `${prefix}${newText}`;
+      return { updatedContent: lines.join('\n'), success: true, updatedText: newText };
+    }
+
+    case 'subtask': {
+      if (options.subtaskAction === 'toggle') {
+        if (options.subtaskText) {
+          let subIdx = targetIndex + 1;
+          let foundSub = -1;
+          while (subIdx < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[subIdx])) {
+            const subMatch = lines[subIdx].match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/);
+            if (subMatch && subMatch[4].trim() === options.subtaskText.trim()) {
+              foundSub = subIdx;
+              break;
+            }
+            subIdx++;
+          }
+          if (foundSub !== -1) {
+            const m = lines[foundSub].match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/)!;
+            const targetChar = options.completed !== undefined
+              ? (options.completed ? 'x' : ' ')
+              : (m[2].toLowerCase() === 'x' ? ' ' : 'x');
+            lines[foundSub] = `${m[1]}${targetChar}${m[3]}${m[4]}`;
+            return { updatedContent: lines.join('\n'), success: true };
+          }
+          return { updatedContent: content, success: false, error: 'not_found', errorMessage: 'Subtarea no encontrada.' };
+        } else {
+          // Target line itself is subtask
+          const m = targetLine.match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/);
+          if (m) {
+            const targetChar = options.completed !== undefined
+              ? (options.completed ? 'x' : ' ')
+              : (m[2].toLowerCase() === 'x' ? ' ' : 'x');
+            lines[targetIndex] = `${m[1]}${targetChar}${m[3]}${m[4]}`;
+            return { updatedContent: lines.join('\n'), success: true };
+          }
+        }
+      }
+
+      // Default subtask action is add
+      const subText = (options.subtaskText || '').trim();
+      if (!subText) {
+        return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'Subtarea vacía.' };
+      }
+      let insertAt = targetIndex + 1;
+      while (insertAt < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[insertAt])) {
+        insertAt++;
+      }
+      lines.splice(insertAt, 0, `  - [ ] ${subText}`);
+      return { updatedContent: lines.join('\n'), success: true };
+    }
+
+    case 'promote': {
+      const match = targetLine.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+      const itemText = match ? match[2].trim() : (locator.text || targetLine);
+      lines.splice(targetIndex, 1);
+      const withoutIdea = lines.join('\n');
+
+      let cleanTitle = itemText.replace(/#(?:ideas?|icebox)\b/gi, '').replace(/^[💡🧊]\s*/u, '').trim();
+      cleanTitle = formatTaskWithPriority(cleanTitle, options.priority !== 'none' && options.priority ? options.priority : 'none');
+      const targetSection = options.tasksSectionHeader || '## Tareas';
+      const updatedContent = appendTaskToMarkdownSection(withoutIdea, cleanTitle, targetSection);
+      return { updatedContent, success: true, updatedText: cleanTitle };
+    }
+
+    default:
+      return { updatedContent: content, success: false, error: 'invalid_action' };
+  }
+}
+
+export function incrementTaskPomodoroInContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string
+): { updatedContent: string; updatedText: string } | null {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'increment' });
+  if (res.success && res.updatedText) {
+    return { updatedContent: res.updatedContent, updatedText: res.updatedText };
+  }
+  return null;
+}
+
+export function decrementTaskPomodoroInContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string
+): { updatedContent: string; updatedText: string } | null {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'decrement' });
+  if (res.success && res.updatedText) {
+    return { updatedContent: res.updatedContent, updatedText: res.updatedText };
+  }
+  return null;
+}
+
+export function promoteIdeaToTaskInContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string,
+  priority: TaskPriority = 'none'
+): { updatedContent: string; promoted: boolean } {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'promote', priority });
+  return { updatedContent: res.updatedContent, promoted: res.success };
+}
+
+export function toggleTaskCompletionInContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string,
+  newCompleted?: boolean
+): { updatedContent: string; found: boolean } {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'toggle', completed: newCompleted });
+  return { updatedContent: res.updatedContent, found: res.success };
+}
+
+export function updateTaskTextInContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string,
+  newText: string
+): { updatedContent: string; found: boolean } {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'update', newText });
+  return { updatedContent: res.updatedContent, found: res.success };
+}
+
+export function toggleSubtaskInContent(
+  content: string,
+  subtaskLocatorOrText: TaskLocator | string,
+  newCompleted?: boolean
+): { updatedContent: string; found: boolean } {
+  const locator: TaskLocator = typeof subtaskLocatorOrText === 'string'
+    ? { sourceFile: '', text: subtaskLocatorOrText }
+    : subtaskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, {
+    action: 'subtask',
+    subtaskAction: 'toggle',
+    completed: newCompleted,
+  });
+  return { updatedContent: res.updatedContent, found: res.success };
+}
+
+export function addSubtaskToContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string,
+  subtaskText: string
+): { updatedContent: string; added: boolean } {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, {
+    action: 'subtask',
+    subtaskAction: 'add',
+    subtaskText,
+  });
+  return { updatedContent: res.updatedContent, added: res.success };
+}
+
+export function deleteTaskFromContent(
+  content: string,
+  taskLocatorOrText: TaskLocator | string
+): { updatedContent: string; deleted: boolean } {
+  const locator: TaskLocator = typeof taskLocatorOrText === 'string'
+    ? { sourceFile: '', text: taskLocatorOrText }
+    : taskLocatorOrText;
+  const res = mutateTaskLineInContent(content, locator, { action: 'delete' });
+  return { updatedContent: res.updatedContent, deleted: res.success };
+}
+
+/**
+ * Creates a stable slug ID from a habit name.
+ * e.g. "📚 Lectura 20 min" -> "lectura-20-min"
+ */
+export function createHabitId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+    .replace(/[^\w\s-]/g, '') // remove emojis and special characters
+    .trim()
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'habit';
+}
+
+export function formatHabitLine(h: {
+  name: string;
+  completedToday?: boolean;
+  streak?: number;
+  lastCompletedDate?: string;
+  history?: string[];
+}): string {
+  const check = h.completedToday ? 'x' : ' ';
+  const histStr = (h.history || []).slice(-60).join(',');
+  return `- [${check}] ${h.name} <!-- streak: ${h.streak || 0} | last: ${h.lastCompletedDate || ''} | history: ${histStr} -->`;
+}
+
+/**
+ * Modifies ONLY habit lines in markdown content and preserves all other content
+ * (headers, quotes, callouts, notes, comments, extra sections).
+ */
+export function syncHabitsToMarkdown(
+  content: string,
+  habits: Array<{
+    id?: string;
+    name: string;
+    completedToday?: boolean;
+    streak?: number;
+    lastCompletedDate?: string;
+    history?: string[];
+  }>
+): string {
+  if (!content || content.trim().length === 0) {
+    return formatHabitsToMarkdown(habits);
+  }
+
+  const lines = content.split(/\r?\n/);
+  const habitLineRegex = /^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>|]*?)(?:\s*\|\s*history:\s*([^>]*?))?\s*-->)?$/;
+
+  const habitMapById = new Map<string, (typeof habits)[0]>();
+  const habitMapByName = new Map<string, (typeof habits)[0]>();
+  for (const h of habits) {
+    const id = h.id || createHabitId(h.name);
+    habitMapById.set(id, h);
+    habitMapByName.set(h.name.trim().toLowerCase(), h);
+  }
+
+  const placedHabitIds = new Set<string>();
+  const updatedLines: string[] = [];
+  let lastHabitLineIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(habitLineRegex);
+
+    if (match) {
+      const lineHabitName = match[2].trim();
+      const lineHabitId = createHabitId(lineHabitName);
+
+      const targetHabit = habitMapById.get(lineHabitId) || habitMapByName.get(lineHabitName.toLowerCase());
+
+      if (targetHabit) {
+        const updatedLine = formatHabitLine(targetHabit);
+        updatedLines.push(updatedLine);
+        placedHabitIds.add(targetHabit.id || lineHabitId);
+        lastHabitLineIndex = updatedLines.length - 1;
+      } else {
+        // Deleted habit: omitted from output, preserving surrounding text
+      }
+    } else {
+      // Non-habit line: preserved exactly as-is
+      updatedLines.push(line);
+    }
+  }
+
+  // Newly added habits that weren't in the original content
+  const remainingHabits = habits.filter((h) => {
+    const id = h.id || createHabitId(h.name);
+    return !placedHabitIds.has(id);
+  });
+
+  if (remainingHabits.length > 0) {
+    const newLines = remainingHabits.map(formatHabitLine);
+
+    if (lastHabitLineIndex !== -1) {
+      // Insert after the last existing habit line
+      updatedLines.splice(lastHabitLineIndex + 1, 0, ...newLines);
+    } else {
+      // No prior habit lines found; find header matching habits
+      const headerIdx = updatedLines.findIndex((l) => /^#+\s+.*h[aá]bito/i.test(l));
+      if (headerIdx !== -1) {
+        updatedLines.splice(headerIdx + 1, 0, '', ...newLines);
+      } else {
+        if (updatedLines.length > 0 && updatedLines[updatedLines.length - 1].trim() !== '') {
+          updatedLines.push('');
+        }
+        updatedLines.push(...newLines);
+      }
+    }
+  }
+
+  return updatedLines.join('\n');
+}
+
+export function formatHabitsToMarkdown(
+  habits: Array<{
+    name: string;
+    completedToday?: boolean;
+    streak?: number;
+    lastCompletedDate?: string;
+    history?: string[];
+  }>
+): string {
+  const lines: string[] = ['# Registro de Hábitos', ''];
+  for (const h of habits) {
+    const check = h.completedToday ? 'x' : ' ';
+    const histStr = (h.history || []).slice(-60).join(',');
+    lines.push(
+      `- [${check}] ${h.name} <!-- streak: ${h.streak || 0} | last: ${h.lastCompletedDate || ''} | history: ${histStr} -->`
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+import { formatTimeBlockLine } from './calendar-utils.ts';
+
+export function syncBlocksToMarkdown(
+  content: string,
+  blocks: Array<{
+    startTime: string;
+    endTime: string;
+    title: string;
+    completed?: boolean;
+    linkedNote?: string;
+  }>
+): string {
+  const lines = content.split(/\r?\n/);
+  const blockLines = blocks.map((b) => formatTimeBlockLine(b));
+
+  const header = '## Bloques de Tiempo';
+  const headerIndex = lines.findIndex((l) => l.trim().toLowerCase() === header.toLowerCase());
+
+  if (headerIndex === -1) {
+    return `${content.trimEnd()}\n\n${header}\n${blockLines.join('\n')}\n`;
+  }
+
+  let endIdx = lines.length;
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    if (/^#{1,6}\s+/.test(lines[i])) {
+      endIdx = i;
+      break;
+    }
+  }
+  lines.splice(headerIndex + 1, endIdx - (headerIndex + 1), ...blockLines);
+  return lines.join('\n');
+}
+
+export function mergeTemplateIntoContent(existingContent: string, template: string): string {
+  if (existingContent.trim().length === 0) {
+    return template;
+  }
+  return `${existingContent.trimEnd()}\n\n${template}`;
+}
+
+export function shouldZenIgnoreEscape(
+  activeElement: {
+    tagName?: string;
+    isContentEditable?: boolean;
+    closest?: (selector: string) => unknown;
+  } | null,
+  isModalOpen: boolean
+): boolean {
+  if (isModalOpen) return true;
+  if (!activeElement) return false;
+
+  const tag = (activeElement.tagName || '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    return true;
+  }
+
+  if (activeElement.isContentEditable) {
+    return true;
+  }
+
+  if (typeof activeElement.closest === 'function') {
+    if (activeElement.closest('.cm-editor, .cm-content, input, textarea, select, [contenteditable="true"]')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Appends a closing note associated with a completed pomodoro task to the daily note content.
+ * If the daily note has a pomodoro log entry for this task, indents the note right below it.
+ * Otherwise, appends as a bullet at the end of the note.
+ */
+export function appendClosingNoteToDailyContent(
+  content: string,
+  taskText: string,
+  closingNote: string
+): string {
+  const noteTrimmed = closingNote.trim();
+  if (!noteTrimmed) return content;
+
+  const lines = content.split('\n');
+  const cleanTask = taskText.trim();
+  const noteBullet = `  - 📝 Nota: ${noteTrimmed}`;
+
+  // Find the last pomodoro log line that references this task
+  let lastMatchingIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (line.includes('Pomodoro completado') && (cleanTask.length === 0 || line.includes(cleanTask))) {
+      lastMatchingIndex = i;
+      break;
+    }
+  }
+
+  if (lastMatchingIndex !== -1) {
+    // Insert immediately after the matching pomodoro entry
+    lines.splice(lastMatchingIndex + 1, 0, noteBullet);
+    return lines.join('\n');
+  }
+
+  // If no matching pomodoro log line found, append at end of file
+  const fallbackBullet = cleanTask
+    ? `- 📝 Nota Pomodoro (*${cleanTask}*): ${noteTrimmed}`
+    : `- 📝 Nota Pomodoro: ${noteTrimmed}`;
+
+  const trimmedEnd = content.trimEnd();
+  return trimmedEnd.length === 0 ? `${fallbackBullet}\n` : `${trimmedEnd}\n${fallbackBullet}\n`;
+}
+
+export interface DeadlineItem {
+  id: string;
+  originalLine: string;
+  text: string;
+  cleanTitle: string;
+  sourceFile: string;
+  lineNumber?: number;
+  lineHash?: string;
+  dueDate: string;
+  dueTime?: string;
+  daysRemaining: number;
+  completed: boolean;
+}
+
+/**
+ * Pure function to extract and sort all deadline items from in-memory tasks.
+ */
+export function computeDeadlinesFromTasks(tasks: TaskRecord[]): DeadlineItem[] {
+  const deadlines: DeadlineItem[] = [];
+  for (const t of tasks) {
+    if (t.dueDate) {
+      const daysRemaining = t.daysRemaining !== undefined ? t.daysRemaining : calculateDaysRemaining(t.dueDate);
+      const { cleanTitle } = parseTaskDeadline(t.text);
+      deadlines.push({
+        id: t.id,
+        originalLine: t.originalLine,
+        text: t.text,
+        cleanTitle: getCleanTaskDisplayTitle(cleanTitle),
+        sourceFile: t.sourceFile,
+        lineNumber: t.lineNumber,
+        lineHash: t.lineHash,
+        dueDate: t.dueDate,
+        dueTime: t.dueTime,
+        daysRemaining,
+        completed: t.completed,
+      });
+    }
+  }
+
+  return deadlines.sort((a, b) => {
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    if (a.daysRemaining !== b.daysRemaining) {
+      return a.daysRemaining - b.daysRemaining;
+    }
+    return a.dueDate.localeCompare(b.dueDate);
+  });
+}
+
+/**
+ * Pure function to check if a file path is included in the task index
+ * based on folder whitelist/blacklist settings.
+ */
+export function isPathIndexed(
+  filePath: string,
+  includedFolders: string[] = [],
+  excludedFolders: string[] = []
+): boolean {
+  if (!filePath.endsWith('.md')) return false;
+
+  const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const lowerPath = normalized.toLowerCase();
+  const pathParts = lowerPath.split('/');
+
+  // Check excluded folders first
+  for (const excluded of excludedFolders) {
+    const cleanEx = excluded.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+    if (cleanEx.length === 0) continue;
+    if (lowerPath === cleanEx || lowerPath.startsWith(cleanEx + '/')) {
+      return false;
+    }
+    // Also match any folder segment in path hierarchy
+    if (pathParts.slice(0, -1).includes(cleanEx)) {
+      return false;
+    }
+  }
+
+  // Check included folders if any are specified
+  const activeInclusions = includedFolders
+    .map((f) => f.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').toLowerCase())
+    .filter((f) => f.length > 0);
+
+  if (activeInclusions.length > 0) {
+    const matched = activeInclusions.some(
+      (inc) => lowerPath === inc || lowerPath.startsWith(inc + '/')
+    );
+    if (!matched) return false;
+  }
+
+  return true;
+}
+
 

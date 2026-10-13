@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { getLanguage, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
 import { HabitsModal } from './habits';
 import { NextDayPlannerModal } from './planner';
 import { PomodoroManager } from './pomodoro';
@@ -9,16 +9,31 @@ import { QuickCaptureModal, TasksManagerModal } from './tasks';
 import { ActiveTab, StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
 import { migratePluginFilesToDedicatedFolder } from './utils';
+import { TaskIndex } from './task-index';
+import { runStartupMigration, loadFocusSessionsFromFile } from './storage-migration';
+import type { FocusSessionRecord } from './analytics';
+import { t, setLanguage, setObsidianLanguageResolver } from './i18n/index.ts';
 
 export default class StudyFlowPlugin extends Plugin {
   settings: StudyFlowSettings = DEFAULT_SETTINGS;
-  pomodoro: PomodoroManager = new PomodoroManager(this);
+  pomodoro!: PomodoroManager;
+  taskIndex!: TaskIndex;
   zen: ZenModeManager = new ZenModeManager(this);
+  focusSessions: FocusSessionRecord[] = [];
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    setObsidianLanguageResolver(getLanguage);
+    setLanguage(this.settings.language || 'auto');
+
     await migratePluginFilesToDedicatedFolder(this.app, this.settings);
+    await runStartupMigration(this);
+    this.focusSessions = await loadFocusSessionsFromFile(this.app);
     await this.saveSettings();
+
+    // Initialize reactive TaskIndex
+    this.taskIndex = new TaskIndex(this);
+    await this.taskIndex.init();
 
     // Register Sidebar Hub View
     this.registerView(
@@ -30,36 +45,21 @@ export default class StudyFlowPlugin extends Plugin {
     const statusBarEl = this.addStatusBarItem();
     this.pomodoro = new PomodoroManager(this);
     this.pomodoro.initStatusBar(statusBarEl);
+    await this.pomodoro.restoreState();
 
     // Ribbon Icons
-    this.addRibbonIcon('clock', 'Study Flow: Abrir Interfaz Completa', () => {
+    this.addRibbonIcon('clock', t('ribbon.openView'), () => {
       this.activateView(true);
     });
 
-    this.addRibbonIcon('check-square', 'Study Flow: Gestor de Tareas', () => {
-      new TasksManagerModal(this.app, this).open();
+    this.addRibbonIcon('plus-circle', t('ribbon.quickCapture'), () => {
+      new QuickCaptureModal(this.app, this).open();
     });
 
-    this.addRibbonIcon('flame', 'Study Flow: Hábitos y Rutinas', () => {
-      new HabitsModal(this.app, this).open();
-    });
-
-    this.addRibbonIcon('calendar-days', 'Study Flow: Calendario & Time Blocking', () => {
-      this.activateView(true, 'calendar');
-    });
-
-    this.addRibbonIcon('calendar-check', 'Study Flow: Planificar el día siguiente', () => {
-      new NextDayPlannerModal(this.app, this).open();
-    });
-
-    this.addRibbonIcon('bar-chart-2', 'Study Flow: Métricas y Rendimiento', () => {
-      new AnalyticsModal(this.app, this).open();
-    });
-
-    // Commands
+    // Commands (Obsidian convention: no plugin prefix)
     this.addCommand({
       id: 'open-study-flow-hub',
-      name: 'Abrir interfaz completa (Pestaña central)',
+      name: t('commands.openHub'),
       callback: () => {
         this.activateView(true);
       },
@@ -67,15 +67,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-study-flow-calendar',
-      name: 'Abrir Calendario y Bloques de Tiempo',
-      callback: () => {
-        this.activateView(true, 'calendar');
-      },
-    });
-
-    this.addCommand({
-      id: 'open-study-flow-deadlines',
-      name: 'Abrir Centro de Deadlines & Entregas',
+      name: t('commands.openCalendar'),
       callback: () => {
         this.activateView(true, 'calendar');
       },
@@ -83,7 +75,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-study-flow-hub-sidebar',
-      name: 'Abrir en panel lateral (Sidebar)',
+      name: t('commands.openSidebar'),
       callback: () => {
         this.activateView(false);
       },
@@ -91,7 +83,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-pomodoro-modal',
-      name: 'Abrir temporizador Pomodoro',
+      name: t('commands.openPomodoro'),
       callback: () => {
         new PomodoroModal(this.app, this).open();
       },
@@ -99,7 +91,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-tasks-manager',
-      name: 'Abrir gestor de tareas & Inbox',
+      name: t('commands.openTasks'),
       callback: () => {
         new TasksManagerModal(this.app, this).open();
       },
@@ -107,7 +99,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-habits-tracker',
-      name: 'Abrir registro de hábitos diarios',
+      name: t('commands.openHabits'),
       callback: () => {
         new HabitsModal(this.app, this).open();
       },
@@ -115,7 +107,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'open-analytics-dashboard',
-      name: 'Abrir métricas y rendimiento de estudio',
+      name: t('commands.openAnalytics'),
       callback: () => {
         new AnalyticsModal(this.app, this).open();
       },
@@ -123,7 +115,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'capture-quick-task',
-      name: 'Capturar tarea rápida',
+      name: t('commands.quickCapture'),
       callback: () => {
         new QuickCaptureModal(this.app, this).open();
       },
@@ -131,7 +123,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'complete-pomodoro-active-task',
-      name: 'Pomodoro: Completar tarea activa actual',
+      name: t('commands.completeActiveTask'),
       callback: async () => {
         await this.pomodoro.completeActiveTask();
       },
@@ -139,15 +131,15 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'plan-next-day',
-      name: 'Planificar el día siguiente',
+      name: t('commands.planNextDay'),
       callback: () => {
-        new NextDayPlannerModal(this.app, this).open();
+        void this.openCalendarTomorrow(true);
       },
     });
 
     this.addCommand({
       id: 'pomodoro-toggle',
-      name: 'Pomodoro: Iniciar / Pausar',
+      name: t('commands.pomodoroToggle'),
       callback: () => {
         this.pomodoro.toggleStartPause();
       },
@@ -155,7 +147,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'pomodoro-reset',
-      name: 'Pomodoro: Reiniciar',
+      name: t('commands.pomodoroReset'),
       callback: () => {
         this.pomodoro.reset();
       },
@@ -163,7 +155,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'pomodoro-switch-mode',
-      name: 'Pomodoro: Alternar entre trabajo y descanso',
+      name: t('commands.pomodoroSwitchMode'),
       callback: () => {
         this.pomodoro.switchMode();
       },
@@ -171,9 +163,50 @@ export default class StudyFlowPlugin extends Plugin {
 
     this.addCommand({
       id: 'toggle-zen-mode',
-      name: 'Modo Zen: Alternar enfoque sin distracciones',
+      name: t('commands.toggleZen'),
       callback: () => {
         this.zen.toggleZen();
+      },
+    });
+
+    this.addCommand({
+      id: 'generate-weekly-review',
+      name: t('commands.generateWeeklyReview'),
+      callback: async () => {
+        try {
+          const { generateWeeklyReviewFile } = await import('./weekly-review.ts');
+          const { file, isNew } = await generateWeeklyReviewFile(this.app, this);
+          new Notice(
+            isNew
+              ? t('weeklyReview.createdNotice', { path: file.path })
+              : t('weeklyReview.openedNotice', { path: file.path })
+          );
+          const leaf = this.app.workspace.getLeaf('tab');
+          await leaf.openFile(file);
+        } catch (err) {
+          console.error('Study Flow: Error generando revisión semanal', err);
+          new Notice(t('weeklyReview.errorNotice'));
+        }
+      },
+    });
+
+    this.addCommand({
+      id: 'spaced-repetition-init',
+      name: t('commands.initSpacedRepetition'),
+      checkCallback: (checking: boolean) => {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) return false;
+        if (checking) return true;
+        void (async () => {
+          try {
+            const { initSpacedRepetitionForFile } = await import('./spaced-repetition.ts');
+            await initSpacedRepetitionForFile(this.app, activeFile);
+            new Notice(t('spaced.initializedNotice', { title: activeFile.basename }));
+          } catch (err) {
+            console.error('Study Flow: Error iniciando repaso espaciado', err);
+          }
+        })();
+        return true;
       },
     });
 
@@ -187,6 +220,9 @@ export default class StudyFlowPlugin extends Plugin {
     }
     if (this.zen) {
       this.zen.destroy();
+    }
+    if (this.taskIndex) {
+      this.taskIndex.destroy();
     }
   }
 
@@ -241,10 +277,25 @@ export default class StudyFlowPlugin extends Plugin {
     }
   }
 
+  async openCalendarTomorrow(showPendingSelector: boolean = true): Promise<void> {
+    await this.activateView(true, 'calendar');
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW);
+    const leaf = leaves.find((l) => l.getRoot() === this.app.workspace.rootSplit) || leaves[0];
+    if (leaf && leaf.view instanceof StudyFlowView) {
+      await leaf.view.openTomorrowWithPlanner();
+    }
+  }
+
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    if (!Array.isArray(this.settings.focusHistory)) {
-      this.settings.focusHistory = [];
+    if (!Array.isArray(this.settings.subjects)) {
+      this.settings.subjects = [];
+    }
+    if (!this.settings.weeklyReviewsFolder) {
+      this.settings.weeklyReviewsFolder = DEFAULT_SETTINGS.weeklyReviewsFolder;
+    }
+    if (!this.settings.weeklyReviewTemplate) {
+      this.settings.weeklyReviewTemplate = DEFAULT_SETTINGS.weeklyReviewTemplate;
     }
   }
 

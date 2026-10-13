@@ -19,277 +19,157 @@ import {
 import {
   SubtaskItem,
   TaskRecord,
+  TaskLocator,
+  TaskMutationAction,
+  TaskMutationOptions,
+  TaskMutationResult,
   compareTasksByPriority,
   extractAllTasksFromContent,
+  computeLineHash,
+  locateTaskLineIndex,
+  mutateTaskLineInContent,
 } from './markdown-utils';
 
-export type { SubtaskItem, TaskRecord };
-export { compareTasksByPriority, extractAllTasksFromContent };
+export type {
+  SubtaskItem,
+  TaskRecord,
+  TaskLocator,
+  TaskMutationAction,
+  TaskMutationOptions,
+  TaskMutationResult,
+};
+export {
+  compareTasksByPriority,
+  extractAllTasksFromContent,
+  computeLineHash,
+  locateTaskLineIndex,
+  mutateTaskLineInContent,
+};
+
+/**
+ * Unified task mutation function using Obsidian's vault.process() with a robust locator:
+ * 1. Checks line position + hash
+ * 2. Falls back to unique exact match
+ * 3. Aborts with a Notice if ambiguous (> 1 match) or not found
+ */
+import { t } from './i18n/index.ts';
+
+export async function mutateTaskLine(
+  app: App,
+  locator: TaskLocator,
+  options: TaskMutationOptions
+): Promise<TaskMutationResult> {
+  const file = app.vault.getAbstractFileByPath(locator.sourceFile);
+  if (!(file instanceof TFile)) {
+    new Notice(t('tasks.fileNotFound', { file: locator.sourceFile }));
+    return { updatedContent: '', success: false, error: 'not_found' };
+  }
+
+  let mutationResult: TaskMutationResult = { updatedContent: '', success: false };
+  await app.vault.process(file, (content) => {
+    mutationResult = mutateTaskLineInContent(content, locator, options);
+    if (!mutationResult.success) {
+      if (mutationResult.error === 'ambiguous') {
+        new Notice(t('tasks.ambiguityNotice'));
+      } else if (mutationResult.error === 'not_found') {
+        new Notice(t('tasks.taskNotFoundNotice'));
+      }
+      return content;
+    }
+    return mutationResult.updatedContent;
+  });
+
+  return mutationResult;
+}
 
 export async function incrementTaskPomodoroInFile(
   app: App,
-  task: { sourceFile: string; text: string }
+  task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<{ updatedText: string } | null> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return null;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let targetIndex = -1;
-  let currentLine = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
-    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
-      targetIndex = i;
-      currentLine = line;
-      break;
-    }
-  }
-
-  if (targetIndex === -1) return null;
-
-  const match = currentLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
-  if (!match) return null;
-
-  const prefix = match[1];
-  const oldText = match[2].trim();
-
-  const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
-  const newCompleted = (completed || 0) + 1;
-  const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
-
-  lines[targetIndex] = `${prefix}${newText}`;
-  await app.vault.modify(file, lines.join('\n'));
-
-  return { updatedText: newText };
+  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'increment' });
+  return res.success && res.updatedText ? { updatedText: res.updatedText } : null;
 }
 
 export async function decrementTaskPomodoroInFile(
   app: App,
-  task: { sourceFile: string; text: string }
+  task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<{ updatedText: string } | null> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return null;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let targetIndex = -1;
-  let currentLine = '';
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
-    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
-      targetIndex = i;
-      currentLine = line;
-      break;
-    }
-  }
-
-  if (targetIndex === -1) return null;
-
-  const match = currentLine.match(/^(\s*-\s+\[.\]\s+)(.*)$/);
-  if (!match) return null;
-
-  const prefix = match[1];
-  const oldText = match[2].trim();
-
-  const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
-  if (!completed || completed <= 0) return null;
-
-  const newCompleted = Math.max(0, completed - 1);
-  const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
-
-  lines[targetIndex] = `${prefix}${newText}`;
-  await app.vault.modify(file, lines.join('\n'));
-
-  return { updatedText: newText };
+  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'decrement' });
+  return res.success && res.updatedText ? { updatedText: res.updatedText } : null;
 }
 
-export async function promoteIdeaToTaskInFile(app: App, task: TaskRecord): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let foundIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
-    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
-      foundIndex = i;
-      break;
-    }
-  }
-
-  if (foundIndex === -1) return false;
-  lines.splice(foundIndex, 1);
-  const withoutIdea = lines.join('\n');
-
-  // Strip icebox/idea markers and keep clean task title with standard priority
-  let cleanTitle = task.text.replace(/#(?:ideas?|icebox)\b/gi, '').replace(/^[💡🧊]\s*/, '').trim();
-  cleanTitle = formatTaskWithPriority(cleanTitle, task.priority !== 'none' ? task.priority : 'none');
-
-  const updatedContent = appendTaskToMarkdownSection(withoutIdea, cleanTitle, '## Tareas');
-  await app.vault.modify(file, updatedContent);
-  return true;
+export async function promoteIdeaToTaskInFile(
+  app: App,
+  task: TaskRecord | TaskLocator,
+  tasksSectionHeader?: string
+): Promise<boolean> {
+  const priority = ('priority' in task && task.priority) ? task.priority : 'none';
+  const res = await mutateTaskLine(app, task as TaskLocator, {
+    action: 'promote',
+    priority,
+    tasksSectionHeader,
+  });
+  return res.success;
 }
 
 export async function toggleTaskCompletionInFile(
   app: App,
-  task: { sourceFile: string; text: string },
-  newCompleted: boolean
+  task: TaskLocator | { sourceFile: string; text: string },
+  newCompleted?: boolean
 ): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-  const targetChar = newCompleted ? 'x' : ' ';
-
-  let found = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s*-\s+\[)(.)(\]\s+)(.*)$/);
-    if (match && match[4].trim() === task.text) {
-      lines[i] = `${match[1]}${targetChar}${match[3]}${match[4]}`;
-      found = true;
-      break;
-    }
-  }
-
-  if (found) {
-    await app.vault.modify(file, lines.join('\n'));
-    return true;
-  }
-  return false;
+  const res = await mutateTaskLine(app, task as TaskLocator, {
+    action: 'toggle',
+    completed: newCompleted,
+  });
+  return res.success;
 }
 
 export async function updateTaskTextInFile(
   app: App,
-  task: { sourceFile: string; text: string },
+  task: TaskLocator | { sourceFile: string; text: string },
   newText: string
 ): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let targetIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
-    if (match && (match[2].trim() === task.text || line.includes(task.text))) {
-      targetIndex = i;
-      lines[i] = `${match[1]}${newText.trim()}`;
-      break;
-    }
-  }
-
-  if (targetIndex === -1) return false;
-  await app.vault.modify(file, lines.join('\n'));
-  return true;
+  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'update', newText });
+  return res.success;
 }
 
 export async function toggleSubtaskInFile(
   app: App,
-  sourceFile: string,
-  subtaskText: string,
-  newCompleted: boolean
+  sourceFileOrLocator: string | TaskLocator,
+  subtaskText?: string,
+  newCompleted?: boolean
 ): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-  const targetChar = newCompleted ? 'x' : ' ';
-
-  let found = false;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const match = line.match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/);
-    if (match && match[4].trim() === subtaskText.trim()) {
-      lines[i] = `${match[1]}${targetChar}${match[3]}${match[4]}`;
-      found = true;
-      break;
-    }
-  }
-
-  if (found) {
-    await app.vault.modify(file, lines.join('\n'));
-    return true;
-  }
-  return false;
+  const locator: TaskLocator = typeof sourceFileOrLocator === 'string'
+    ? { sourceFile: sourceFileOrLocator, text: subtaskText }
+    : sourceFileOrLocator;
+  const res = await mutateTaskLine(app, locator, {
+    action: 'subtask',
+    subtaskAction: 'toggle',
+    subtaskText: locator.text || subtaskText,
+    completed: newCompleted,
+  });
+  return res.success;
 }
 
 export async function addSubtaskToFile(
   app: App,
-  task: { sourceFile: string; text: string },
+  task: TaskLocator | { sourceFile: string; text: string },
   subtaskText: string
 ): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let targetIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^\s*-\s+\[.\]\s+(.*)$/);
-    if (match && match[1].trim() === task.text) {
-      targetIndex = i;
-      break;
-    }
-  }
-
-  if (targetIndex === -1) return false;
-
-  // Insert after any existing subtasks of this task
-  let insertAt = targetIndex + 1;
-  while (insertAt < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[insertAt])) {
-    insertAt++;
-  }
-
-  lines.splice(insertAt, 0, `  - [ ] ${subtaskText.trim()}`);
-  await app.vault.modify(file, lines.join('\n'));
-  return true;
+  const res = await mutateTaskLine(app, task as TaskLocator, {
+    action: 'subtask',
+    subtaskAction: 'add',
+    subtaskText,
+  });
+  return res.success;
 }
 
 export async function deleteTaskFromFile(
   app: App,
-  task: { sourceFile: string; text: string }
+  task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<boolean> {
-  const file = app.vault.getAbstractFileByPath(task.sourceFile);
-  if (!(file instanceof TFile)) return false;
-
-  const content = await app.vault.read(file);
-  const lines = content.split(/\r?\n/);
-
-  let foundIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const match = lines[i].match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
-    if (match && (match[2].trim() === task.text || lines[i].includes(task.text))) {
-      foundIndex = i;
-      break;
-    }
-  }
-
-  if (foundIndex !== -1) {
-    let count = 1;
-    while (foundIndex + count < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[foundIndex + count])) {
-      count++;
-    }
-    lines.splice(foundIndex, count);
-    await app.vault.modify(file, lines.join('\n'));
-    return true;
-  }
-  return false;
+  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'delete' });
+  return res.success;
 }
 
 export class QuickCaptureModal extends Modal {
@@ -312,7 +192,7 @@ export class QuickCaptureModal extends Modal {
     contentEl.addClass('study-flow-modal', 'study-flow-quick-capture');
 
     const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
-    const title = header.createEl('h2', { text: 'Captura Rápida' });
+    const title = header.createEl('h2', { text: t('tasks.quickCaptureTitle') });
     const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
     setIcon(iconSpan, 'zap');
 
@@ -324,11 +204,11 @@ export class QuickCaptureModal extends Modal {
     let deadlineSetting: Setting | null = null;
 
     new Setting(contentEl)
-      .setName('Tipo de entrada')
-      .setDesc('Diferenciá entre trabajo ejecutable e ideas espontáneas')
+      .setName(t('tasks.entryTypeName'))
+      .setDesc(t('tasks.entryTypeDesc'))
       .addDropdown((drop) => {
-        drop.addOption('task', '📋 Tarea accionable');
-        drop.addOption('idea', '💡 Idea espontánea (Backlog)');
+        drop.addOption('task', t('tasks.actionableTask'));
+        drop.addOption('idea', t('tasks.spontaneousIdea'));
         drop.setValue('task');
         drop.onChange((val) => {
           this.itemType = val as 'task' | 'idea';
@@ -345,12 +225,12 @@ export class QuickCaptureModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName('Guardar en')
-      .setDesc('Ubicación donde se registrará la entrada')
+      .setName(t('tasks.saveInName'))
+      .setDesc(t('tasks.saveInDesc'))
       .addDropdown((drop) => {
-        drop.addOption('inbox', `Inbox (${this.plugin.settings.inboxFilePath})`);
+        drop.addOption('inbox', t('tasks.inboxOption', { path: this.plugin.settings.inboxFilePath }));
         if (canUseActiveFile && activeFile) {
-          drop.addOption('activeNote', `Nota activa (${activeFile.basename})`);
+          drop.addOption('activeNote', t('tasks.activeNoteOption', { name: activeFile.basename }));
         }
         drop.setValue('inbox');
         drop.onChange((val) => {
@@ -359,13 +239,13 @@ export class QuickCaptureModal extends Modal {
       });
 
     prioritySetting = new Setting(contentEl)
-      .setName('Prioridad')
-      .setDesc('Nivel de urgencia o impacto')
+      .setName(t('tasks.priorityName'))
+      .setDesc(t('tasks.priorityDesc'))
       .addDropdown((drop) => {
-        drop.addOption('none', 'Normal / Sin prioridad');
-        drop.addOption('high', '⏫ Alta (Urgente / Impacto)');
-        drop.addOption('medium', '🔼 Media');
-        drop.addOption('low', '🔽 Baja');
+        drop.addOption('none', t('priority.none'));
+        drop.addOption('high', t('priority.highUrgent'));
+        drop.addOption('medium', t('priority.medium'));
+        drop.addOption('low', t('priority.low'));
         drop.setValue('none');
         drop.onChange((val) => {
           this.selectedPriority = val as TaskPriority;
@@ -373,16 +253,16 @@ export class QuickCaptureModal extends Modal {
       });
 
     estimateSetting = new Setting(contentEl)
-      .setName('Estimación (Pomodoros)')
-      .setDesc('Bloques de estudio previstos (ej. 🍅 2 = 50m)')
+      .setName(t('tasks.estimateName'))
+      .setDesc(t('tasks.estimateDesc'))
       .addDropdown((drop) => {
-        drop.addOption('0', 'Sin estimar');
-        drop.addOption('1', '🍅 1 pomodoro (~25m)');
-        drop.addOption('2', '🍅 2 pomodoros (~50m)');
-        drop.addOption('3', '🍅 3 pomodoros (~1h 15m)');
-        drop.addOption('4', '🍅 4 pomodoros (~1h 40m)');
-        drop.addOption('5', '🍅 5 pomodoros (~2h 05m)');
-        drop.addOption('6', '🍅 6 pomodoros (~2h 30m)');
+        drop.addOption('0', t('tasks.unestimated'));
+        drop.addOption('1', t('tasks.onePomodoro'));
+        drop.addOption('2', t('tasks.twoPomodoros'));
+        drop.addOption('3', t('tasks.threePomodoros'));
+        drop.addOption('4', t('tasks.fourPomodoros'));
+        drop.addOption('5', t('tasks.fivePomodoros'));
+        drop.addOption('6', t('tasks.sixPomodoros'));
         drop.setValue(String(this.selectedEstimate));
         drop.onChange((val) => {
           this.selectedEstimate = parseInt(val, 10) || 0;
@@ -390,8 +270,8 @@ export class QuickCaptureModal extends Modal {
       });
 
     deadlineSetting = new Setting(contentEl)
-      .setName('Fecha límite (Deadline)')
-      .setDesc('Fecha límite o entrega prevista (opcional)')
+      .setName(t('tasks.deadlineName'))
+      .setDesc(t('tasks.deadlineDesc'))
       .addText((text) => {
         text.inputEl.type = 'date';
         text.onChange((val) => {
@@ -403,7 +283,7 @@ export class QuickCaptureModal extends Modal {
     const inputEl = inputWrap.createEl('input', {
       type: 'text',
       cls: 'study-flow-task-input study-flow-input-lg',
-      placeholder: '¿Qué necesitas registrar? (Presiona Enter para guardar)...',
+      placeholder: t('tasks.quickCapturePlaceholder'),
     });
 
     inputEl.focus();
@@ -418,11 +298,11 @@ export class QuickCaptureModal extends Modal {
 
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
     footer.createEl('span', {
-      text: '↵ Enter para confirmar • Esc para cancelar',
+      text: t('tasks.quickCaptureShortcutHint'),
       cls: 'study-flow-shortcut-hint',
     });
 
-    const cancelBtn = footer.createEl('button', { text: 'Cancelar' });
+    const cancelBtn = footer.createEl('button', { text: t('common.cancel') });
     cancelBtn.addEventListener('click', () => this.close());
 
     const submitBtn = footer.createEl('button', {
@@ -430,7 +310,7 @@ export class QuickCaptureModal extends Modal {
     });
     const subIcon = submitBtn.createSpan();
     setIcon(subIcon, 'plus');
-    submitBtn.createSpan({ text: 'Añadir' });
+    submitBtn.createSpan({ text: t('common.add') });
     submitBtn.addEventListener('click', async () => {
       this.taskText = inputEl.value.trim();
       await this.submitTask();
@@ -444,7 +324,7 @@ export class QuickCaptureModal extends Modal {
 
   private async submitTask(): Promise<void> {
     if (!this.taskText) {
-      new Notice('Ingresa el texto para guardar');
+      new Notice(t('tasks.enterTextToSave'));
       return;
     }
 
@@ -459,19 +339,21 @@ export class QuickCaptureModal extends Modal {
         }
       }
 
+      const tasksH = this.plugin.settings.tasksSectionHeader || '## Tareas';
+      const iceboxH = this.plugin.settings.iceboxSectionHeader || '## Icebox';
+
       if (!targetFile) {
         const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-        targetFile = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
+        targetFile = await getOrCreateFile(this.app, inboxPath, `# Inbox\n\n${tasksH}\n\n${iceboxH}\n\n`);
         targetName = targetFile.basename;
       }
 
-      const content = await this.app.vault.read(targetFile);
-
       if (this.itemType === 'idea') {
         const ideaLine = this.taskText.startsWith('💡') ? this.taskText : `💡 ${this.taskText}`;
-        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
-        await this.app.vault.modify(targetFile, updated);
-        new Notice(`💡 Idea guardada en ${targetName}`);
+        await this.app.vault.process(targetFile, (content) => {
+          return appendTaskToMarkdownSection(content, ideaLine, iceboxH);
+        });
+        new Notice(t('tasks.ideaSavedIn', { target: targetName }));
       } else {
         let finalText = this.selectedPriority !== 'none'
           ? formatTaskWithPriority(this.taskText, this.selectedPriority)
@@ -482,359 +364,21 @@ export class QuickCaptureModal extends Modal {
         if (this.selectedDeadline) {
           finalText = formatTaskWithDeadline(finalText, this.selectedDeadline);
         }
-        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-        await this.app.vault.modify(targetFile, updated);
-        new Notice(`✓ Tarea agregada a ${targetName}`);
+        await this.app.vault.process(targetFile, (content) => {
+          return appendTaskToMarkdownSection(content, finalText, tasksH);
+        });
+        new Notice(t('tasks.taskAddedTo', { target: targetName }));
       }
 
       this.close();
     } catch (err) {
-      new Notice('Error al guardar');
+      new Notice(t('tasks.saveError'));
     }
   }
 }
 
-export class TasksManagerModal extends Modal {
-  private plugin: StudyFlowPlugin;
-  private tasks: TaskRecord[] = [];
-  private filter: 'all' | 'pending' | 'ideas' | 'completed' = 'pending';
-  private searchQuery: string = '';
+/**
+ * Minimal task capture modal (replaces duplicate dashboard modal).
+ */
+export class TasksManagerModal extends QuickCaptureModal {}
 
-  constructor(app: App, plugin: StudyFlowPlugin) {
-    super(app);
-    this.plugin = plugin;
-  }
-
-  async onOpen(): Promise<void> {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass('study-flow-modal', 'study-flow-tasks-modal');
-
-    await this.refreshTasks();
-    this.renderUI();
-  }
-
-  private async refreshTasks(): Promise<void> {
-    this.tasks = [];
-    const filesToRead = [this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md'];
-
-    for (const filePath of filesToRead) {
-      const file = this.app.vault.getAbstractFileByPath(filePath);
-      if (file instanceof TFile) {
-        try {
-          const content = await this.app.vault.read(file);
-          const found = extractAllTasksFromContent(content, file.path);
-          this.tasks.push(...found);
-        } catch (err) {
-          console.error('Error cargando tareas:', filePath, err);
-        }
-      }
-    }
-  }
-
-  private renderUI(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-
-    // Header
-    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
-    const title = header.createEl('h2', { text: 'Gestor de Tareas & Inbox' });
-    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
-    setIcon(iconSpan, 'check-square');
-
-    // Stats bar
-    const pendingCount = this.tasks.filter((t) => !t.completed && !t.isIdea).length;
-    const ideasCount = this.tasks.filter((t) => !t.completed && t.isIdea).length;
-    const completedCount = this.tasks.filter((t) => t.completed).length;
-
-    const statsBar = contentEl.createDiv({ cls: 'study-flow-stats-bar' });
-    statsBar.createSpan({ text: `${pendingCount} pendientes`, cls: 'study-flow-badge-stat is-pending' });
-    statsBar.createSpan({ text: `${ideasCount} ideas`, cls: 'study-flow-badge-stat is-idea' });
-    statsBar.createSpan({ text: `${completedCount} completadas`, cls: 'study-flow-badge-stat is-completed' });
-
-    // Quick Add Bar
-    const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
-    const addInput = addSection.createEl('input', {
-      type: 'text',
-      placeholder: 'Nueva entrada rápida... (Enter para añadir)',
-      cls: 'study-flow-task-input',
-    });
-
-    let addType: 'task' | 'idea' = 'task';
-    const typeSelect = addSection.createEl('select', { cls: 'study-flow-type-select' });
-    typeSelect.createEl('option', { value: 'task', text: '📋 Tarea' });
-    typeSelect.createEl('option', { value: 'idea', text: '💡 Idea' });
-
-    let addPriority: TaskPriority = 'none';
-    const prioritySelect = addSection.createEl('select', { cls: 'study-flow-priority-select' });
-    prioritySelect.createEl('option', { value: 'none', text: 'Normal' });
-    prioritySelect.createEl('option', { value: 'high', text: '⏫ Alta' });
-    prioritySelect.createEl('option', { value: 'medium', text: '🔼 Media' });
-    prioritySelect.createEl('option', { value: 'low', text: '🔽 Baja' });
-    prioritySelect.addEventListener('change', () => {
-      addPriority = prioritySelect.value as TaskPriority;
-    });
-
-    let addEstimate: number = 0;
-    const estimateSelect = addSection.createEl('select', { cls: 'study-flow-estimate-select' });
-    estimateSelect.createEl('option', { value: '0', text: '🍅 -' });
-    estimateSelect.createEl('option', { value: '1', text: '🍅 1 (25m)' });
-    estimateSelect.createEl('option', { value: '2', text: '🍅 2 (50m)' });
-    estimateSelect.createEl('option', { value: '3', text: '🍅 3 (1h15m)' });
-    estimateSelect.createEl('option', { value: '4', text: '🍅 4 (1h40m)' });
-    estimateSelect.createEl('option', { value: '5', text: '🍅 5 (2h05m)' });
-    estimateSelect.createEl('option', { value: '6', text: '🍅 6 (2h30m)' });
-    estimateSelect.addEventListener('change', () => {
-      addEstimate = parseInt(estimateSelect.value, 10) || 0;
-    });
-
-    typeSelect.addEventListener('change', () => {
-      addType = typeSelect.value as 'task' | 'idea';
-      prioritySelect.style.display = addType === 'idea' ? 'none' : '';
-      estimateSelect.style.display = addType === 'idea' ? 'none' : '';
-    });
-
-    const addBtn = addSection.createEl('button', { cls: 'mod-cta' });
-    const addIcon = addBtn.createSpan();
-    setIcon(addIcon, 'plus');
-    addBtn.createSpan({ text: 'Añadir' });
-
-    const handleAdd = async () => {
-      const text = addInput.value.trim();
-      if (!text) return;
-
-      const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-      const file = await getOrCreateFile(this.app, inboxPath, '# Inbox\n\n## Tareas\n\n## Ideas\n\n');
-      const content = await this.app.vault.read(file);
-
-      if (addType === 'idea') {
-        const ideaLine = text.startsWith('💡') ? text : `💡 ${text}`;
-        const updated = appendTaskToMarkdownSection(content, ideaLine, '## Ideas');
-        await this.app.vault.modify(file, updated);
-        new Notice('💡 Idea añadida a tu banco');
-      } else {
-        let finalText = addPriority !== 'none'
-          ? formatTaskWithPriority(text, addPriority)
-          : text;
-        if (addEstimate > 0) {
-          finalText = formatTaskWithPomodoroEstimate(finalText, addEstimate);
-        }
-        const updated = appendTaskToMarkdownSection(content, finalText, '## Tareas');
-        await this.app.vault.modify(file, updated);
-        new Notice('✓ Tarea añadida al Inbox');
-      }
-
-      addInput.value = '';
-      prioritySelect.value = 'none';
-      estimateSelect.value = '0';
-      addPriority = 'none';
-      addEstimate = 0;
-      await this.refreshTasks();
-      this.renderUI();
-    };
-
-    addBtn.addEventListener('click', handleAdd);
-    addInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        handleAdd();
-      }
-    });
-
-    // Filters and Search Bar
-    const filterRow = contentEl.createDiv({ cls: 'study-flow-segmented-control' });
-    const filters: Array<{ id: 'pending' | 'ideas' | 'completed' | 'all'; label: string; count: number }> = [
-      { id: 'pending', label: 'Pendientes', count: pendingCount },
-      { id: 'ideas', label: '💡 Ideas', count: ideasCount },
-      { id: 'completed', label: 'Completadas', count: completedCount },
-      { id: 'all', label: 'Todas', count: this.tasks.length },
-    ];
-
-    filters.forEach((f) => {
-      const btn = filterRow.createEl('button', {
-        cls: `study-flow-segmented-btn ${this.filter === f.id ? 'is-active' : ''}`,
-      });
-      btn.createSpan({ text: f.label });
-      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
-      btn.addEventListener('click', () => {
-        this.filter = f.id;
-        this.renderUI();
-      });
-    });
-
-    // Tasks List Container
-    const listContainer = contentEl.createDiv({ cls: 'study-flow-task-list-cards' });
-    const displayedTasks = this.tasks.filter((t) => {
-      if (this.filter === 'pending') return !t.completed && !t.isIdea;
-      if (this.filter === 'ideas') return !t.completed && t.isIdea;
-      if (this.filter === 'completed') return t.completed;
-      return true;
-    });
-
-    if (displayedTasks.length === 0) {
-      const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
-      const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      setIcon(emptyIcon, this.filter === 'ideas' ? 'sparkles' : 'check-circle-2');
-      emptyState.createEl('h4', {
-        text: this.filter === 'ideas'
-          ? 'No hay ideas espontáneas guardadas'
-          : (this.filter === 'pending' ? '¡Todo al día!' : 'No hay tareas registradas'),
-      });
-      emptyState.createEl('p', {
-        text: this.filter === 'ideas'
-          ? 'Captura tus ideas aquí para no perderlas sin saturar tu lista de tareas activas.'
-          : (this.filter === 'pending' ? 'No tienes tareas pendientes.' : 'Añade una tarea arriba para comenzar.'),
-      });
-    } else {
-      displayedTasks.forEach((task) => {
-        const itemCard = listContainer.createDiv({
-          cls: `study-flow-task-card ${task.completed ? 'is-done' : ''}`,
-        });
-
-        const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
-        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
-        cb.checked = task.completed;
-        cb.addEventListener('change', async () => {
-          await toggleTaskCompletionInFile(this.app, task, cb.checked);
-          task.completed = cb.checked;
-          new Notice(cb.checked ? '✓ Marcado como completado' : 'Desmarcado');
-          await this.refreshTasks();
-          this.renderUI();
-        });
-
-        const textSpan = itemCard.createEl('span', {
-          text: task.text,
-          cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
-        });
-        textSpan.addEventListener('click', () => {
-          cb.checked = !cb.checked;
-          cb.dispatchEvent(new Event('change'));
-        });
-
-        if (task.isIdea) {
-          itemCard.createSpan({ text: '💡 Idea', cls: 'study-flow-priority-badge is-idea' });
-
-          const promoteBtn = itemCard.createEl('button', {
-            cls: 'study-flow-promote-btn',
-            attr: { 'aria-label': 'Promover a tarea accionable' },
-          });
-          const pIcon = promoteBtn.createSpan();
-          setIcon(pIcon, 'arrow-up-right');
-          promoteBtn.createSpan({ text: 'A Tarea' });
-          promoteBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await promoteIdeaToTaskInFile(this.app, task);
-            new Notice(`✓ "${task.text}" promovida a tarea`);
-            await this.refreshTasks();
-            this.renderUI();
-          });
-        } else {
-          if (task.priority === 'high') {
-            itemCard.createSpan({ text: '⏫ Alta', cls: 'study-flow-priority-badge is-high' });
-          } else if (task.priority === 'medium') {
-            itemCard.createSpan({ text: '🔼 Media', cls: 'study-flow-priority-badge is-medium' });
-          } else if (task.priority === 'low') {
-            itemCard.createSpan({ text: '🔽 Baja', cls: 'study-flow-priority-badge is-low' });
-          }
-
-          const estCount = task.estimatedPomodoros || 0;
-          const compCount = task.completedPomodoros || 0;
-          if (estCount > 0 || compCount > 0) {
-            let badgeLabel = '';
-            let badgeCls = 'study-flow-estimate-badge';
-            if (compCount > 0 && estCount > 0) {
-              badgeLabel = `🍅 ${compCount}/${estCount}`;
-              if (compCount >= estCount) badgeCls += ' is-met';
-            } else if (estCount > 0) {
-              badgeLabel = `🍅 ${estCount}`;
-            } else if (compCount > 0) {
-              badgeLabel = `🍅 ${compCount}`;
-            }
-            itemCard.createSpan({ text: badgeLabel, cls: badgeCls });
-          }
-
-          if (task.dueDate) {
-            let dCls = 'study-flow-deadline-badge';
-            let dText = `📅 ${task.dueDate}`;
-            if (task.daysRemaining !== undefined) {
-              if (task.daysRemaining < 0) {
-                dCls += ' is-overdue';
-                dText = `🚨 Vencida (${task.dueDate})`;
-              } else if (task.daysRemaining === 0) {
-                dCls += ' is-today';
-                dText = `⚠️ Vence hoy`;
-              } else if (task.daysRemaining === 1) {
-                dCls += ' is-tomorrow';
-                dText = `📌 Vence mañana`;
-              } else if (task.daysRemaining <= 7) {
-                dCls += ' is-soon';
-                dText = `📅 En ${task.daysRemaining}d (${task.dueDate})`;
-              }
-            }
-            itemCard.createSpan({ text: dText, cls: dCls });
-          }
-
-          if ((task.completedPomodoros || 0) > 0) {
-            const minusPomoBtn = itemCard.createEl('button', {
-              cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn',
-              attr: { 'aria-label': 'Restar pomodoro a esta tarea (−1 🍅)' },
-            });
-            minusPomoBtn.createSpan({ text: '−🍅' });
-            minusPomoBtn.addEventListener('click', async (e) => {
-              e.stopPropagation();
-              const res = await decrementTaskPomodoroInFile(this.app, task);
-              if (res) {
-                new Notice(`🍅 Pomodoro restado para "${task.text}"`);
-                await this.refreshTasks();
-                this.renderUI();
-              }
-            });
-          }
-
-          const addPomoBtn = itemCard.createEl('button', {
-            cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
-            attr: { 'aria-label': 'Registrar pomodoro a esta tarea (+1 🍅)' },
-          });
-          addPomoBtn.createSpan({ text: '+🍅' });
-          addPomoBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const res = await incrementTaskPomodoroInFile(this.app, task);
-            if (res) {
-              new Notice(`🍅 Pomodoro registrado para "${task.text}"`);
-              await this.refreshTasks();
-              this.renderUI();
-            }
-          });
-        }
-
-        const fileBadge = itemCard.createSpan({
-          text: '#Inbox',
-          cls: 'study-flow-source-chip',
-        });
-
-        const delBtn = itemCard.createEl('button', {
-          cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': 'Eliminar entrada' },
-        });
-        setIcon(delBtn, 'trash-2');
-        delBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await deleteTaskFromFile(this.app, task);
-          new Notice('Entrada eliminada');
-          await this.refreshTasks();
-          this.renderUI();
-        });
-      });
-    }
-
-    // Modal Footer
-    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
-    const closeBtn = footer.createEl('button', { text: 'Cerrar' });
-    closeBtn.addEventListener('click', () => this.close());
-  }
-
-  onClose(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-}

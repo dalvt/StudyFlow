@@ -22,6 +22,21 @@ export const MONTH_NAMES_ES = [
   'Diciembre',
 ];
 
+export const MONTH_NAMES_EN = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
 export const DAY_NAMES_ES = [
   'Domingo',
   'Lunes',
@@ -32,7 +47,20 @@ export const DAY_NAMES_ES = [
   'Sábado',
 ];
 
+export const DAY_NAMES_EN = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
 export const SHORT_DAY_NAMES_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+export const SHORT_DAY_NAMES_SUN_FIRST_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+export const SHORT_DAY_NAMES_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+export const SHORT_DAY_NAMES_SUN_FIRST_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
  * Returns YYYY-MM-DD representation of a local Date.
@@ -45,32 +73,39 @@ export function formatDateKey(d: Date): string {
 }
 
 /**
- * Formats "Mes Año" header string in Spanish (e.g. "Octubre 2026").
+ * Formats "Mes Año" / "Month Year" header string (defaults to Spanish).
  */
-export function formatMonthYearHeader(year: number, month: number): string {
-  const mName = MONTH_NAMES_ES[month] || '';
+export function formatMonthYearHeader(year: number, month: number, lang: 'es' | 'en' = 'es'): string {
+  const names = lang === 'en' ? MONTH_NAMES_EN : MONTH_NAMES_ES;
+  const mName = names[month] || '';
   return `${mName} ${year}`;
 }
 
 /**
- * Formats full human date in Spanish (e.g. "Lunes 12 de Octubre, 2026").
+ * Formats full human date (defaults to Spanish, e.g. "Lunes 12 de Octubre, 2026").
  */
-export function formatLongDate(dateStr: string): string {
+export function formatLongDate(dateStr: string, lang: 'es' | 'en' = 'es'): string {
   const parts = dateStr.split('-').map(Number);
   if (parts.length !== 3 || parts.some(isNaN)) return dateStr;
   const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  if (lang === 'en') {
+    const dayName = DAY_NAMES_EN[d.getDay()] || '';
+    const monthName = MONTH_NAMES_EN[d.getMonth()] || '';
+    return `${dayName}, ${monthName} ${d.getDate()}, ${d.getFullYear()}`;
+  }
   const dayName = DAY_NAMES_ES[d.getDay()] || '';
   const monthName = MONTH_NAMES_ES[d.getMonth()] || '';
   return `${dayName} ${d.getDate()} de ${monthName}, ${d.getFullYear()}`;
 }
 
 /**
- * Computes calendar grid cells for a given month and year starting on Monday.
+ * Computes calendar grid cells for a given month and year starting on Monday or Sunday.
  */
 export function getCalendarMonthMatrix(
   year: number,
   month: number,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  weekStartDay: 'monday' | 'sunday' = 'monday'
 ): CalendarDayCell[] {
   const todayStr = formatDateKey(referenceDate);
 
@@ -79,8 +114,10 @@ export function getCalendarMonthMatrix(
   // Total days in target month
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Convert getDay() (0=Sun..6=Sat) to Monday-based index (0=Mon..6=Sun)
-  const startDayOfWeek = (firstDay.getDay() + 6) % 7;
+  // Convert getDay() (0=Sun..6=Sat) to chosen week start
+  const startDayOfWeek = weekStartDay === 'sunday'
+    ? firstDay.getDay()
+    : (firstDay.getDay() + 6) % 7;
 
   const cells: CalendarDayCell[] = [];
 
@@ -133,27 +170,35 @@ export function getCalendarMonthMatrix(
 }
 
 /**
- * Computes the 7 days of the current week containing referenceDate (Monday to Sunday).
+ * Computes the 7 days of the current week containing referenceDate (Monday to Sunday, or Sunday to Saturday).
  */
 export function getWeekDays(
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  weekStartDay: 'monday' | 'sunday' = 'monday',
+  lang: 'es' | 'en' = 'es'
 ): Array<{ dateStr: string; dayNumber: number; shortDay: string; isToday: boolean }> {
   const todayStr = formatDateKey(new Date());
-  const dayOfWeek = (referenceDate.getDay() + 6) % 7; // 0=Mon..6=Sun
+  const dayOfWeek = weekStartDay === 'sunday'
+    ? referenceDate.getDay()
+    : (referenceDate.getDay() + 6) % 7;
 
-  // Start Monday
-  const monday = new Date(referenceDate);
-  monday.setDate(referenceDate.getDate() - dayOfWeek);
+  // Start of week
+  const startDay = new Date(referenceDate);
+  startDay.setDate(referenceDate.getDate() - dayOfWeek);
+
+  const shortNames = weekStartDay === 'sunday'
+    ? (lang === 'en' ? SHORT_DAY_NAMES_SUN_FIRST_EN : SHORT_DAY_NAMES_SUN_FIRST_ES)
+    : (lang === 'en' ? SHORT_DAY_NAMES_EN : SHORT_DAY_NAMES_ES);
 
   const days: Array<{ dateStr: string; dayNumber: number; shortDay: string; isToday: boolean }> = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(startDay);
+    d.setDate(startDay.getDate() + i);
     const dateStr = formatDateKey(d);
     days.push({
       dateStr,
       dayNumber: d.getDate(),
-      shortDay: SHORT_DAY_NAMES_ES[i],
+      shortDay: shortNames[i],
       isToday: dateStr === todayStr,
     });
   }
@@ -172,3 +217,173 @@ export function calculateBlockDurationMinutes(startTime: string, endTime: string
   const endMins = eh * 60 + em;
   return Math.max(0, endMins - startMins);
 }
+
+export interface CalendarTimeBlock {
+  id: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  title: string;
+  linkedNote?: string;
+  completed?: boolean;
+}
+
+/**
+ * Formats a single time block into markdown checklist item.
+ * Format: - [ ] HH:mm—HH:mm Título [[nota]]
+ */
+export function formatTimeBlockLine(block: {
+  startTime: string;
+  endTime: string;
+  title: string;
+  completed?: boolean;
+  linkedNote?: string;
+}): string {
+  const check = block.completed ? 'x' : ' ';
+  const cleanTitle = block.title.trim();
+  const cleanNote = block.linkedNote ? block.linkedNote.replace(/[\[\]]/g, '').trim() : '';
+  const noteSuffix = cleanNote ? ` [[${cleanNote}]]` : '';
+  return `- [${check}] ${block.startTime}—${block.endTime} ${cleanTitle}${noteSuffix}`;
+}
+
+/**
+ * Parses a single line representing a calendar time block.
+ * Recognizes formats:
+ * - [ ] HH:mm—HH:mm Título [[nota]]
+ * - [x] HH:mm—HH:mm Título
+ * Tolerates variations: em-dash, en-dash, hyphen, spaces, pipe separators.
+ */
+export function parseTimeBlockLine(
+  line: string,
+  dateStr: string = '',
+  index: number = 0
+): CalendarTimeBlock | null {
+  const trimmed = line.trim();
+  const match = trimmed.match(
+    /^-\s+\[([ xX])\]\s+(\d{1,2}:\d{2})\s*(?:—|–|-)\s*(\d{1,2}:\d{2})\s*(.*)$/
+  );
+  if (!match) return null;
+
+  const completed = match[1].toLowerCase() === 'x';
+  const startTime = match[2].padStart(5, '0');
+  const endTime = match[3].padStart(5, '0');
+  const rest = match[4].trim();
+
+  let title = rest;
+  let linkedNote: string | undefined = undefined;
+
+  // Check for pipe separator e.g. "Title | [[Note]]" or "Title | Note"
+  const pipeIndex = rest.indexOf('|');
+  if (pipeIndex !== -1) {
+    title = rest.substring(0, pipeIndex).trim();
+    const notePart = rest.substring(pipeIndex + 1).trim();
+    if (notePart) {
+      linkedNote = notePart.replace(/[\[\]]/g, '').trim();
+    }
+  } else {
+    // Check for trailing [[Note]]
+    const linkMatch = rest.match(/^(.*?)\s*\[\[([^\]]+)\]\]\s*$/);
+    if (linkMatch) {
+      title = linkMatch[1].trim();
+      linkedNote = linkMatch[2].trim();
+    }
+  }
+
+  if (!title && linkedNote) {
+    title = linkedNote;
+  }
+
+  const id = `block-${dateStr || 'd'}-${startTime}-${endTime}-${index}`;
+
+  return {
+    id,
+    date: dateStr,
+    startTime,
+    endTime,
+    title,
+    linkedNote: linkedNote || undefined,
+    completed,
+  };
+}
+
+/**
+ * Parses all time blocks located under the "## Bloques de Tiempo" section in markdown.
+ */
+export function parseTimeBlocksFromMarkdown(
+  content: string,
+  dateStr: string = ''
+): CalendarTimeBlock[] {
+  if (!content) return [];
+  const lines = content.split(/\r?\n/);
+  const header = '## Bloques de Tiempo';
+  const headerIndex = lines.findIndex((l) => l.trim().toLowerCase() === header.toLowerCase());
+  if (headerIndex === -1) return [];
+
+  const blocks: CalendarTimeBlock[] = [];
+  let blockIndex = 0;
+
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const line = lines[i];
+    // Stop at the next header
+    if (/^#{1,6}\s+/.test(line)) {
+      break;
+    }
+    const parsed = parseTimeBlockLine(line, dateStr, blockIndex);
+    if (parsed) {
+      blocks.push(parsed);
+      blockIndex++;
+    }
+  }
+
+  return blocks;
+}
+
+/**
+ * Converts "HH:mm" into minutes since 00:00.
+ */
+export function timeStringToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.trim().split(':').map(Number);
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return 0;
+  return parts[0] * 60 + parts[1];
+}
+
+/**
+ * Checks if two time intervals overlap.
+ * Strictly overlapping intervals: max(startA, startB) < min(endA, endB).
+ * Adjacent intervals (e.g. 09:00-10:00 and 10:00-11:00) do NOT overlap.
+ */
+export function doBlocksOverlap(
+  a: { startTime: string; endTime: string },
+  b: { startTime: string; endTime: string }
+): boolean {
+  const startA = timeStringToMinutes(a.startTime);
+  const endA = timeStringToMinutes(a.endTime);
+  const startB = timeStringToMinutes(b.startTime);
+  const endB = timeStringToMinutes(b.endTime);
+
+  if (startA >= endA || startB >= endB) {
+    return false;
+  }
+
+  return Math.max(startA, startB) < Math.min(endA, endB);
+}
+
+/**
+ * Returns any blocks in existingBlocks that overlap with the candidate block.
+ * When editing, excludes candidate from comparison if candidate.id matches.
+ */
+export function findOverlappingBlocks<
+  T extends { startTime: string; endTime: string; id?: string; title?: string }
+>(
+  existingBlocks: T[],
+  candidate: { startTime: string; endTime: string; id?: string }
+): T[] {
+  return existingBlocks.filter((b) => {
+    if (candidate.id && b.id && candidate.id === b.id) {
+      return false;
+    }
+    return doBlocksOverlap(b, candidate);
+  });
+}
+

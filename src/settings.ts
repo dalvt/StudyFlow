@@ -3,45 +3,10 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import type { FocusSessionRecord } from './analytics';
 
-export interface CalendarTimeBlock {
-  id: string;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  title: string;
-  linkedNote?: string;
-  completed?: boolean;
-}
-
-export interface StudyFlowSettings {
-  pomodoroWorkDuration: number;
-  pomodoroBreakDuration: number;
-  dailyNotesFolder: string;
-  dailyNoteDateFormat: string;
-  inboxFilePath: string;
-  habitsFilePath: string;
-  logPomodoroToDailyNote: boolean;
-  enableChimeSound: boolean;
-  chimeVolume: number;
-  autoZenMode: boolean;
-  focusHistory: FocusSessionRecord[];
-  calendarBlocks: Record<string, CalendarTimeBlock[]>;
-}
-
-export const DEFAULT_SETTINGS: StudyFlowSettings = {
-  pomodoroWorkDuration: 25,
-  pomodoroBreakDuration: 5,
-  dailyNotesFolder: 'Daily',
-  dailyNoteDateFormat: 'YYYY-MM-DD',
-  inboxFilePath: 'StudyFlow/Inbox.md',
-  habitsFilePath: 'StudyFlow/Habits.md',
-  logPomodoroToDailyNote: true,
-  enableChimeSound: true,
-  chimeVolume: 0.7,
-  autoZenMode: false,
-  focusHistory: [],
-  calendarBlocks: {},
-};
+import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, validateSettingNumber } from './settings-utils';
+export * from './settings-utils';
+import { t, setLanguage } from './i18n/index.ts';
+import { SubjectEditModal } from './subject-modal.ts';
 
 export class StudyFlowSettingTab extends PluginSettingTab {
   plugin: StudyFlowPlugin;
@@ -55,60 +20,80 @@ export class StudyFlowSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'Study Flow Assistant — Ajustes' });
+    // 1. Pomodoro Section
+    new Setting(containerEl).setName(t('settings.headingPomodoro')).setHeading();
 
-    // Pomodoro section
-    containerEl.createEl('h3', { text: 'Pomodoro' });
+    this.addValidatedNumberSetting(
+      containerEl,
+      t('settings.workDurationName'),
+      t('settings.workDurationDesc'),
+      this.plugin.settings.pomodoroWorkDuration,
+      1,
+      180,
+      async (val) => {
+        this.plugin.settings.pomodoroWorkDuration = val;
+        await this.plugin.saveSettings();
+        this.plugin.pomodoro.onSettingsUpdated();
+      }
+    );
+
+    this.addValidatedNumberSetting(
+      containerEl,
+      t('settings.breakDurationName'),
+      t('settings.breakDurationDesc'),
+      this.plugin.settings.pomodoroBreakDuration,
+      1,
+      60,
+      async (val) => {
+        this.plugin.settings.pomodoroBreakDuration = val;
+        await this.plugin.saveSettings();
+        this.plugin.pomodoro.onSettingsUpdated();
+      }
+    );
+
+    this.addValidatedNumberSetting(
+      containerEl,
+      t('settings.longBreakDurationName'),
+      t('settings.longBreakDurationDesc'),
+      this.plugin.settings.pomodoroLongBreakDuration,
+      1,
+      120,
+      async (val) => {
+        this.plugin.settings.pomodoroLongBreakDuration = val;
+        await this.plugin.saveSettings();
+        this.plugin.pomodoro.onSettingsUpdated();
+      }
+    );
+
+    this.addValidatedNumberSetting(
+      containerEl,
+      t('settings.longBreakIntervalName'),
+      t('settings.longBreakIntervalDesc'),
+      this.plugin.settings.pomodoroLongBreakInterval,
+      1,
+      20,
+      async (val) => {
+        this.plugin.settings.pomodoroLongBreakInterval = val;
+        await this.plugin.saveSettings();
+        this.plugin.pomodoro.onSettingsUpdated();
+      }
+    );
 
     new Setting(containerEl)
-      .setName('Duración de trabajo (minutos)')
-      .setDesc('Minutos asignados para cada sesión de enfoque.')
-      .addText((text) =>
-        text
-          .setPlaceholder('25')
-          .setValue(String(this.plugin.settings.pomodoroWorkDuration))
-          .onChange(async (value) => {
-            const parsed = parseInt(value, 10);
-            if (!isNaN(parsed) && parsed > 0) {
-              this.plugin.settings.pomodoroWorkDuration = parsed;
-              await this.plugin.saveSettings();
-              this.plugin.pomodoro.onSettingsUpdated();
-            }
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Duración de descanso (minutos)')
-      .setDesc('Minutos asignados para el descanso tras completar una sesión.')
-      .addText((text) =>
-        text
-          .setPlaceholder('5')
-          .setValue(String(this.plugin.settings.pomodoroBreakDuration))
-          .onChange(async (value) => {
-            const parsed = parseInt(value, 10);
-            if (!isNaN(parsed) && parsed > 0) {
-              this.plugin.settings.pomodoroBreakDuration = parsed;
-              await this.plugin.saveSettings();
-              this.plugin.pomodoro.onSettingsUpdated();
-            }
-          })
-      );
-
-    new Setting(containerEl)
-      .setName('Registrar Pomodoro automáticamente')
-      .setDesc('Registra "- [x] Pomodoro completado a las HH:mm" en la nota diaria de hoy.')
+      .setName(t('settings.autoStartNextPhaseName'))
+      .setDesc(t('settings.autoStartNextPhaseDesc'))
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.logPomodoroToDailyNote)
+          .setValue(this.plugin.settings.autoStartNextPhase)
           .onChange(async (value) => {
-            this.plugin.settings.logPomodoroToDailyNote = value;
+            this.plugin.settings.autoStartNextPhase = value;
             await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
-      .setName('Notificación sonora (Chime zen)')
-      .setDesc('Reproduce una campana armónica sintetizada con Web Audio API al completar cada sesión.')
+      .setName(t('settings.chimeSoundName'))
+      .setDesc(t('settings.chimeSoundDesc'))
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.enableChimeSound)
@@ -119,8 +104,8 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Volumen del timbre')
-      .setDesc('Ajusta el volumen de la campana acústica.')
+      .setName(t('settings.chimeVolumeName'))
+      .setDesc(t('settings.chimeVolumeDesc'))
       .addSlider((slider) =>
         slider
           .setLimits(0.1, 1.0, 0.05)
@@ -133,7 +118,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       )
       .addButton((btn) =>
         btn
-          .setButtonText('Probar sonido')
+          .setButtonText(t('settings.testSoundBtn'))
           .setIcon('bell')
           .onClick(() => {
             playPomodoroChime('work', this.plugin.settings.chimeVolume);
@@ -141,36 +126,120 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Modo Zen automático al estudiar')
-      .setDesc('Pliega automáticamente las barras laterales de Obsidian y minimiza distracciones cuando se inicia un Pomodoro.')
+      .setName(t('settings.logDailyNoteName'))
+      .setDesc(t('settings.logDailyNoteDesc'))
       .addToggle((toggle) =>
         toggle
-          .setValue(this.plugin.settings.autoZenMode)
+          .setValue(this.plugin.settings.logPomodoroToDailyNote)
           .onChange(async (value) => {
-            this.plugin.settings.autoZenMode = value;
+            this.plugin.settings.logPomodoroToDailyNote = value;
             await this.plugin.saveSettings();
           })
       );
 
-    // Daily Notes, Inbox & Habits section
-    containerEl.createEl('h3', { text: 'Notas Diarias, Inbox y Hábitos' });
+    new Setting(containerEl)
+      .setName(t('settings.systemNotificationsName'))
+      .setDesc(t('settings.systemNotificationsDesc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableSystemNotifications)
+          .onChange(async (value) => {
+            this.plugin.settings.enableSystemNotifications = value;
+            if (value && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // 2. Tareas Section
+    new Setting(containerEl).setName(t('settings.headingTasks')).setHeading();
 
     new Setting(containerEl)
-      .setName('Carpeta de Notas Diarias')
-      .setDesc('Ruta relativa donde se almacenan las notas diarias (ej. Daily).')
+      .setName(t('settings.tasksHeaderName'))
+      .setDesc(t('settings.tasksHeaderDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('## Tareas')
+          .setValue(this.plugin.settings.tasksSectionHeader)
+          .onChange(async (value) => {
+            this.plugin.settings.tasksSectionHeader = value.trim() || '## Tareas';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.iceboxHeaderName'))
+      .setDesc(t('settings.iceboxHeaderDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('## Icebox')
+          .setValue(this.plugin.settings.iceboxSectionHeader)
+          .onChange(async (value) => {
+            this.plugin.settings.iceboxSectionHeader = value.trim() || '## Icebox';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.includedFoldersName'))
+      .setDesc(t('settings.includedFoldersDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder(t('settings.includedFoldersPlaceholder'))
+          .setValue((this.plugin.settings.taskIncludedFolders || []).join(', '))
+          .onChange(async (value) => {
+            const folders = value
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+            this.plugin.settings.taskIncludedFolders = folders;
+            await this.plugin.saveSettings();
+            if (this.plugin.taskIndex) {
+              await this.plugin.taskIndex.reindexAll();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.excludedFoldersName'))
+      .setDesc(t('settings.excludedFoldersDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('Templates, templates')
+          .setValue((this.plugin.settings.taskExcludedFolders || []).join(', '))
+          .onChange(async (value) => {
+            const folders = value
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+            this.plugin.settings.taskExcludedFolders = folders;
+            await this.plugin.saveSettings();
+            if (this.plugin.taskIndex) {
+              await this.plugin.taskIndex.reindexAll();
+            }
+          })
+      );
+
+    // 3. Notas Section
+    new Setting(containerEl).setName(t('settings.headingNotes')).setHeading();
+
+    new Setting(containerEl)
+      .setName(t('settings.dailyNotesFolderName'))
+      .setDesc(t('settings.dailyNotesFolderDesc'))
       .addText((text) =>
         text
           .setPlaceholder('Daily')
           .setValue(this.plugin.settings.dailyNotesFolder)
           .onChange(async (value) => {
-            this.plugin.settings.dailyNotesFolder = value.trim();
+            this.plugin.settings.dailyNotesFolder = value.trim() || 'Daily';
             await this.plugin.saveSettings();
           })
       );
 
     new Setting(containerEl)
-      .setName('Formato de fecha de la Nota Diaria')
-      .setDesc('Formato de fecha compatible con Moment.js (por defecto: YYYY-MM-DD).')
+      .setName(t('settings.dailyNoteFormatName'))
+      .setDesc(t('settings.dailyNoteFormatDesc'))
       .addText((text) =>
         text
           .setPlaceholder('YYYY-MM-DD')
@@ -182,8 +251,8 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Ruta de archivo Inbox')
-      .setDesc('Ruta del archivo Markdown para capturas rápidas e ideas (por defecto: StudyFlow/Inbox.md).')
+      .setName(t('settings.inboxFilePathName'))
+      .setDesc(t('settings.inboxFilePathDesc'))
       .addText((text) =>
         text
           .setPlaceholder('StudyFlow/Inbox.md')
@@ -194,9 +263,12 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           })
       );
 
+    // 4. Hábitos Section
+    new Setting(containerEl).setName(t('settings.headingHabits')).setHeading();
+
     new Setting(containerEl)
-      .setName('Ruta de archivo de Hábitos')
-      .setDesc('Ruta del archivo Markdown donde se registran los hábitos y rachas (por defecto: StudyFlow/Habits.md).')
+      .setName(t('settings.habitsFilePathName'))
+      .setDesc(t('settings.habitsFilePathDesc'))
       .addText((text) =>
         text
           .setPlaceholder('StudyFlow/Habits.md')
@@ -207,22 +279,231 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           })
       );
 
-    // Analytics section
-    containerEl.createEl('h3', { text: 'Métricas & Estadísticas' });
+    // 5. Apariencia Section
+    new Setting(containerEl).setName(t('settings.headingAppearance')).setHeading();
 
     new Setting(containerEl)
-      .setName('Sincronizar historial con Notas Diarias')
-      .setDesc('Escanea tus notas diarias en busca de sesiones de pomodoro registradas previamente.')
+      .setName(t('settings.weekStartName'))
+      .setDesc(t('settings.weekStartDesc'))
+      .addDropdown((drop) =>
+        drop
+          .addOption('monday', t('settings.weekStartMonday'))
+          .addOption('sunday', t('settings.weekStartSunday'))
+          .setValue(this.plugin.settings.weekStartDay || 'monday')
+          .onChange(async (value) => {
+            this.plugin.settings.weekStartDay = value as 'monday' | 'sunday';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.autoZenName'))
+      .setDesc(t('settings.autoZenDesc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.autoZenMode)
+          .onChange(async (value) => {
+            this.plugin.settings.autoZenMode = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // 6. Materias (Cursos) Section
+    new Setting(containerEl).setName(t('subjects.headingSettings')).setHeading();
+    new Setting(containerEl)
+      .setDesc(t('subjects.descSettings'))
+      .addButton((btn) => {
+        btn
+          .setButtonText(t('subjects.addSubjectBtn'))
+          .setCta()
+          .onClick(() => {
+            new SubjectEditModal(this.app, this.plugin, null, async (saved) => {
+              if (!this.plugin.settings.subjects) {
+                this.plugin.settings.subjects = [];
+              }
+              this.plugin.settings.subjects.push(saved);
+              await this.plugin.saveSettings();
+              new Notice(t('subjects.savedNotice', { name: saved.name }));
+              this.display();
+            }).open();
+          });
+      });
+
+    const subjectsList = containerEl.createDiv({ cls: 'study-flow-subjects-settings-list' });
+    const subjects = this.plugin.settings.subjects || [];
+
+    if (subjects.length === 0) {
+      subjectsList.createEl('p', {
+        text: t('subjects.noSubjectsConfigured'),
+        cls: 'study-flow-text-muted',
+      });
+    } else {
+      subjects.forEach((sub, index) => {
+        const itemSetting = new Setting(subjectsList)
+          .setName(sub.name)
+          .setDesc(`${sub.tag} • ${t('subjects.weeklyGoalUnit', { hours: String(sub.weeklyGoalHours) })}`);
+
+        const dot = itemSetting.nameEl.createSpan({ cls: 'study-flow-subject-color-dot' });
+        dot.style.backgroundColor = sub.color || '#4f46e5';
+        itemSetting.nameEl.prepend(dot);
+
+        itemSetting.addExtraButton((btn) => {
+          btn
+            .setIcon('pencil')
+            .setTooltip(t('common.edit'))
+            .onClick(() => {
+              new SubjectEditModal(this.app, this.plugin, sub, async (updated) => {
+                this.plugin.settings.subjects[index] = updated;
+                await this.plugin.saveSettings();
+                new Notice(t('subjects.savedNotice', { name: updated.name }));
+                this.display();
+              }).open();
+            });
+        });
+
+        itemSetting.addExtraButton((btn) => {
+          btn
+            .setIcon('trash')
+            .setTooltip(t('common.delete'))
+            .onClick(async () => {
+              this.plugin.settings.subjects.splice(index, 1);
+              await this.plugin.saveSettings();
+              new Notice(t('subjects.deletedNotice'));
+              this.display();
+            });
+        });
+      });
+    }
+
+    // 7. Avanzado Section
+    new Setting(containerEl).setName(t('settings.headingAdvanced')).setHeading();
+
+    new Setting(containerEl)
+      .setName(t('settings.languageName'))
+      .setDesc(t('settings.languageDesc'))
+      .addDropdown((drop) =>
+        drop
+          .addOption('auto', t('settings.langAuto'))
+          .addOption('es', t('settings.langEs'))
+          .addOption('en', t('settings.langEn'))
+          .setValue(this.plugin.settings.language || 'auto')
+          .onChange(async (value) => {
+            this.plugin.settings.language = value as 'es' | 'en' | 'auto';
+            setLanguage(this.plugin.settings.language);
+            await this.plugin.saveSettings();
+            this.display();
+          })
+      );
+
+    // Weekly Review Section
+    new Setting(containerEl).setName(t('settings.weeklyReviewHeading')).setHeading();
+
+    new Setting(containerEl)
+      .setName(t('settings.weeklyReviewFolderLabel'))
+      .setDesc(t('settings.weeklyReviewFolderDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('StudyFlow/Reviews')
+          .setValue(this.plugin.settings.weeklyReviewsFolder || 'StudyFlow/Reviews')
+          .onChange(async (val) => {
+            this.plugin.settings.weeklyReviewsFolder = val.trim() || 'StudyFlow/Reviews';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    const templateSetting = new Setting(containerEl)
+      .setName(t('settings.weeklyReviewTemplateLabel'))
+      .setDesc(t('settings.weeklyReviewTemplateDesc'));
+
+    templateSetting.addTextArea((ta) => {
+      ta.inputEl.rows = 8;
+      ta.inputEl.cols = 40;
+      ta.setValue(this.plugin.settings.weeklyReviewTemplate || DEFAULT_WEEKLY_REVIEW_TEMPLATE)
+        .onChange(async (val) => {
+          this.plugin.settings.weeklyReviewTemplate = val;
+          await this.plugin.saveSettings();
+        });
+    });
+
+    templateSetting.addButton((btn) =>
+      btn
+        .setButtonText(t('settings.resetTemplateBtn'))
+        .setTooltip(t('settings.resetTemplateTooltip'))
+        .onClick(async () => {
+          this.plugin.settings.weeklyReviewTemplate = DEFAULT_WEEKLY_REVIEW_TEMPLATE;
+          await this.plugin.saveSettings();
+          this.display();
+          new Notice(t('settings.templateResetNotice'));
+        })
+    );
+
+    new Setting(containerEl)
+      .setName(t('settings.syncHistoryName'))
+      .setDesc(t('settings.syncHistoryDesc'))
       .addButton((btn) =>
         btn
-          .setButtonText('Sincronizar ahora')
+          .setButtonText(t('settings.syncNowBtn'))
           .onClick(async () => {
-            const { syncHistoricalSessionsFromVault } = await import('./analytics');
-            const count = await syncHistoricalSessionsFromVault(this.app, this.plugin.settings);
+            const { syncHistoricalSessionsFromVault } = await import('./storage-migration');
+            const count = await syncHistoricalSessionsFromVault(this.app, this.plugin.settings, this.plugin);
+            new Notice(t('settings.syncHistoryNotice', { count }));
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.resetDefaultsName'))
+      .setDesc(t('settings.resetDefaultsDesc'))
+      .addButton((btn) =>
+        btn
+          .setWarning()
+          .setButtonText(t('settings.resetValuesBtn'))
+          .onClick(async () => {
+            this.plugin.settings = Object.assign({}, DEFAULT_SETTINGS);
+            setLanguage(this.plugin.settings.language);
             await this.plugin.saveSettings();
-            new Notice(`Se sincronizaron ${count} sesiones históricas desde tus notas.`);
+            this.plugin.pomodoro.onSettingsUpdated();
+            new Notice(t('settings.resetDefaultsNotice'));
+            this.display();
           })
       );
   }
-}
 
+  private addValidatedNumberSetting(
+    containerEl: HTMLElement,
+    name: string,
+    desc: string,
+    currentVal: number,
+    minVal: number,
+    maxVal: number,
+    onSave: (val: number) => Promise<void>
+  ): Setting {
+    const setting = new Setting(containerEl)
+      .setName(name)
+      .setDesc(desc);
+
+    const errorEl = setting.descEl.createDiv({ cls: 'study-flow-setting-error' });
+    errorEl.style.display = 'none';
+
+    setting.addText((text) => {
+      text
+        .setValue(String(currentVal))
+        .onChange(async (raw) => {
+          const res = validateSettingNumber(raw, minVal, maxVal, name);
+          if (!res.valid) {
+            errorEl.setText(res.error || t('settings.validationInvalid'));
+            errorEl.style.display = 'block';
+            text.inputEl.addClass('study-flow-input-invalid');
+            return;
+          }
+
+          errorEl.style.display = 'none';
+          text.inputEl.removeClass('study-flow-input-invalid');
+          if (res.value !== undefined) {
+            await onSave(res.value);
+          }
+        });
+    });
+
+    return setting;
+  }
+}
