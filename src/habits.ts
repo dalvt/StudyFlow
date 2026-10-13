@@ -1,28 +1,42 @@
 import { App, Modal, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { getOrCreateFile, getLocalDateString } from './utils';
-import { formatHabitsToMarkdown, createHabitId, syncHabitsToMarkdown } from './markdown-utils';
+import {
+  calculateHabitStreak,
+  computeHabitWeeklyProgress,
+  createHabitId,
+  formatHabitsToMarkdown,
+  type HabitFrequency,
+  type HabitFrequencyType,
+  type HabitItemData,
+  type HabitWeeklyProgress,
+  parseHabitLine,
+  syncHabitsToMarkdown,
+} from './markdown-utils';
 import { t } from './i18n/index.ts';
 
-export { createHabitId, syncHabitsToMarkdown };
+export {
+  calculateHabitStreak,
+  computeHabitWeeklyProgress,
+  createHabitId,
+  syncHabitsToMarkdown,
+};
+export type { HabitFrequency, HabitFrequencyType, HabitWeeklyProgress };
 
-export interface HabitItem {
+export interface HabitItem extends HabitItemData {
   id: string;
   name: string;
   completedToday: boolean;
   streak: number;
   lastCompletedDate: string;
   history: string[];
+  frequency?: HabitFrequency;
+  restDays?: string[];
+  isRestDayToday?: boolean;
 }
 
 function getTodayString(): string {
   return getLocalDateString();
-}
-
-function getYesterdayString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return getLocalDateString(d);
 }
 
 /**
@@ -44,29 +58,10 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
   const today = getTodayString();
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Matches: - [ ] Name <!-- streak: N | last: YYYY-MM-DD | history: YYYY-MM-DD,... -->
-    const match = line.match(/^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>|]*?)(?:\s*\|\s*history:\s*([^>]*?))?\s*-->)?$/);
-    if (match) {
-      const statusChar = match[1];
-      const name = match[2].trim();
-      const streak = parseInt(match[3] || '0', 10) || 0;
-      const lastCompletedDate = (match[4] || '').trim();
-      const historyRaw = (match[5] || '').trim();
-      const history = historyRaw
-        ? historyRaw.split(',').map((s) => s.trim()).filter(Boolean)
-        : (lastCompletedDate ? [lastCompletedDate] : []);
-
-      const completedToday = statusChar.toLowerCase() === 'x' && lastCompletedDate === today;
-
-      habits.push({
-        id: createHabitId(name),
-        name,
-        completedToday,
-        streak,
-        lastCompletedDate,
-        history,
-      });
+    const parsed = parseHabitLine(lines[i], today);
+    if (parsed) {
+      parsed.streak = calculateHabitStreak(parsed);
+      habits.push(parsed as HabitItem);
     }
   }
 
@@ -98,31 +93,59 @@ export async function toggleHabitStatus(
   if (!target) return habits;
 
   const today = getTodayString();
-  const yesterday = getYesterdayString();
   if (!target.history) target.history = [];
+  if (!target.restDays) target.restDays = [];
 
   if (newCompleted) {
     target.completedToday = true;
-    if (target.lastCompletedDate === yesterday) {
-      target.streak += 1;
-    } else if (target.lastCompletedDate === today) {
-      // Already today, keep
-    } else {
-      // Broken streak or first time
-      target.streak = 1;
-    }
     target.lastCompletedDate = today;
     if (!target.history.includes(today)) {
       target.history.push(today);
     }
+    target.restDays = target.restDays.filter((d) => d !== today);
+    target.isRestDayToday = false;
   } else {
     target.completedToday = false;
-    if (target.lastCompletedDate === today) {
-      target.streak = Math.max(0, target.streak - 1);
-      target.lastCompletedDate = '';
-    }
     target.history = target.history.filter((d) => d !== today);
+    const sorted = [...target.history].sort();
+    target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
   }
+
+  target.streak = calculateHabitStreak(target);
+
+  await saveHabitsToFile(app, filePath, habits);
+  return habits;
+}
+
+/**
+ * Toggles a habit's rest day status for today without breaking streak.
+ */
+export async function toggleHabitRestDay(
+  app: App,
+  filePath: string,
+  habitId: string
+): Promise<HabitItem[]> {
+  const habits = await loadHabitsFromFile(app, filePath);
+  const target = habits.find((h) => h.id === habitId);
+  if (!target) return habits;
+
+  const today = getTodayString();
+  if (!target.restDays) target.restDays = [];
+  if (!target.history) target.history = [];
+
+  if (target.restDays.includes(today)) {
+    target.restDays = target.restDays.filter((d) => d !== today);
+    target.isRestDayToday = false;
+  } else {
+    target.restDays.push(today);
+    target.isRestDayToday = true;
+    target.completedToday = false;
+    target.history = target.history.filter((d) => d !== today);
+    const sorted = [...target.history].sort();
+    target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
+  }
+
+  target.streak = calculateHabitStreak(target);
 
   await saveHabitsToFile(app, filePath, habits);
   return habits;
@@ -131,7 +154,12 @@ export async function toggleHabitStatus(
 /**
  * Adds a new habit to the list.
  */
-export async function addHabitToFile(app: App, filePath: string, name: string): Promise<HabitItem[]> {
+export async function addHabitToFile(
+  app: App,
+  filePath: string,
+  name: string,
+  frequency: HabitFrequency = { type: 'daily' }
+): Promise<HabitItem[]> {
   const habits = await loadHabitsFromFile(app, filePath);
   habits.push({
     id: createHabitId(name),
@@ -140,6 +168,9 @@ export async function addHabitToFile(app: App, filePath: string, name: string): 
     streak: 0,
     lastCompletedDate: '',
     history: [],
+    frequency,
+    restDays: [],
+    isRestDayToday: false,
   });
 
   await saveHabitsToFile(app, filePath, habits);
@@ -284,13 +315,39 @@ export class HabitsModal extends Modal {
     });
 
     // Add new habit bar
-    const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar' });
+    const addSection = contentEl.createDiv({ cls: 'study-flow-search-bar study-flow-habit-add-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
       placeholder: t('habits.modalNewPlaceholder'),
       cls: 'study-flow-task-input',
       attr: { 'aria-label': t('habits.newHabitLabel') },
     });
+
+    const freqSelect = addSection.createEl('select', {
+      cls: 'study-flow-tasks-sort-select study-flow-habit-freq-select',
+      attr: { 'aria-label': t('habits.frequencyLabel') },
+    });
+    freqSelect.createEl('option', { value: 'daily', text: t('habits.freqDailyOption') });
+    freqSelect.createEl('option', { value: 'weekly', text: t('habits.freqWeeklyOption') });
+    freqSelect.createEl('option', { value: 'specific_days', text: t('habits.freqWeekdaysOption') });
+
+    const targetInput = addSection.createEl('input', {
+      type: 'number',
+      cls: 'study-flow-task-input study-flow-habit-target-input',
+      attr: {
+        min: '1',
+        max: '7',
+        placeholder: '3',
+        style: 'display: none; width: 60px;',
+        'aria-label': t('habits.timesPerWeekPlaceholder'),
+      },
+      value: '3',
+    });
+
+    freqSelect.addEventListener('change', () => {
+      targetInput.style.display = freqSelect.value === 'weekly' ? 'inline-block' : 'none';
+    });
+
     const addBtn = addSection.createEl('button', {
       cls: 'mod-cta',
       attr: { 'aria-label': t('habits.addHabitTooltip') },
@@ -303,7 +360,15 @@ export class HabitsModal extends Modal {
       const val = addInput.value.trim();
       if (!val) return;
       const path = this.plugin.settings.habitsFilePath || 'Habits.md';
-      this.habits = await addHabitToFile(this.app, path, val);
+      let freq: HabitFrequency = { type: 'daily' };
+      if (freqSelect.value === 'weekly') {
+        const tgt = parseInt(targetInput.value, 10) || 3;
+        freq = { type: 'weekly', weeklyTarget: Math.max(1, Math.min(7, tgt)) };
+      } else if (freqSelect.value === 'specific_days') {
+        freq = { type: 'specific_days', daysOfWeek: [1, 2, 3, 4, 5] };
+      }
+
+      this.habits = await addHabitToFile(this.app, path, val, freq);
       addInput.value = '';
       new Notice(t('habits.habitAddedNotice', { name: val }));
       this.renderUI();
@@ -329,7 +394,7 @@ export class HabitsModal extends Modal {
     } else {
       this.habits.forEach((habit) => {
         const card = listContainer.createDiv({
-          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''}`,
+          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''} ${habit.isRestDayToday ? 'is-rest-day' : ''}`,
         });
 
         const cbWrapper = card.createDiv({ cls: 'study-flow-cb-wrapper' });
@@ -347,7 +412,10 @@ export class HabitsModal extends Modal {
           this.renderUI();
         });
 
-        const textSpan = card.createEl('span', {
+        const infoWrap = card.createDiv({ cls: 'study-flow-habit-info' });
+
+        const titleRow = infoWrap.createDiv({ cls: 'study-flow-habit-title-row' });
+        const textSpan = titleRow.createEl('span', {
           text: habit.name,
           cls: `study-flow-task-text ${habit.completedToday ? 'is-strikethrough' : ''}`,
         });
@@ -356,11 +424,60 @@ export class HabitsModal extends Modal {
           cb.dispatchEvent(new Event('change'));
         });
 
+        // Frequency pill badge
+        const freq = habit.frequency || { type: 'daily' };
+        const freqBadge = titleRow.createSpan({ cls: 'study-flow-habit-freq-badge' });
+        if (freq.type === 'weekly') {
+          freqBadge.setText(t('habits.frequencyWeekly', { target: String(freq.weeklyTarget || 3) }));
+        } else if (freq.type === 'specific_days') {
+          freqBadge.setText(t('habits.freqWeekdaysOption'));
+        } else {
+          freqBadge.setText(t('habits.frequencyDaily'));
+        }
+
+        // Weekly progress
+        const prog = computeHabitWeeklyProgress(habit);
+        const progRow = infoWrap.createDiv({ cls: 'study-flow-habit-progress-row' });
+        progRow.createSpan({
+          text: t('habits.weeklyProgress', {
+            completed: String(prog.completedCount),
+            target: String(prog.target),
+          }),
+          cls: 'study-flow-habit-progress-text',
+        });
+        const bar = progRow.createDiv({ cls: 'study-flow-habit-progress-bar' });
+        const fill = bar.createDiv({
+          cls: `study-flow-habit-progress-fill ${prog.isMet ? 'is-met' : ''}`,
+        });
+        fill.style.width = `${prog.percentage}%`;
+
+        // Rest day button
+        const restBtn = card.createEl('button', {
+          cls: `study-flow-icon-action-btn-styled study-flow-habit-rest-btn ${habit.isRestDayToday ? 'is-active' : ''}`,
+          text: habit.isRestDayToday ? t('habits.restDayBadge') : t('habits.restDayBtn'),
+          attr: { 'aria-label': t('habits.restDayBtn') },
+        });
+        restBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const path = this.plugin.settings.habitsFilePath || 'Habits.md';
+          this.habits = await toggleHabitRestDay(this.app, path, habit.id);
+          const updated = this.habits.find((h) => h.id === habit.id);
+          if (updated?.isRestDayToday) {
+            new Notice(t('habits.restDayMarkedNotice', { name: habit.name }));
+          } else {
+            new Notice(t('habits.restDayUnmarkedNotice', { name: habit.name }));
+          }
+          this.renderUI();
+        });
+
         // Streak Flame Badge
         const streakBadge = card.createDiv({ cls: 'study-flow-streak-badge' });
         const fIcon = streakBadge.createSpan({ cls: 'study-flow-flame-icon' });
         setIcon(fIcon, 'flame');
-        streakBadge.createSpan({ text: t('habits.daysStreak', { count: habit.streak }) });
+        const streakText = freq.type === 'weekly'
+          ? t('habits.weeksStreak', { count: String(habit.streak) })
+          : t('habits.daysStreak', { count: String(habit.streak) });
+        streakBadge.createSpan({ text: streakText });
 
         // Delete button
         const delBtn = card.createEl('button', {

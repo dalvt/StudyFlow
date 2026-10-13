@@ -13,6 +13,8 @@ import { TaskIndex } from './task-index';
 import { runStartupMigration, loadFocusSessionsFromFile } from './storage-migration';
 import type { FocusSessionRecord } from './analytics';
 import { t, setLanguage, setObsidianLanguageResolver } from './i18n/index.ts';
+import { exportStudyFlowIcsFile } from './ics-export';
+import { handleStudyFlowProtocol } from './protocol-handler';
 
 export default class StudyFlowPlugin extends Plugin {
   settings: StudyFlowSettings = DEFAULT_SETTINGS;
@@ -208,6 +210,25 @@ export default class StudyFlowPlugin extends Plugin {
         })();
         return true;
       },
+    });
+
+    this.addCommand({
+      id: 'export-calendar-ics',
+      name: t('commands.exportCalendarIcs'),
+      callback: async () => {
+        try {
+          const outPath = await exportStudyFlowIcsFile(this.app, this);
+          new Notice(t('ics.exportedNotice', { path: outPath }));
+        } catch (err) {
+          console.error('Study Flow: Error exportando calendario a .ics', err);
+          new Notice(t('ics.exportErrorNotice'));
+        }
+      },
+    });
+
+    // Register Obsidian Protocol Handler: obsidian://study-flow?action=...
+    this.registerObsidianProtocolHandler('study-flow', async (params) => {
+      await handleStudyFlowProtocol(this, params as Record<string, string>);
     });
 
     // Add Settings Tab

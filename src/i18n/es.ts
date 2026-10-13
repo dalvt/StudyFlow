@@ -537,4 +537,32 @@ export const es: TranslationDict = {
   'spaced.reviewedHardNotice': 'Repasado (Difícil): {title} reprogramado para mañana (1d)',
   'spaced.reviewedEasyNotice': 'Repasado (Fácil): {title} reprogramado para {next}',
   'spaced.initializedNotice': 'Repaso espaciado configurado en {title}',
+
+  // ICS Export
+  'commands.exportCalendarIcs': 'Exportar bloques y deadlines a .ics',
+  'ics.exportedNotice': '✓ Calendario exportado a: {path}',
+  'ics.exportErrorNotice': 'Error al exportar el archivo .ics',
+
+  // Protocol Handler
+  'protocol.timerStartedNotice': '🍅 Pomodoro iniciado',
+  'protocol.timerPausedNotice': '⏸️ Pomodoro pausado',
+  'protocol.timerAlreadyRunning': 'El temporizador Pomodoro ya está en ejecución',
+  'protocol.timerNotRunning': 'El temporizador Pomodoro no está en ejecución',
+  'protocol.taskCapturedNotice': '✓ Tarea capturada en Inbox: {text}',
+  'protocol.unknownActionNotice': 'Acción no reconocida en el protocolo study-flow',
+
+  // Habits frequency and rest days
+  'habits.frequencyLabel': 'Frecuencia',
+  'habits.frequencyDaily': 'Diario',
+  'habits.frequencyWeekly': '{target}x / sem',
+  'habits.freqDailyOption': 'Diario (7 días)',
+  'habits.freqWeeklyOption': 'Semanal (veces/semana)',
+  'habits.freqWeekdaysOption': 'Días de semana (Lun-Vie)',
+  'habits.timesPerWeekPlaceholder': 'Meta semanal',
+  'habits.weeklyProgress': '{completed}/{target} esta semana',
+  'habits.restDayBtn': 'Descanso',
+  'habits.restDayBadge': '💤 Descanso hoy',
+  'habits.restDayMarkedNotice': 'Día de descanso marcado para "{name}". Tu racha se mantiene intacta.',
+  'habits.restDayUnmarkedNotice': 'Día de descanso desmarcado para "{name}".',
+  'habits.weeksStreak': '{count} sem',
 };

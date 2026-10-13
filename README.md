@@ -22,28 +22,38 @@ Asistente integral de estudio y productividad académica para Obsidian. Combina 
 - **Captura rápida:** Modal veloz (`plus-circle` en ribbon) para registrar tareas o ideas directamente en `Inbox.md` o en la nota activa.
 
 ### 🔥 3. Hábitos y Rutinas
-- **Almacenamiento limpio:** Archivo centralizado `StudyFlow/Habits.md` en formato Markdown estándar.
-- **Rachas y Consistencia:** Cálculo automático de rachas actuales y frecuencias (diario, días por semana).
-- **Mapa de calor semanal (Heatmap):** Visualización interactiva de consistencia de los últimos 35 días (5 semanas).
-- **Tasa de cumplimiento:** Monitoreo porcentual semanal del cumplimiento de tus hábitos.
+- **Frecuencias flexibles:** Soporte para hábitos diarios (`diaria`), N veces por semana (`weekly`, ej. 3x/sem) o días específicos (`specific_days`, ej. Lun-Vie).
+- **Día de descanso:** Posibilidad de marcar días de descanso (`💤`) para pausar un hábito sin penalizar ni romper la racha.
+- **Rachas recalculadas:** Algoritmo dinámico que evalúa la racha continua según la frecuencia configurada (días para hábitos diarios o específicos, semanas para hábitos semanales).
+- **Progreso semanal visual:** Barra y contador de cumplimiento semanal directo en la tarjeta del hábito (ej. `3/4 esta semana`).
+- **Almacenamiento limpio:** Archivo centralizado `StudyFlow/Habits.md` en formato Markdown estándar con metadatos no intrusivos en comentarios HTML (migración automática y reversible).
+- **Mapa de calor (Heatmap):** Visualización interactiva de consistencia de los últimos 35 días (5 semanas).
 
-### 📅 4. Calendario & Time Blocking
+### 📅 4. Calendario, Bloques de Tiempo & Exportación ICS
 - **Vistas Mensual y Semanal:** Cuadrícula con inicio de semana configurable (Lunes o Domingo).
 - **Bloques de tiempo en la Nota Diaria:** Almacenamiento transparente bajo `## Bloques de Tiempo` en formato `- [ ] HH:mm—HH:mm Título [[nota]]`.
 - **Detección de solapamientos:** Advertencia visible automática cuando dos bloques de tiempo compiten por el mismo horario.
 - **Hub de Entregas (Deadlines):** Panel unificado con tareas ordenadas por vencimiento, destacando entregas vencidas (🚨) y próximas (⚠️).
+- **Exportación iCalendar (.ics):** Comando `Study Flow: Exportar bloques y deadlines a .ics` que escribe `StudyFlow/study-flow.ics` con eventos RFC 5545 y **UIDs estables** para sincronización sin duplicados en Google Calendar, Apple Calendar o Thunderbird.
 
-### 📊 5. Métricas y Rendimiento de Estudio
-- **Historial ilimitado en JSONL:** Sesiones de estudio registradas de forma atómica en `StudyFlow/Sessions.jsonl`.
-- **KPIs en tiempo real:** Minutos totales de enfoque hoy, promedio diario, sesiones completadas y tasa de hábitos.
-- **Tendencia semanal:** Gráfico de barras de minutos de estudio durante los últimos 7 días.
-- **Distribución por Materia / Etiquetas:** Análisis porcentual del tiempo invertido según etiquetas (`#materia`).
-- **Sincronización histórica:** Herramienta para importar sesiones previas registradas en tus notas diarias.
+---
 
-### 🧘 6. Modo Zen
-- **Enfoque sin distracciones:** Pliega automáticamente las barras laterales izquierda y derecha de Obsidian.
-- **Auto-Zen:** Opción para activar el modo Zen de manera automática al iniciar cualquier sesión de Pomodoro.
-- **Atajo rápido:** Comando dedicado para alternar el modo Zen en cualquier momento.
+## 🔗 Protocol Handler (`obsidian://study-flow`)
+
+Study Flow registra el manejador de protocolo `study-flow` para controlar el plugin externamente mediante URIs de Obsidian (compatible con Raycast, Alfred, Atajos de iOS, cron o terminal):
+
+| Acción | URI de Ejemplo | Descripción |
+|---|---|---|
+| **Iniciar Pomodoro** | `obsidian://study-flow?action=start` | Inicia una nueva sesión de enfoque o reanuda el temporizador activo. |
+| **Pausar Pomodoro** | `obsidian://study-flow?action=pause` | Pausa el temporizador Pomodoro en ejecución. |
+| **Captura Rápida** | `obsidian://study-flow?action=capture&text=Repasar%20Álgebra` | Guarda la tarea directamente en `Inbox.md` bajo `## Tareas` y reindexa. Si se omite `text`, abre el modal de captura. |
+
+*Ejemplo en terminal (macOS/Linux):*
+```bash
+xdg-open "obsidian://study-flow?action=start"
+# o
+open "obsidian://study-flow?action=capture&text=Comprar%20cuaderno"
+```
 
 ---
 
@@ -58,6 +68,9 @@ La interfaz mantiene una superficie minimalista con solo dos íconos esenciales:
 - `Study Flow: Abrir interfaz completa (Pestaña central)`
 - `Study Flow: Abrir en panel lateral (Sidebar)`
 - `Study Flow: Abrir Calendario y Bloques de Tiempo`
+- `Study Flow: Exportar bloques y deadlines a .ics`
+- `Study Flow: Generar revisión semanal`
+- `Study Flow: Iniciar repaso espaciado en la nota activa`
 - `Study Flow: Abrir temporizador Pomodoro` (Mini Timer)
 - `Study Flow: Abrir gestor de tareas & Inbox`
 - `Study Flow: Abrir registro de hábitos diarios`

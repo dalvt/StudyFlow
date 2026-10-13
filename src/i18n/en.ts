@@ -535,4 +535,32 @@ export const en = {
   'spaced.reviewedHardNotice': 'Reviewed (Hard): {title} rescheduled for tomorrow (1d)',
   'spaced.reviewedEasyNotice': 'Reviewed (Easy): {title} rescheduled for {next}',
   'spaced.initializedNotice': 'Spaced repetition initialized in {title}',
+
+  // ICS Export
+  'commands.exportCalendarIcs': 'Export blocks and deadlines to .ics',
+  'ics.exportedNotice': '✓ Calendar exported to: {path}',
+  'ics.exportErrorNotice': 'Error exporting .ics file',
+
+  // Protocol Handler
+  'protocol.timerStartedNotice': '🍅 Pomodoro started',
+  'protocol.timerPausedNotice': '⏸️ Pomodoro paused',
+  'protocol.timerAlreadyRunning': 'Pomodoro timer is already running',
+  'protocol.timerNotRunning': 'Pomodoro timer is not running',
+  'protocol.taskCapturedNotice': '✓ Task captured to Inbox: {text}',
+  'protocol.unknownActionNotice': 'Unrecognized action in study-flow protocol',
+
+  // Habits frequency and rest days
+  'habits.frequencyLabel': 'Frequency',
+  'habits.frequencyDaily': 'Daily',
+  'habits.frequencyWeekly': '{target}x / wk',
+  'habits.freqDailyOption': 'Daily (7 days)',
+  'habits.freqWeeklyOption': 'Weekly (times/week)',
+  'habits.freqWeekdaysOption': 'Weekdays (Mon-Fri)',
+  'habits.timesPerWeekPlaceholder': 'Weekly target',
+  'habits.weeklyProgress': '{completed}/{target} this week',
+  'habits.restDayBtn': 'Rest day',
+  'habits.restDayBadge': '💤 Rest day today',
+  'habits.restDayMarkedNotice': 'Rest day marked for "{name}". Streak preserved.',
+  'habits.restDayUnmarkedNotice': 'Rest day unmarked for "{name}".',
+  'habits.weeksStreak': '{count} wks',
 };

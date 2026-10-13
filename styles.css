@@ -3755,4 +3755,124 @@ body.is-study-flow-zen .workspace-split {
   color: var(--text-muted);
 }
 
+/* =========================================
+   Habits Frequency & Rest Day Additions
+   ========================================= */
+.study-flow-habit-add-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-habit-freq-select {
+  padding: 4px 8px;
+  font-size: var(--font-ui-smaller, 11px);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.study-flow-habit-target-input {
+  width: 50px !important;
+  padding: 4px 6px;
+  font-size: var(--font-ui-smaller, 11px);
+  text-align: center;
+}
+
+.study-flow-habit-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.study-flow-habit-card.is-rest-day {
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary));
+  border-color: color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.study-flow-habit-info {
+  flex: 1;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.study-flow-habit-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-habit-freq-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: var(--background-modifier-form-field);
+  color: var(--text-muted);
+}
+
+.study-flow-habit-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-habit-progress-text {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.study-flow-habit-progress-bar {
+  flex: 1;
+  max-width: 120px;
+  height: 5px;
+  background: var(--background-modifier-border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.study-flow-habit-progress-fill {
+  height: 100%;
+  background: var(--interactive-accent);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.study-flow-habit-progress-fill.is-met {
+  background: var(--sf-success, #10b981);
+}
+
+.study-flow-habit-rest-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-habit-rest-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.study-flow-habit-rest-btn.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+
 

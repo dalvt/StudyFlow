@@ -3,10 +3,13 @@ import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
 import {
   addHabitToFile,
+  computeHabitWeeklyProgress,
   deleteHabitFromFile,
+  type HabitFrequency,
   HabitItem,
   loadHabitsFromFile,
   renderHabitHeatmap,
+  toggleHabitRestDay,
   toggleHabitStatus,
 } from '../habits';
 import { t } from '../i18n/index.ts';
@@ -40,13 +43,39 @@ export class HabitsTab implements TabComponent {
     });
 
     // Add new habit bar
-    const addSection = card.createDiv({ cls: 'study-flow-search-bar' });
+    const addSection = card.createDiv({ cls: 'study-flow-search-bar study-flow-habit-add-bar' });
     const addInput = addSection.createEl('input', {
       type: 'text',
       placeholder: t('habits.newHabitPlaceholder'),
       cls: 'study-flow-task-input',
       attr: { 'aria-label': t('habits.newHabitLabel') },
     });
+
+    const freqSelect = addSection.createEl('select', {
+      cls: 'study-flow-tasks-sort-select study-flow-habit-freq-select',
+      attr: { 'aria-label': t('habits.frequencyLabel') },
+    });
+    freqSelect.createEl('option', { value: 'daily', text: t('habits.freqDailyOption') });
+    freqSelect.createEl('option', { value: 'weekly', text: t('habits.freqWeeklyOption') });
+    freqSelect.createEl('option', { value: 'specific_days', text: t('habits.freqWeekdaysOption') });
+
+    const targetInput = addSection.createEl('input', {
+      type: 'number',
+      cls: 'study-flow-task-input study-flow-habit-target-input',
+      attr: {
+        min: '1',
+        max: '7',
+        placeholder: '3',
+        style: 'display: none; width: 60px;',
+        'aria-label': t('habits.timesPerWeekPlaceholder'),
+      },
+      value: '3',
+    });
+
+    freqSelect.addEventListener('change', () => {
+      targetInput.style.display = freqSelect.value === 'weekly' ? 'inline-block' : 'none';
+    });
+
     const addBtn = addSection.createEl('button', {
       cls: 'mod-cta',
       attr: { 'aria-label': t('habits.addHabitTooltip') },
@@ -58,7 +87,15 @@ export class HabitsTab implements TabComponent {
     const handleAdd = async () => {
       const val = addInput.value.trim();
       if (!val) return;
-      this.habits = await addHabitToFile(this.app, path, val);
+      let freq: HabitFrequency = { type: 'daily' };
+      if (freqSelect.value === 'weekly') {
+        const tgt = parseInt(targetInput.value, 10) || 3;
+        freq = { type: 'weekly', weeklyTarget: Math.max(1, Math.min(7, tgt)) };
+      } else if (freqSelect.value === 'specific_days') {
+        freq = { type: 'specific_days', daysOfWeek: [1, 2, 3, 4, 5] };
+      }
+
+      this.habits = await addHabitToFile(this.app, path, val, freq);
       addInput.value = '';
       new Notice(t('habits.habitAddedNotice', { name: val }));
       if (this.container) await this.render(this.container);
@@ -84,7 +121,7 @@ export class HabitsTab implements TabComponent {
     } else {
       this.habits.forEach((habit) => {
         const hCard = listContainer.createDiv({
-          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''}`,
+          cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''} ${habit.isRestDayToday ? 'is-rest-day' : ''}`,
         });
 
         const cbWrapper = hCard.createDiv({ cls: 'study-flow-cb-wrapper' });
@@ -93,11 +130,18 @@ export class HabitsTab implements TabComponent {
 
         cb.addEventListener('change', async () => {
           this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
-          new Notice(cb.checked ? t('habits.streakIncreasedNotice', { streak: String(habit.streak + 1) }) : t('habits.habitUnmarkedNotice'));
+          new Notice(
+            cb.checked
+              ? t('habits.streakIncreasedNotice', { streak: String(habit.streak + 1) })
+              : t('habits.habitUnmarkedNotice')
+          );
           if (this.container) await this.render(this.container);
         });
 
-        const textSpan = hCard.createEl('span', {
+        const infoWrap = hCard.createDiv({ cls: 'study-flow-habit-info' });
+
+        const titleRow = infoWrap.createDiv({ cls: 'study-flow-habit-title-row' });
+        const textSpan = titleRow.createEl('span', {
           text: habit.name,
           cls: `study-flow-task-text ${habit.completedToday ? 'is-strikethrough' : ''}`,
         });
@@ -106,11 +150,59 @@ export class HabitsTab implements TabComponent {
           cb.dispatchEvent(new Event('change'));
         });
 
+        // Frequency pill badge
+        const freq = habit.frequency || { type: 'daily' };
+        const freqBadge = titleRow.createSpan({ cls: 'study-flow-habit-freq-badge' });
+        if (freq.type === 'weekly') {
+          freqBadge.setText(t('habits.frequencyWeekly', { target: String(freq.weeklyTarget || 3) }));
+        } else if (freq.type === 'specific_days') {
+          freqBadge.setText(t('habits.freqWeekdaysOption'));
+        } else {
+          freqBadge.setText(t('habits.frequencyDaily'));
+        }
+
+        // Weekly progress
+        const prog = computeHabitWeeklyProgress(habit);
+        const progRow = infoWrap.createDiv({ cls: 'study-flow-habit-progress-row' });
+        progRow.createSpan({
+          text: t('habits.weeklyProgress', {
+            completed: String(prog.completedCount),
+            target: String(prog.target),
+          }),
+          cls: 'study-flow-habit-progress-text',
+        });
+        const bar = progRow.createDiv({ cls: 'study-flow-habit-progress-bar' });
+        const fill = bar.createDiv({
+          cls: `study-flow-habit-progress-fill ${prog.isMet ? 'is-met' : ''}`,
+        });
+        fill.style.width = `${prog.percentage}%`;
+
+        // Rest day button
+        const restBtn = hCard.createEl('button', {
+          cls: `study-flow-icon-action-btn-styled study-flow-habit-rest-btn ${habit.isRestDayToday ? 'is-active' : ''}`,
+          text: habit.isRestDayToday ? t('habits.restDayBadge') : t('habits.restDayBtn'),
+          attr: { 'aria-label': t('habits.restDayBtn') },
+        });
+        restBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.habits = await toggleHabitRestDay(this.app, path, habit.id);
+          const updated = this.habits.find((h) => h.id === habit.id);
+          if (updated?.isRestDayToday) {
+            new Notice(t('habits.restDayMarkedNotice', { name: habit.name }));
+          } else {
+            new Notice(t('habits.restDayUnmarkedNotice', { name: habit.name }));
+          }
+          if (this.container) await this.render(this.container);
+        });
+
         // Flame Streak Badge
         const streakBadge = hCard.createDiv({ cls: 'study-flow-streak-badge' });
         const fIcon = streakBadge.createSpan({ cls: 'study-flow-flame-icon' });
         setIcon(fIcon, 'flame');
-        streakBadge.createSpan({ text: t('habits.daysStreak', { count: String(habit.streak) }) });
+        const streakText = freq.type === 'weekly'
+          ? t('habits.weeksStreak', { count: String(habit.streak) })
+          : t('habits.daysStreak', { count: String(habit.streak) });
+        streakBadge.createSpan({ text: streakText });
 
         // Delete button
         const delBtn = hCard.createEl('button', {
