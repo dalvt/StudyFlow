@@ -537,6 +537,79 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           })
       );
 
+    // 7. Today Tab Sections
+    new Setting(containerEl).setName(t('settings.headingTodayTab')).setHeading();
+
+    const todaySec = this.plugin.settings.todaySections || {
+      showNowNext: true,
+      showMiniTimer: true,
+      showTodayTasks: true,
+      showHabits: true,
+      showSpacedRepetition: true,
+      showUpcomingDeadlines: true,
+    };
+    this.plugin.settings.todaySections = todaySec;
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionNowNextName'))
+      .setDesc(t('settings.todaySectionNowNextDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showNowNext).onChange(async (val) => {
+          todaySec.showNowNext = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionMiniTimerName'))
+      .setDesc(t('settings.todaySectionMiniTimerDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showMiniTimer).onChange(async (val) => {
+          todaySec.showMiniTimer = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionTodayTasksName'))
+      .setDesc(t('settings.todaySectionTodayTasksDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showTodayTasks).onChange(async (val) => {
+          todaySec.showTodayTasks = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionHabitsName'))
+      .setDesc(t('settings.todaySectionHabitsDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showHabits).onChange(async (val) => {
+          todaySec.showHabits = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionSpacedRepetitionName'))
+      .setDesc(t('settings.todaySectionSpacedRepetitionDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showSpacedRepetition).onChange(async (val) => {
+          todaySec.showSpacedRepetition = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.todaySectionUpcomingDeadlinesName'))
+      .setDesc(t('settings.todaySectionUpcomingDeadlinesDesc'))
+      .addToggle((toggle) =>
+        toggle.setValue(todaySec.showUpcomingDeadlines).onChange(async (val) => {
+          todaySec.showUpcomingDeadlines = val;
+          await this.plugin.saveSettings();
+        })
+      );
+
     new Setting(containerEl)
       .setName(t('settings.resetDefaultsName'))
       .setDesc(t('settings.resetDefaultsDesc'))

@@ -3980,5 +3980,264 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
 }
 
+/* ==========================================================================
+   Today Tab ("¿Qué hago ahora?") Layout & Compact Sidebar Styling
+   ========================================================================== */
+.study-flow-today-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.study-flow-today-header {
+  margin-bottom: 2px;
+}
+
+.study-flow-today-title {
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-normal);
+}
+
+.study-flow-today-subtitle {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  margin: 2px 0 0 0;
+}
+
+.study-flow-today-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.study-flow-today-sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.study-flow-sec-title-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.study-flow-sec-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--interactive-accent);
+}
+
+.study-flow-sec-heading {
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+/* Time Block (Ahora / Siguiente) */
+.study-flow-today-block-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.study-flow-today-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.study-flow-today-badge {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.study-flow-today-badge.is-now {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.study-flow-today-badge.is-next {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.study-flow-today-block-time {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.study-flow-today-block-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-today-block-title {
+  font-size: var(--font-ui-medium);
+  font-weight: 500;
+  color: var(--text-normal);
+  flex: 1;
+}
+
+.study-flow-today-subject-chip {
+  font-size: var(--font-ui-smaller);
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.study-flow-today-focus-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Mini Timer Card */
+.study-flow-today-minitimer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.study-flow-today-minitimer-card:hover {
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-today-timer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.study-flow-today-timer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-today-timer-digits {
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  font-family: var(--font-monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.study-flow-minitimer-btn {
+  padding: 4px;
+}
+
+.study-flow-today-timer-task-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.study-flow-today-timer-task-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Items List & Rows */
+.study-flow-today-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.study-flow-today-task-row,
+.study-flow-today-habit-row,
+.study-flow-today-spaced-row,
+.study-flow-today-deadline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  background: var(--background-primary-alt);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-today-item-title {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.study-flow-spaced-link {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.study-flow-spaced-link:hover {
+  color: var(--interactive-accent);
+}
+
+.study-flow-today-spaced-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.study-flow-btn-mini {
+  padding: 2px 6px;
+  font-size: var(--font-ui-smaller);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.study-flow-btn-mini.is-easy {
+  background: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
+  color: var(--color-green, var(--text-success));
+  border-color: color-mix(in srgb, var(--color-green, var(--text-success)) 30%, transparent);
+}
+
+.study-flow-btn-mini.is-hard {
+  background: color-mix(in srgb, var(--color-red, var(--text-error)) 15%, transparent);
+  color: var(--color-red, var(--text-error));
+  border-color: color-mix(in srgb, var(--color-red, var(--text-error)) 30%, transparent);
+}
+
+.study-flow-today-empty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.study-flow-today-empty-row .study-flow-empty-icon {
+  display: inline-flex;
+  opacity: 0.6;
+}
+
+
 
 

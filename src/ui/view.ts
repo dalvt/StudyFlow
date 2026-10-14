@@ -1,6 +1,7 @@
-import { ItemView, Platform, setIcon, setTooltip, WorkspaceLeaf } from 'obsidian';
+import { ItemView, Platform, setIcon, setTooltip, ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
+import { TodayTab } from './today-tab';
 import { PomodoroTab } from './pomodoro-tab';
 import { TasksTab } from './tasks-tab';
 import { HabitsTab } from './habits-tab';
@@ -14,9 +15,10 @@ export { PromptModal } from './prompt-modal';
 
 export class StudyFlowView extends ItemView {
   private plugin: StudyFlowPlugin;
-  private activeTab: ActiveTab = 'pomodoro';
+  private activeTab: ActiveTab = 'today';
 
   // Sub-tabs
+  public todayTab: TodayTab;
   public pomodoroTab: PomodoroTab;
   public tasksTab: TasksTab;
   public habitsTab: HabitsTab;
@@ -35,6 +37,9 @@ export class StudyFlowView extends ItemView {
     super(leaf);
     this.plugin = plugin;
 
+    this.todayTab = new TodayTab(this.app, this.plugin, (tab) => {
+      void this.setActiveTab(tab);
+    });
     this.pomodoroTab = new PomodoroTab(this.app, this.plugin);
     this.tasksTab = new TasksTab(this.app, this.plugin, (tab) => {
       void this.setActiveTab(tab);
@@ -46,6 +51,7 @@ export class StudyFlowView extends ItemView {
     this.analyticsTab = new AnalyticsTab(this.app, this.plugin);
 
     this.tabComponents = {
+      today: this.todayTab,
       pomodoro: this.pomodoroTab,
       tasks: this.tasksTab,
       habits: this.habitsTab,
@@ -66,6 +72,23 @@ export class StudyFlowView extends ItemView {
     return 'clock';
   }
 
+  getState(): Record<string, unknown> {
+    return {
+      activeTab: this.activeTab,
+    };
+  }
+
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    await super.setState(state, result);
+    const typedState = state as { activeTab?: ActiveTab } | undefined;
+    if (typedState?.activeTab && this.tabComponents[typedState.activeTab]) {
+      this.activeTab = typedState.activeTab;
+      if (this.navButtons.size > 0) {
+        await this.switchTab(typedState.activeTab);
+      }
+    }
+  }
+
   async onOpen(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
@@ -77,8 +100,9 @@ export class StudyFlowView extends ItemView {
     await this.switchTab(this.activeTab);
 
     // Reactive subscriptions (incremental updates without full renderView)
-    this.unsubscribePomodoro = this.plugin.pomodoro.subscribe(() => {
+    this.unsubscribePomodoro = this.plugin.pomodoro.subscribe((status) => {
       this.pomodoroTab.updateClock();
+      this.todayTab.onPomodoroTick(status);
     });
 
     if (this.plugin.taskIndex) {
@@ -92,6 +116,7 @@ export class StudyFlowView extends ItemView {
         const habitsPath = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
         if (file.path === habitsPath) {
           await this.habitsTab.onHabitsModified();
+          await this.todayTab.onHabitsChanged();
         }
       })
     );
@@ -180,7 +205,7 @@ export class StudyFlowView extends ItemView {
       }
     });
 
-    // Navigation Tab Bar with 5 tabs (role="tablist")
+    // Navigation Tab Bar (role="tablist")
     const navBar = rootWrapper.createDiv({
       cls: 'study-flow-segmented-nav',
       attr: {
@@ -190,6 +215,7 @@ export class StudyFlowView extends ItemView {
     });
 
     const tabsConfig: Array<{ id: ActiveTab; label: string; icon: string }> = [
+      { id: 'today', label: t('tabs.today'), icon: 'sun' },
       { id: 'pomodoro', label: t('tabs.pomodoro'), icon: 'timer' },
       { id: 'tasks', label: t('tabs.tasks'), icon: 'check-square' },
       { id: 'habits', label: t('tabs.habits'), icon: 'flame' },
@@ -294,6 +320,7 @@ export class StudyFlowView extends ItemView {
 
   private handleTaskIndexChanged(): void {
     // Incrementally notify components without destroying active view or tab state
+    this.todayTab.onTasksChanged();
     this.tasksTab.onTasksChanged();
     this.calendarTab.onTasksChanged();
     this.analyticsTab.onTasksChanged();

@@ -19,6 +19,15 @@ export interface Subject {
   weeklyGoalHours: number;
 }
 
+export interface TodayTabSectionsConfig {
+  showNowNext: boolean;
+  showMiniTimer: boolean;
+  showTodayTasks: boolean;
+  showHabits: boolean;
+  showSpacedRepetition: boolean;
+  showUpcomingDeadlines: boolean;
+}
+
 export interface StudyFlowSettings {
   schemaVersion: number;
   pomodoroWorkDuration: number;
@@ -50,6 +59,7 @@ export interface StudyFlowSettings {
   subjects: Subject[];
   weeklyReviewsFolder: string;
   weeklyReviewTemplate: string;
+  todaySections?: TodayTabSectionsConfig;
   /** @deprecated Moved to StudyFlow/Sessions.jsonl */
   focusHistory?: FocusSessionRecord[];
   /** @deprecated Moved to Daily Notes "## Bloques de Tiempo" */
@@ -103,6 +113,14 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   subjects: [],
   weeklyReviewsFolder: 'StudyFlow/Reviews',
   weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
+  todaySections: {
+    showNowNext: true,
+    showMiniTimer: true,
+    showTodayTasks: true,
+    showHabits: true,
+    showSpacedRepetition: true,
+    showUpcomingDeadlines: true,
+  },
 };
 
 export function cloneDefaultSettings(lang?: SupportedConventionLanguage): StudyFlowSettings {

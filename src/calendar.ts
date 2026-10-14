@@ -1,6 +1,6 @@
 import { App, Notice, TFile } from 'obsidian';
-import type StudyFlowPlugin from './main';
-import type { CalendarTimeBlock, StudyFlowSettings } from './settings';
+import type StudyFlowPlugin from './main.ts';
+import type { CalendarTimeBlock, StudyFlowSettings } from './settings.ts';
 import { t } from './i18n/index.ts';
 export type { CalendarTimeBlock, StudyFlowSettings };
 import {
@@ -16,9 +16,9 @@ import {
   PendingTaskItem,
   TaskPriority,
   syncBlocksToMarkdown,
-} from './utils';
+} from './utils.ts';
 
-export * from './calendar-utils';
+export * from './calendar-utils.ts';
 
 export interface DeadlineItem extends PendingTaskItem {
   cleanTitle: string;
@@ -28,7 +28,7 @@ export interface DeadlineItem extends PendingTaskItem {
   completed: boolean;
 }
 
-import { findOverlappingBlocks, parseTimeBlocksFromMarkdown } from './calendar-utils';
+import { findOverlappingBlocks, parseTimeBlocksFromMarkdown } from './calendar-utils.ts';
 
 /**
  * Retrieves time blocks for a given date directly from its Daily Note (sole source of truth).
