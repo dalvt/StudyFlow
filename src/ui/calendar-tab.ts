@@ -365,6 +365,11 @@ export class CalendarTab implements TabComponent {
     setIcon(dlIcon, 'target');
     hubTitle.createEl('h3', { text: t('calendar.deadlinesHubTitle') });
 
+    // Inline form for master hub
+    const formWrapper = hubWrapper.createDiv({
+      cls: `study-flow-block-create-form ${this.isAddingDeadline ? '' : 'is-hidden'}`,
+    });
+
     const newDlBtn = hubHeader.createEl('button', {
       cls: 'mod-cta study-flow-btn-sm',
     });
@@ -374,11 +379,6 @@ export class CalendarTab implements TabComponent {
     newDlBtn.addEventListener('click', () => {
       this.isAddingDeadline = !this.isAddingDeadline;
       formWrapper.toggleClass('is-hidden', !this.isAddingDeadline);
-    });
-
-    // Inline form for master hub
-    const formWrapper = hubWrapper.createDiv({
-      cls: `study-flow-block-create-form ${this.isAddingDeadline ? '' : 'is-hidden'}`,
     });
     const r1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
     const titleIn = r1.createEl('input', {

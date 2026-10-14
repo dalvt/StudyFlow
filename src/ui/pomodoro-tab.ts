@@ -560,7 +560,8 @@ export class PomodoroTab implements TabComponent {
     const heroBtn = this.container.querySelector('.study-flow-hero-play-btn');
     if (heroBtn) {
       const isRunning = status.state === 'running';
-      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'} clickable-icon`;
+      heroBtn.setAttribute('aria-label', isRunning ? t('pomodoro.pause') : t('pomodoro.start'));
       heroBtn.empty();
       const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
       setIcon(heroIcon, isRunning ? 'pause' : 'play');

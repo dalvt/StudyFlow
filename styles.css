@@ -1097,8 +1097,13 @@
 }
 
 .study-flow-icon-action-btn:hover {
-  color: var(--sf-danger);
+  color: var(--text-normal);
   background-color: var(--background-modifier-hover);
+}
+
+.study-flow-icon-action-btn.study-flow-delete-btn:hover {
+  color: var(--sf-danger);
+  background-color: var(--sf-danger-subtle);
 }
 
 .study-flow-icon-action-btn svg {
@@ -1114,6 +1119,22 @@
   font-size: var(--font-ui-smaller);
   border-radius: var(--radius-s);
   cursor: pointer;
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  transition: all 0.15s ease;
+}
+
+.study-flow-icon-action-btn-styled:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.study-flow-icon-action-btn-styled.is-active {
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
 }
 
 .study-flow-icon-action-btn-styled svg {
@@ -3804,12 +3825,15 @@ body.is-study-flow-zen .workspace-split {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  opacity: 0.35;
+  opacity: 0.7;
   transition: opacity 0.18s ease;
 }
 
 .study-flow-task-card:hover .study-flow-task-actions-toolbar,
-.study-flow-task-card:focus-within .study-flow-task-actions-toolbar {
+.study-flow-task-card:focus-within .study-flow-task-actions-toolbar,
+.study-flow-container.is-in-sidebar .study-flow-task-actions-toolbar,
+.study-flow-container.is-mobile .study-flow-task-actions-toolbar,
+.is-mobile .study-flow-task-actions-toolbar {
   opacity: 1;
 }
 
@@ -3861,8 +3885,13 @@ body.is-study-flow-zen .workspace-split {
   container-type: inline-size;
 }
 
-/* Hide brand header when docked in sidebar */
+/* Sidebar compact header: keep action buttons (expand, reload) accessible */
 .study-flow-container.is-in-sidebar .study-flow-brand-header {
+  padding: 4px 6px 8px 6px;
+  justify-content: flex-end;
+}
+
+.study-flow-container.is-in-sidebar .study-flow-brand-title {
   display: none;
 }
 

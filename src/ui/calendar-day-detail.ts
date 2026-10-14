@@ -173,23 +173,8 @@ export async function renderTimeBlocksColumn(
   setIcon(tbIcon, 'clock');
   tbTitle.createSpan({ text: t('calendar.timeBlocksTitle') });
 
-  const addBlockBtn = tbHeader.createEl('button', {
-    cls: 'study-flow-icon-action-btn-styled',
-    attr: { 'aria-label': t('calendar.addBlockTooltip') },
-  });
-  const addBlockIcon = addBlockBtn.createSpan();
-  setIcon(addBlockIcon, 'plus');
-  addBlockBtn.createSpan({ text: t('calendar.newBlock') });
-  addBlockBtn.addEventListener('click', () => {
-    state.isAddingTimeBlock = !state.isAddingTimeBlock;
-    if (state.isAddingTimeBlock) {
-      state.editingBlockId = null;
-      saveBlockBtn.setText(t('common.save'));
-      titleInput.value = '';
-      noteInput.value = '';
-    }
-    formWrapper.toggleClass('is-hidden', !state.isAddingTimeBlock);
-  });
+  // Load existing blocks
+  const blocks = await getTimeBlocksForDate(app, plugin.settings, state.selectedCalendarDate);
 
   // Inline Add/Edit Block Form
   const formWrapper = timeBlocksCol.createDiv({
@@ -230,6 +215,24 @@ export async function renderTimeBlocksColumn(
     text: t('common.cancel'),
   });
 
+  const addBlockBtn = tbHeader.createEl('button', {
+    cls: 'study-flow-icon-action-btn-styled',
+    attr: { 'aria-label': t('calendar.addBlockTooltip') },
+  });
+  const addBlockIcon = addBlockBtn.createSpan();
+  setIcon(addBlockIcon, 'plus');
+  addBlockBtn.createSpan({ text: t('calendar.newBlock') });
+  addBlockBtn.addEventListener('click', () => {
+    state.isAddingTimeBlock = !state.isAddingTimeBlock;
+    if (state.isAddingTimeBlock) {
+      state.editingBlockId = null;
+      saveBlockBtn.setText(t('common.save'));
+      titleInput.value = '';
+      noteInput.value = '';
+    }
+    formWrapper.toggleClass('is-hidden', !state.isAddingTimeBlock);
+  });
+
   saveBlockBtn.addEventListener('click', async () => {
     const title = titleInput.value.trim();
     const startTime = startInput.value.trim();
@@ -239,6 +242,7 @@ export async function renderTimeBlocksColumn(
       return;
     }
     const blockId = state.editingBlockId || String(Date.now());
+    const existing = blocks.find((b) => b.id === state.editingBlockId);
     const newBlock: CalendarTimeBlock = {
       id: blockId,
       date: state.selectedCalendarDate,
@@ -246,11 +250,15 @@ export async function renderTimeBlocksColumn(
       endTime,
       title,
       linkedNote: noteInput.value.trim() || undefined,
-      completed: false,
+      completed: existing ? existing.completed : false,
+      color: existing?.color,
+      subject: existing?.subject,
+      isVirtual: existing?.isVirtual,
     };
     await saveTimeBlock(plugin, newBlock);
     state.isAddingTimeBlock = false;
     state.editingBlockId = null;
+    saveBlockBtn.setText(t('common.save'));
     new Notice(t('calendar.blockSavedNotice', { title }));
     await callbacks.onRefresh();
   });
@@ -263,7 +271,6 @@ export async function renderTimeBlocksColumn(
   });
 
   // Time Blocks List
-  const blocks = await getTimeBlocksForDate(app, plugin.settings, state.selectedCalendarDate);
   const blocksListEl = timeBlocksCol.createDiv({ cls: 'study-flow-blocks-list' });
 
   if (blocks.length === 0) {
@@ -400,6 +407,11 @@ export async function renderDeadlinesColumn(
   setIcon(dlIcon, 'alert-circle');
   dlTitle.createSpan({ text: t('calendar.dayDeadlinesTitle') });
 
+  // Inline Add Deadline Form
+  const dlFormWrapper = deadlinesCol.createDiv({
+    cls: `study-flow-block-create-form ${state.isAddingDeadline ? '' : 'is-hidden'}`,
+  });
+
   const addDlBtn = dlHeader.createEl('button', {
     cls: 'study-flow-icon-action-btn-styled',
     attr: { 'aria-label': t('calendar.addDeadlineTooltip') },
@@ -410,11 +422,6 @@ export async function renderDeadlinesColumn(
   addDlBtn.addEventListener('click', () => {
     state.isAddingDeadline = !state.isAddingDeadline;
     dlFormWrapper.toggleClass('is-hidden', !state.isAddingDeadline);
-  });
-
-  // Inline Add Deadline Form
-  const dlFormWrapper = deadlinesCol.createDiv({
-    cls: `study-flow-block-create-form ${state.isAddingDeadline ? '' : 'is-hidden'}`,
   });
   const dlRow1 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
   const dlTitleInput = dlRow1.createEl('input', {
@@ -590,6 +597,8 @@ export function renderPendingTasksSelectorColumn(
   const selectorCol = columnsContainer.createDiv({
     cls: 'study-flow-day-column study-flow-planner-column',
   });
+  let updateAddButtonLabel = (): void => {};
+
   const colHeader = selectorCol.createDiv({ cls: 'study-flow-column-header' });
   const colTitle = colHeader.createDiv({ cls: 'study-flow-column-title' });
   const pIcon = colTitle.createSpan();
@@ -676,6 +685,7 @@ export function renderPendingTasksSelectorColumn(
         } else {
           state.selectedPendingTaskIds.delete(task.id);
         }
+        updateAddButtonLabel();
       });
 
       const label = itemEl.createEl('span', { text: task.text, cls: 'study-flow-task-text' });
@@ -742,12 +752,21 @@ export function renderPendingTasksSelectorColumn(
   });
   const addIcon = addSelectedBtn.createSpan();
   setIcon(addIcon, 'calendar-plus');
-  addSelectedBtn.createSpan({
+  const addSelectedBtnText = addSelectedBtn.createSpan({
     text: t('calendar.incorporateToDate', {
       date: state.selectedCalendarDate,
       count: String(state.selectedPendingTaskIds.size),
     }),
   });
+
+  updateAddButtonLabel = () => {
+    addSelectedBtnText.setText(
+      t('calendar.incorporateToDate', {
+        date: state.selectedCalendarDate,
+        count: String(state.selectedPendingTaskIds.size),
+      })
+    );
+  };
 
   addSelectedBtn.addEventListener('click', async () => {
     const selected = pendingTasks.filter((t) => state.selectedPendingTaskIds.has(t.id));

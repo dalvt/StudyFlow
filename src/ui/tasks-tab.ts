@@ -185,23 +185,24 @@ export class TasksTab implements TabComponent {
       value: this.taskSearchQuery,
       attr: { 'aria-label': t('tasks.searchLabel') },
     });
-    searchInput.addEventListener('input', () => {
-      this.taskSearchQuery = searchInput.value.trim().toLowerCase();
+    const clearBtn = searchWrap.createEl('button', {
+      cls: `study-flow-search-clear-btn clickable-icon ${this.taskSearchQuery ? '' : 'is-hidden'}`,
+      attr: { 'aria-label': t('tasks.clearSearch') },
+    });
+    setIcon(clearBtn, 'x');
+    clearBtn.addEventListener('click', () => {
+      this.taskSearchQuery = '';
+      searchInput.value = '';
+      clearBtn.addClass('is-hidden');
+      searchInput.focus();
       renderList();
     });
 
-    if (this.taskSearchQuery) {
-      const clearBtn = searchWrap.createEl('button', {
-        cls: 'study-flow-search-clear-btn clickable-icon',
-        attr: { 'aria-label': t('tasks.clearSearch') },
-      });
-      setIcon(clearBtn, 'x');
-      clearBtn.addEventListener('click', () => {
-        this.taskSearchQuery = '';
-        searchInput.value = '';
-        renderList();
-      });
-    }
+    searchInput.addEventListener('input', () => {
+      this.taskSearchQuery = searchInput.value.trim().toLowerCase();
+      clearBtn.toggleClass('is-hidden', !this.taskSearchQuery);
+      renderList();
+    });
 
     const sortSelect = searchRow.createEl('select', {
       cls: 'study-flow-tasks-sort-select dropdown',

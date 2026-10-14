@@ -14,6 +14,7 @@ import {
 } from '../calendar.ts';
 import { getDailyNotePath } from '../utils.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
+import { PromptModal } from './prompt-modal';
 
 export interface CalendarGridCallbacks {
   onSelectDate: (dateStr: string) => Promise<void>;
@@ -368,17 +369,31 @@ export class CalendarGridComponent {
         const startTime = minutesToTimeString(startMins);
         const endTime = minutesToTimeString(currentEndMins);
 
-        const newBlock: CalendarTimeBlock = {
-          id: String(Date.now()),
-          date: dateStr,
-          startTime,
-          endTime,
-          title: t('calendar.defaultBlockTitle') || 'Estudio',
-          completed: false,
-        };
+        new PromptModal(
+          this.app,
+          t('calendar.newBlock') || 'Nuevo bloque de estudio',
+          t('calendar.defaultBlockTitle') || 'Estudio',
+          async (blockTitle) => {
+            const title = blockTitle.trim() || t('calendar.defaultBlockTitle') || 'Estudio';
+            const newBlock: CalendarTimeBlock = {
+              id: String(Date.now()),
+              date: dateStr,
+              startTime,
+              endTime,
+              title,
+              completed: false,
+            };
 
-        await saveTimeBlock(this.plugin, newBlock);
-        await this.callbacks.onRefresh();
+            await saveTimeBlock(this.plugin, newBlock);
+            new Notice(
+              t('calendar.blockCreatedNotice', {
+                title: newBlock.title,
+                time: `${newBlock.startTime}—${newBlock.endTime}`,
+              }) || `Bloque creado: ${newBlock.title} (${newBlock.startTime} - ${newBlock.endTime})`
+            );
+            await this.callbacks.onRefresh();
+          }
+        ).open();
       };
 
       window.addEventListener('pointermove', onPointerMove);
@@ -492,6 +507,30 @@ export class CalendarGridComponent {
         sourceFile: getDailyNotePath(this.plugin.settings, block.date),
       });
       this.callbacks.onSwitchTab('pomodoro');
+    });
+
+    // Edit button
+    const editBtn = actionsBar.createEl('button', {
+      cls: 'study-flow-icon-action-btn',
+      attr: { 'aria-label': t('calendar.editBlockTooltip') },
+    });
+    setIcon(editBtn, 'pencil');
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      new PromptModal(
+        this.app,
+        t('calendar.blockTitlePlaceholder') || 'Título del bloque',
+        block.title,
+        async (newTitle) => {
+          const trimmed = newTitle.trim();
+          if (trimmed && trimmed !== block.title) {
+            block.title = trimmed;
+            await saveTimeBlock(this.plugin, block);
+            new Notice(t('calendar.blockSavedNotice', { title: trimmed }));
+            await this.callbacks.onRefresh();
+          }
+        }
+      ).open();
     });
 
     // Delete button

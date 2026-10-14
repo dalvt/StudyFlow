@@ -294,6 +294,7 @@ export class TodayTab implements TabComponent {
     }
 
     if (this.miniTimerPlayBtn) {
+      this.miniTimerPlayBtn.empty();
       setIcon(this.miniTimerPlayBtn, status.state === 'running' ? 'pause' : 'play');
       this.miniTimerPlayBtn.setAttribute(
         'aria-label',
@@ -348,14 +349,23 @@ export class TodayTab implements TabComponent {
         cls: 'study-flow-task-checkbox',
       });
       check.checked = Boolean(task.completed);
+
+      const titleEl = itemRow.createSpan({
+        cls: `study-flow-today-item-title ${task.completed ? 'is-strikethrough' : ''}`,
+        text: task.text,
+      });
+
       check.addEventListener('change', async () => {
+        titleEl.toggleClass('is-strikethrough', check.checked);
+        itemRow.toggleClass('is-done', check.checked);
+        task.completed = check.checked;
         await toggleTaskCompletionInFile(this.app, task, check.checked);
         new Notice(check.checked ? t('tasks.markedCompletedNotice') : t('tasks.unmarkedNotice'));
       });
 
-      const titleEl = itemRow.createSpan({
-        cls: 'study-flow-today-item-title',
-        text: task.text,
+      titleEl.addEventListener('click', () => {
+        check.checked = !check.checked;
+        check.dispatchEvent(new Event('change'));
       });
 
       if (task.daysRemaining !== undefined && task.daysRemaining < 0) {
@@ -392,7 +402,7 @@ export class TodayTab implements TabComponent {
     titleGroup.createSpan({ text: t('today.habitsTitle'), cls: 'study-flow-sec-heading' });
 
     const viewAllBtn = header.createEl('button', {
-      text: t('today.viewAllTasksBtn'),
+      text: t('tabs.habits'),
       cls: 'study-flow-link-btn',
     });
     viewAllBtn.addEventListener('click', () => this.onSwitchTab('habits'));
@@ -520,7 +530,7 @@ export class TodayTab implements TabComponent {
     titleGroup.createSpan({ text: t('today.deadlinesTitle'), cls: 'study-flow-sec-heading' });
 
     const viewCalBtn = header.createEl('button', {
-      text: t('today.viewAllTasksBtn'),
+      text: t('tabs.calendar'),
       cls: 'study-flow-link-btn',
     });
     viewCalBtn.addEventListener('click', () => this.onSwitchTab('calendar'));
@@ -536,7 +546,10 @@ export class TodayTab implements TabComponent {
     const list = card.createDiv({ cls: 'study-flow-today-items-list' });
 
     topDeadlines.forEach((item) => {
-      const itemRow = list.createDiv({ cls: 'study-flow-today-deadline-row' });
+      const itemRow = list.createDiv({ cls: 'study-flow-today-deadline-row study-flow-clickable-row' });
+      itemRow.addEventListener('click', () => {
+        this.onSwitchTab('calendar');
+      });
 
       itemRow.createSpan({
         cls: 'study-flow-today-item-title',
