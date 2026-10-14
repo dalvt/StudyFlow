@@ -1,7 +1,7 @@
 import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
-import { parseTaskPomodoroEstimate, PendingTaskItem } from '../utils';
+import { parseTaskPomodoroEstimate, PendingTaskItem, getCleanTaskDisplayTitle } from '../utils';
 import { SubjectSelectModal } from '../subject-modal';
 import { t } from '../i18n/index.ts';
 
@@ -318,7 +318,7 @@ export class PomodoroTab implements TabComponent {
 
       const textWrap = banner.createDiv({ cls: 'study-flow-task-banner-text' });
       textWrap.createSpan({ text: t('pomodoro.focusedOn'), cls: 'study-flow-task-banner-label' });
-      textWrap.createSpan({ text: status.activeTask.text, cls: 'study-flow-task-banner-name' });
+      textWrap.createSpan({ text: getCleanTaskDisplayTitle(status.activeTask.text), cls: 'study-flow-task-banner-name' });
 
       const { estimated, completed } = parseTaskPomodoroEstimate(status.activeTask.text);
       if (estimated || (completed && completed > 0)) {
@@ -428,11 +428,12 @@ export class PomodoroTab implements TabComponent {
           pickerBox.createDiv({ cls: 'study-flow-empty-tasks', text: t('pomodoro.noPendingTasks') });
         } else {
           this.pendingInboxTasks.forEach((tTask) => {
+            const cleanTitle = getCleanTaskDisplayTitle(tTask.text);
             const item = pickerBox.createEl('button', {
               cls: 'study-flow-picker-item',
-              attr: { 'aria-label': t('pomodoro.selectTaskLabel', { text: tTask.text }) },
+              attr: { 'aria-label': t('pomodoro.selectTaskLabel', { text: cleanTitle }) },
             });
-            item.createSpan({ text: tTask.text });
+            item.createSpan({ text: cleanTitle });
             item.addEventListener('click', async () => {
               this.plugin.pomodoro.setActiveTask({
                 id: tTask.id,

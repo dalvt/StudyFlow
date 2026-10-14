@@ -52,11 +52,12 @@ export class TaskIndex {
    */
   async scanVault(): Promise<void> {
     const files = this.app.vault.getMarkdownFiles();
-    const { taskIncludedFolders, taskExcludedFolders, tasksSectionHeader, iceboxSectionHeader } =
+    const { taskIncludedFolders, taskExcludedFolders, tasksSectionHeader, iceboxSectionHeader, habitsFilePath } =
       this.plugin.settings;
+    const excludedFiles = habitsFilePath ? [habitsFilePath] : [];
 
     for (const file of files) {
-      if (!isPathIndexed(file.path, taskIncludedFolders, taskExcludedFolders)) {
+      if (!isPathIndexed(file.path, taskIncludedFolders, taskExcludedFolders, excludedFiles)) {
         continue;
       }
       await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
@@ -145,8 +146,9 @@ export class TaskIndex {
   }
 
   private queueFile(filePath: string): void {
-    const { taskIncludedFolders, taskExcludedFolders } = this.plugin.settings;
-    if (!isPathIndexed(filePath, taskIncludedFolders, taskExcludedFolders)) {
+    const { taskIncludedFolders, taskExcludedFolders, habitsFilePath } = this.plugin.settings;
+    const excludedFiles = habitsFilePath ? [habitsFilePath] : [];
+    if (!isPathIndexed(filePath, taskIncludedFolders, taskExcludedFolders, excludedFiles)) {
       if (this.tasksByFile.has(filePath)) {
         this.tasksByFile.delete(filePath);
         this.invalidateCaches();

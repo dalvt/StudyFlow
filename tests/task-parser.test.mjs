@@ -268,6 +268,14 @@ test('isPathIndexed correctly applies included and excluded folder settings', as
   assert.equal(isPathIndexed('templates/Habit.md', [], excluded), false);
   assert.equal(isPathIndexed('image.png', [], excluded), false);
 
+  // Trash and hidden folders are always excluded
+  assert.equal(isPathIndexed('.trash/note.md', [], excluded), false);
+  assert.equal(isPathIndexed('Folder/.trash/subnote.md', [], excluded), false);
+  assert.equal(isPathIndexed('.obsidian/plugins/note.md', [], excluded), false);
+
+  // Excluded files (e.g. StudyFlow/Habits.md)
+  assert.equal(isPathIndexed('StudyFlow/Habits.md', [], excluded, ['StudyFlow/Habits.md']), false);
+
   // Whitelist folder: only 'Projects' and 'Tasks'
   const included = ['Projects', 'Tasks'];
   assert.equal(isPathIndexed('Projects/Paper.md', included, excluded), true);
@@ -275,4 +283,45 @@ test('isPathIndexed correctly applies included and excluded folder settings', as
   assert.equal(isPathIndexed('Other/Random.md', included, excluded), false);
   assert.equal(isPathIndexed('Projects/Templates/Template.md', included, excluded), false);
 });
+
+test('getCleanTaskDisplayTitle strips HTML comments from task text', () => {
+  const withComment = 'Databases <!-- streak: 0 | last: | history: -->';
+  assert.equal(getCleanTaskDisplayTitle(withComment), 'Databases');
+
+  const withMetadataAndComment = 'Numeric Methods <!-- streak: 1 --> 📅 2026-10-20 #materia';
+  assert.equal(getCleanTaskDisplayTitle(withMetadataAndComment), 'Numeric Methods');
+});
+
+test('isIceboxSection accurately identifies icebox headings without false positives', async () => {
+  const { isIceboxSection } = await import('../src/markdown-utils.ts');
+  assert.equal(isIceboxSection('Icebox'), true);
+  assert.equal(isIceboxSection('## Icebox'), true);
+  assert.equal(isIceboxSection('## 🧊 Icebox'), true);
+  assert.equal(isIceboxSection('## Ideas'), true);
+  assert.equal(isIceboxSection('## 💡 Ideas'), true);
+  assert.equal(isIceboxSection('## Nevera', '## Nevera'), true);
+
+  // False positives from normal notes must be rejected
+  assert.equal(isIceboxSection('## Main ideas'), false);
+  assert.equal(isIceboxSection('## Key ideas of chapter 1'), false);
+  assert.equal(isIceboxSection('## Ideas preconcebidas'), false);
+});
+
+test('extractAllTasksFromContent ignores habit lines with streak comments', () => {
+  const content = `# StudyFlow\n\n## Tareas\n- [ ] Estudiar cálculo 📅 2026-10-15\n- [ ] Databases <!-- streak: 0 | last:  | history:  -->\n- [ ] Numeric Methods <!-- streak: 2 | last: 2026-10-12 | history: 2026-10-12 -->\n- [x] Tarea terminada\n`;
+  const tasks = extractAllTasksFromContent(content, 'StudyFlow/Habits.md');
+
+  // Only real tasks (not habit items) should be returned
+  assert.equal(tasks.length, 2);
+  assert.equal(tasks[0].text, 'Estudiar cálculo 📅 2026-10-15');
+  assert.equal(tasks[1].text, 'Tarea terminada');
+});
+
+test('extractPendingTasksFromContent ignores habit lines with streak comments', () => {
+  const content = `# Habits\n- [ ] English <!-- streak: 0 | last:  | history:  -->\n- [ ] Tarea real en Inbox\n`;
+  const pending = extractPendingTasksFromContent(content, 'Test.md');
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].text, 'Tarea real en Inbox');
+});
+
 

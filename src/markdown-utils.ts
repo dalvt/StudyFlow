@@ -458,6 +458,7 @@ export function formatTaskWithPomodoroEstimate(
  */
 export function getCleanTaskDisplayTitle(text: string): string {
   let clean = text;
+  clean = clean.replace(/<!--[\s\S]*?-->/g, '');
   clean = clean.replace(/(?:⏫|🔼|🔽|#p[1-3]\b|#alta\b|#media\b|#baja\b)/gi, '');
   clean = clean.replace(/(?:🍅|:tomato:)\s*\d+(?:\s*\/\s*\d+)?/gi, '');
   clean = clean.replace(/📅\s*\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2})?/gi, '');
@@ -468,7 +469,7 @@ export function getCleanTaskDisplayTitle(text: string): string {
   clean = clean.replace(/#[\w\u00C0-\u017F-]+/g, '');
   clean = clean.replace(/^(?:💡|🧊|#ideas?\b|#icebox\b)\s*/i, '');
   clean = clean.replace(/\s{2,}/g, ' ').trim();
-  return clean || text;
+  return clean || text.replace(/<!--[\s\S]*?-->/g, '').trim() || text;
 }
 
 /**
@@ -619,6 +620,25 @@ export function appendIceboxItemToMarkdownSection(
 }
 
 /**
+ * Checks whether a markdown section heading corresponds to an Icebox / Ideas section.
+ * Avoids false positives from generic headings containing "idea" like "Main ideas" or "Ideas preconcebidas".
+ */
+export function isIceboxSection(sectionHeader: string, customIceboxHeader?: string): boolean {
+  if (!sectionHeader) return false;
+  const raw = sectionHeader.trim().toLowerCase();
+  const clean = raw.replace(/^#+\s*/, '').replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+  const customClean = customIceboxHeader
+    ? customIceboxHeader.trim().toLowerCase().replace(/^#+\s*/, '').replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim()
+    : 'icebox';
+
+  if (customClean && clean === customClean) return true;
+  if (clean === 'icebox' || clean === 'ideas' || clean === 'idea') return true;
+  if (/^icebox\s*[-/:|(\]]/i.test(clean)) return true;
+  if (/^ideas?\s*[-/:|(\]]/i.test(clean)) return true;
+  return false;
+}
+
+/**
  * Pure Markdown helper:
  * Extracts uncompleted tasks (- [ ]) from markdown content.
  */
@@ -631,10 +651,6 @@ export function extractPendingTasksFromContent(
   const lines = content.split(/\r?\n/);
   let currentSection = '';
 
-  const iceboxHeaderClean = options?.iceboxSectionHeader
-    ? options.iceboxSectionHeader.replace(/^#+\s*/, '').trim().toLowerCase()
-    : 'icebox';
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const headerMatch = line.match(/^#{1,6}\s+(.*)$/);
@@ -644,6 +660,10 @@ export function extractPendingTasksFromContent(
 
     const match = line.match(/^\s*-\s+\[\s\]\s+(.*)$/);
     if (match) {
+      // Habit tracker lines (- [ ] Habit <!-- streak: ... -->) are not todo tasks
+      if (/<!--\s*streak:\s*\d+/i.test(line)) {
+        continue;
+      }
       const taskText = match[1].trim();
       const { priority } = parseTaskPriority(taskText);
       const { estimated, completed } = parseTaskPomodoroEstimate(taskText);
@@ -653,10 +673,9 @@ export function extractPendingTasksFromContent(
       const { completedDate } = parseTaskCompletionDate(taskText);
       const { recurrence } = parseTaskRecurrence(taskText);
       const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
+      const inIcebox = isIceboxSection(currentSection, options?.iceboxSectionHeader);
       const isIdea =
-        currentSection.includes(iceboxHeaderClean) ||
-        currentSection.includes('icebox') ||
-        currentSection.includes('idea') ||
+        inIcebox ||
         /#(?:ideas?|icebox)\b/i.test(taskText) ||
         taskText.startsWith('💡') ||
         taskText.startsWith('🧊');
@@ -822,6 +841,10 @@ export function extractAllTasksFromContent(
 
     const match = line.match(/^\s*-\s+\[(.)\]\s+(.*)$/);
     if (match) {
+      // Habit tracker lines (- [ ] Habit <!-- streak: ... -->) are not todo tasks
+      if (/<!--\s*streak:\s*\d+/i.test(line)) {
+        continue;
+      }
       const statusChar = match[1];
       const taskText = match[2].trim();
       const completed = statusChar.toLowerCase() === 'x';
@@ -833,10 +856,9 @@ export function extractAllTasksFromContent(
       const { completedDate } = parseTaskCompletionDate(taskText);
       const { recurrence } = parseTaskRecurrence(taskText);
       const daysRemaining = dueDate ? calculateDaysRemaining(dueDate) : undefined;
+      const inIcebox = isIceboxSection(currentSection, options?.iceboxSectionHeader);
       const isIdea =
-        currentSection.includes(iceboxHeaderClean) ||
-        currentSection.includes('icebox') ||
-        currentSection.includes('idea') ||
+        inIcebox ||
         /#(?:ideas?|icebox)\b/i.test(taskText) ||
         taskText.startsWith('💡') ||
         taskText.startsWith('🧊');
@@ -869,12 +891,10 @@ export function extractAllTasksFromContent(
 
     // Passive bullet under Icebox / Ideas section (- bullet)
     const bulletMatch = line.match(/^\s*-\s+(?!\[[ xX]\])(.*)$/);
-    if (
-      bulletMatch &&
-      (currentSection.includes(iceboxHeaderClean) ||
-        currentSection.includes('icebox') ||
-        currentSection.includes('idea'))
-    ) {
+    if (bulletMatch && isIceboxSection(currentSection, options?.iceboxSectionHeader)) {
+      if (/<!--\s*streak:\s*\d+/i.test(line)) {
+        continue;
+      }
       const itemText = bulletMatch[1].trim();
       if (itemText) {
         const tags = extractTagsFromText(itemText);
@@ -1958,18 +1978,32 @@ export function computeDeadlinesFromTasks(tasks: TaskRecord[]): DeadlineItem[] {
 
 /**
  * Pure function to check if a file path is included in the task index
- * based on folder whitelist/blacklist settings.
+ * based on folder whitelist/blacklist settings and excluded files.
  */
 export function isPathIndexed(
   filePath: string,
   includedFolders: string[] = [],
-  excludedFolders: string[] = []
+  excludedFolders: string[] = [],
+  excludedFiles: string[] = []
 ): boolean {
   if (!filePath.endsWith('.md')) return false;
 
   const normalized = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
   const lowerPath = normalized.toLowerCase();
   const pathParts = lowerPath.split('/');
+
+  // Never index files inside trash or hidden folders (.trash, .obsidian, etc.)
+  if (pathParts.some((part) => part.startsWith('.') || part === '.trash' || part === 'trash')) {
+    return false;
+  }
+
+  // Check excluded files
+  for (const exFile of excludedFiles) {
+    const cleanExFile = exFile.trim().replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
+    if (cleanExFile && lowerPath === cleanExFile) {
+      return false;
+    }
+  }
 
   // Check excluded folders first
   for (const excluded of excludedFolders) {
