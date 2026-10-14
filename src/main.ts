@@ -1,11 +1,8 @@
 import { getLanguage, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
-import { HabitsModal } from './habits';
-import { NextDayPlannerModal } from './planner';
 import { PomodoroManager } from './pomodoro';
 import { PomodoroModal } from './pomodoro-modal';
-import { AnalyticsModal } from './analytics-modal';
 import { cloneDefaultSettings, StudyFlowSettings, StudyFlowSettingTab } from './settings';
-import { QuickCaptureModal, TasksManagerModal } from './tasks';
+import { QuickCaptureModal } from './tasks';
 import { ActiveTab, StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
 import { migratePluginFilesToDedicatedFolder } from './utils';
@@ -96,7 +93,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-tasks-manager',
       name: t('commands.openTasks'),
       callback: () => {
-        new TasksManagerModal(this.app, this).open();
+        void this.activateView(true, 'tasks');
       },
     });
 
@@ -104,7 +101,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-habits-tracker',
       name: t('commands.openHabits'),
       callback: () => {
-        new HabitsModal(this.app, this).open();
+        void this.activateView(true, 'habits');
       },
     });
 
@@ -112,7 +109,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-analytics-dashboard',
       name: t('commands.openAnalytics'),
       callback: () => {
-        new AnalyticsModal(this.app, this).open();
+        void this.activateView(true, 'analytics');
       },
     });
 

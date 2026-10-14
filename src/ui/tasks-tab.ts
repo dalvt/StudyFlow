@@ -21,11 +21,6 @@ import {
   getCleanTaskDisplayTitle,
 } from '../utils';
 import { matchesSubjectTag } from '../subject-analytics';
-import {
-  getSpacedRepetitionQueue,
-  reviewSpacedNote,
-  type SpacedRepetitionNoteItem,
-} from '../spaced-repetition';
 import { t } from '../i18n/index.ts';
 
 export class TasksTab implements TabComponent {
@@ -35,8 +30,8 @@ export class TasksTab implements TabComponent {
   private onSwitchTab: (tab: ActiveTab) => void;
 
   private tasks: TaskRecord[] = [];
-  private spacedNotesQueue: SpacedRepetitionNoteItem[] = [];
-  private taskFilter: 'inbox' | 'today' | 'subjects' | 'spaced' | 'icebox' | 'completed' | 'all' = 'inbox';
+  private taskView: 'today' | 'upcoming' | 'subjects' | 'icebox' = 'today';
+  private showCompleted: boolean = false;
   private taskSearchQuery: string = '';
   private taskSortBy: 'urgency' | 'priority' | 'estimate' | 'alpha' = 'urgency';
   private editingTaskId: string | null = null;
@@ -56,56 +51,73 @@ export class TasksTab implements TabComponent {
       this.tasks = this.plugin.taskIndex.getAllTasks();
     }
 
-    try {
-      this.spacedNotesQueue = await getSpacedRepetitionQueue(this.app, undefined, this.plugin);
-    } catch (e) {
-      this.spacedNotesQueue = [];
-    }
-
     const card = container.createDiv({ cls: 'study-flow-card study-flow-tasks-main-card' });
 
-    const pendingTasks = this.tasks.filter((t) => !t.completed && !t.isIdea);
-    const inboxTasks = this.tasks.filter((t) => !t.completed && !t.isIdea && (!t.tags || t.tags.length === 0));
-    const subjectTasks = this.tasks.filter((t) => !t.completed && !t.isIdea && t.tags && t.tags.length > 0);
-    const todayTasks = pendingTasks.filter(
-      (t) => (t.daysRemaining !== undefined && t.daysRemaining <= 0) || t.dueDate === formatDateKey(new Date())
-    );
-    const dueSpacedNotes = this.spacedNotesQueue.filter((n) => n.isDueToday);
-    const iceboxTasks = this.tasks.filter((t) => !t.completed && t.isIdea);
-    const completedTasks = this.tasks.filter((t) => t.completed && !t.isIdea);
-    const totalActionableTasks = this.tasks.filter((t) => !t.isIdea).length;
+    const todayDate = formatDateKey(new Date());
 
-    // 1. Segmented Views Tabs (At top, replaces redundant stats bar)
-    const filterRow = card.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
-    const filters: Array<{
-      id: 'inbox' | 'today' | 'subjects' | 'spaced' | 'icebox' | 'completed' | 'all';
+    const isToday = (t: TaskRecord) =>
+      !t.isIdea &&
+      ((t.daysRemaining !== undefined && t.daysRemaining <= 0) ||
+        t.dueDate === todayDate ||
+        (t.dueDate !== undefined && t.dueDate < todayDate));
+
+    const isUpcoming = (t: TaskRecord) =>
+      !t.isIdea &&
+      ((t.daysRemaining !== undefined && t.daysRemaining > 0) ||
+        (t.dueDate !== undefined && t.dueDate > todayDate));
+
+    const isSubject = (t: TaskRecord) => !t.isIdea;
+    const isIcebox = (t: TaskRecord) => Boolean(t.isIdea);
+
+    const pendingTasks = this.tasks.filter((t) => !t.completed);
+    const todayCount = pendingTasks.filter(isToday).length;
+    const upcomingCount = pendingTasks.filter(isUpcoming).length;
+    const subjectsCount = pendingTasks.filter(isSubject).length;
+    const iceboxCount = pendingTasks.filter(isIcebox).length;
+
+    // 1. Header controls: 4 Views Tabs + Completed Toggle
+    const headerControls = card.createDiv({ cls: 'study-flow-tasks-header-controls' });
+    const filterRow = headerControls.createDiv({ cls: 'study-flow-segmented-control study-flow-tasks-nav' });
+    const views: Array<{
+      id: 'today' | 'upcoming' | 'subjects' | 'icebox';
       label: string;
       count: number;
       icon: string;
     }> = [
-      { id: 'inbox', label: t('tasks.filterInbox'), count: inboxTasks.length, icon: 'inbox' },
-      { id: 'today', label: t('tasks.filterToday'), count: todayTasks.length, icon: 'calendar-check' },
-      { id: 'subjects', label: t('tasks.filterSubjects'), count: subjectTasks.length, icon: 'book-open' },
-      { id: 'spaced', label: t('tasks.filterSpaced'), count: dueSpacedNotes.length, icon: 'repeat' },
-      { id: 'icebox', label: t('tasks.filterIcebox'), count: iceboxTasks.length, icon: 'snowflake' },
-      { id: 'completed', label: t('tasks.filterCompleted'), count: completedTasks.length, icon: 'check-circle' },
-      { id: 'all', label: t('tasks.filterAll'), count: totalActionableTasks, icon: 'layers' },
+      { id: 'today', label: t('tasks.filterToday'), count: todayCount, icon: 'calendar-check' },
+      { id: 'upcoming', label: t('tasks.filterUpcoming'), count: upcomingCount, icon: 'calendar' },
+      { id: 'subjects', label: t('tasks.filterSubjects'), count: subjectsCount, icon: 'book-open' },
+      { id: 'icebox', label: t('tasks.filterIcebox'), count: iceboxCount, icon: 'snowflake' },
     ];
 
-    filters.forEach((f) => {
+    views.forEach((v) => {
       const btn = filterRow.createEl('button', {
-        cls: `study-flow-segmented-btn ${this.taskFilter === f.id ? 'is-active' : ''}`,
-        attr: { 'aria-label': `${f.label} (${f.count})` },
+        cls: `study-flow-segmented-btn ${this.taskView === v.id ? 'is-active' : ''}`,
+        attr: { 'aria-label': `${v.label} (${v.count})` },
       });
       const iconSpan = btn.createSpan({ cls: 'study-flow-tab-icon' });
-      setIcon(iconSpan, f.icon);
-      btn.createSpan({ text: f.label, cls: 'study-flow-segmented-label' });
-      btn.createSpan({ text: String(f.count), cls: 'study-flow-count-pill' });
+      setIcon(iconSpan, v.icon);
+      btn.createSpan({ text: v.label, cls: 'study-flow-segmented-label' });
+      btn.createSpan({ text: String(v.count), cls: 'study-flow-count-pill' });
       btn.addEventListener('click', async () => {
-        this.taskFilter = f.id;
+        this.taskView = v.id;
         this.selectedSubjectTag = null;
         if (this.container) await this.render(this.container);
       });
+    });
+
+    // Completed tasks toggle switch
+    const toggleWrap = headerControls.createDiv({ cls: 'study-flow-tasks-completed-toggle-wrap' });
+    const toggleLabel = toggleWrap.createEl('label', { cls: 'study-flow-toggle-label' });
+    const toggleCheckbox = toggleLabel.createEl('input', {
+      type: 'checkbox',
+      cls: 'study-flow-toggle-checkbox',
+    });
+    toggleCheckbox.checked = this.showCompleted;
+    toggleLabel.createSpan({ text: t('tasks.showCompleted'), cls: 'study-flow-toggle-text' });
+    toggleCheckbox.addEventListener('change', () => {
+      this.showCompleted = toggleCheckbox.checked;
+      renderList();
     });
 
     // 2. Search & Sort Bar
@@ -164,7 +176,7 @@ export class TasksTab implements TabComponent {
       ])
     );
 
-    const triggerBox = card.createDiv({ cls: 'study-flow-cloud-trigger-bar' });
+    const triggerBox = card.createDiv({ cls: 'study-flow-cloud-trigger-bar study-flow-new-task-trigger-bar' });
     const triggerLeft = triggerBox.createDiv({ cls: 'study-flow-trigger-left' });
     const plusSpan = triggerLeft.createSpan({ cls: 'study-flow-trigger-plus' });
     setIcon(plusSpan, 'plus');
@@ -174,13 +186,13 @@ export class TasksTab implements TabComponent {
     });
 
     const triggerRight = triggerBox.createDiv({ cls: 'study-flow-trigger-right' });
-    const cloudBtn = triggerRight.createEl('button', {
-      cls: 'study-flow-trigger-cloud-btn',
-      attr: { 'aria-label': t('tasks.openCloudTooltip') },
+    const newTaskBtn = triggerRight.createEl('button', {
+      cls: 'study-flow-trigger-cloud-btn study-flow-new-task-btn',
+      attr: { 'aria-label': t('tasks.newTaskTooltip') },
     });
-    const cIcon = cloudBtn.createSpan({ cls: 'study-flow-btn-icon' });
-    setIcon(cIcon, 'cloud');
-    cloudBtn.createSpan({ text: t('tasks.openCloud') });
+    const cIcon = newTaskBtn.createSpan({ cls: 'study-flow-btn-icon' });
+    setIcon(cIcon, 'plus');
+    newTaskBtn.createSpan({ text: t('tasks.newTask') });
 
     const openCreationModal = (initial = '') => {
       new TaskCreateModal(
@@ -195,7 +207,7 @@ export class TasksTab implements TabComponent {
     };
 
     triggerBox.addEventListener('click', () => openCreationModal());
-    cloudBtn.addEventListener('click', (e: MouseEvent) => {
+    newTaskBtn.addEventListener('click', (e: MouseEvent) => {
       e.stopPropagation();
       openCreationModal();
     });
@@ -212,47 +224,38 @@ export class TasksTab implements TabComponent {
   }
 
   private renderFilteredTaskList(listContainer: HTMLElement, rootContainer: HTMLElement): void {
-    // 0. Spaced view mode
-    if (this.taskFilter === 'spaced') {
-      let spacedItems = this.spacedNotesQueue.filter((n) => n.isDueToday);
-      if (this.taskSearchQuery) {
-        const q = this.taskSearchQuery.toLowerCase();
-        spacedItems = spacedItems.filter(
-          (n) => n.title.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
-        );
-      }
-      this.renderSpacedRepetitionSection(listContainer, spacedItems);
-      return;
-    }
+    const todayDate = formatDateKey(new Date());
 
-    // 0b. Spaced repetition queue section in 'today' view
-    if (this.taskFilter === 'today' && !this.selectedSubjectTag) {
-      let dueSpaced = this.spacedNotesQueue.filter((n) => n.isDueToday);
-      if (this.taskSearchQuery) {
-        const q = this.taskSearchQuery.toLowerCase();
-        dueSpaced = dueSpaced.filter(
-          (n) => n.title.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
-        );
-      }
-      if (dueSpaced.length > 0) {
-        this.renderSpacedRepetitionSection(listContainer, dueSpaced);
-      }
-    }
-
-    // 1. Filter by view mode
+    // 1. Filter by 4 views
     let filtered = this.tasks.filter((t) => {
-      if (this.taskFilter === 'inbox') return !t.completed && !t.isIdea && (!t.tags || t.tags.length === 0);
-      if (this.taskFilter === 'today') {
-        if (t.completed || t.isIdea) return false;
-        const isOverdueOrToday = t.daysRemaining !== undefined && t.daysRemaining <= 0;
-        const isTodayDate = t.dueDate === formatDateKey(new Date());
-        return isOverdueOrToday || isTodayDate;
+      if (this.taskView === 'today') {
+        if (t.isIdea) return false;
+        return (
+          (t.daysRemaining !== undefined && t.daysRemaining <= 0) ||
+          t.dueDate === todayDate ||
+          (t.dueDate !== undefined && t.dueDate < todayDate)
+        );
       }
-      if (this.taskFilter === 'subjects') return !t.completed && !t.isIdea && Boolean(t.tags && t.tags.length > 0);
-      if (this.taskFilter === 'icebox') return !t.completed && t.isIdea;
-      if (this.taskFilter === 'completed') return t.completed && !t.isIdea;
-      return !t.isIdea; // 'all' only includes actionable tasks
+      if (this.taskView === 'upcoming') {
+        if (t.isIdea) return false;
+        return (
+          (t.daysRemaining !== undefined && t.daysRemaining > 0) ||
+          (t.dueDate !== undefined && t.dueDate > todayDate)
+        );
+      }
+      if (this.taskView === 'subjects') {
+        return !t.isIdea;
+      }
+      if (this.taskView === 'icebox') {
+        return Boolean(t.isIdea);
+      }
+      return true;
     });
+
+    // Completed tasks toggle
+    if (!this.showCompleted) {
+      filtered = filtered.filter((t) => !t.completed);
+    }
 
     // 2. Search query filter
     if (this.taskSearchQuery) {
@@ -267,7 +270,11 @@ export class TasksTab implements TabComponent {
 
     // 3. Subject filter if tag is clicked
     if (this.selectedSubjectTag) {
-      filtered = filtered.filter((t) => t.tags && t.tags.includes(this.selectedSubjectTag!));
+      if (this.selectedSubjectTag === '__unclassified__') {
+        filtered = filtered.filter((t) => !t.tags || t.tags.length === 0);
+      } else {
+        filtered = filtered.filter((t) => t.tags && t.tags.includes(this.selectedSubjectTag!));
+      }
     }
 
     // 4. Sort
@@ -300,19 +307,19 @@ export class TasksTab implements TabComponent {
     if (filtered.length === 0) {
       const emptyState = listContainer.createDiv({ cls: 'study-flow-empty-state' });
       const emptyIcon = emptyState.createDiv({ cls: 'study-flow-empty-icon' });
-      if (this.taskFilter === 'icebox') {
+      if (this.taskView === 'icebox') {
         setIcon(emptyIcon, 'snowflake');
         emptyState.createEl('h4', { text: t('tasks.emptyIceboxTitle') });
         emptyState.createEl('p', { text: t('tasks.emptyIceboxDesc') });
-      } else if (this.taskFilter === 'today') {
+      } else if (this.taskView === 'today') {
         setIcon(emptyIcon, 'calendar-check');
         emptyState.createEl('h4', { text: t('tasks.emptyTodayTitle') });
         emptyState.createEl('p', { text: t('tasks.emptyTodayDesc') });
-      } else if (this.taskFilter === 'completed') {
-        setIcon(emptyIcon, 'check-circle-2');
-        emptyState.createEl('h4', { text: t('tasks.emptyCompletedTitle') });
-        emptyState.createEl('p', { text: t('tasks.emptyCompletedDesc') });
-      } else if (this.taskFilter === 'subjects') {
+      } else if (this.taskView === 'upcoming') {
+        setIcon(emptyIcon, 'calendar');
+        emptyState.createEl('h4', { text: t('tasks.emptyUpcomingTitle') });
+        emptyState.createEl('p', { text: t('tasks.emptyUpcomingDesc') });
+      } else if (this.taskView === 'subjects') {
         setIcon(emptyIcon, 'book-open');
         emptyState.createEl('h4', { text: t('tasks.emptySubjectsTitle') });
         emptyState.createEl('p', { text: t('tasks.emptySubjectsDesc') });
@@ -329,12 +336,12 @@ export class TasksTab implements TabComponent {
     }
 
     // If subject view without selected tag, render grouped by subject!
-    if (this.taskFilter === 'subjects' && !this.selectedSubjectTag) {
+    if (this.taskView === 'subjects' && !this.selectedSubjectTag) {
       const groups = new Map<string, TaskRecord[]>();
       filtered.forEach((task) => {
-        const tags = (task.tags && task.tags.length > 0) ? task.tags : ['#general'];
+        const tags = (task.tags && task.tags.length > 0) ? task.tags : ['__unclassified__'];
         tags.forEach((tag) => {
-          const groupName = tag.startsWith('#') ? tag : `#${tag}`;
+          const groupName = tag === '__unclassified__' ? '__unclassified__' : (tag.startsWith('#') ? tag : `#${tag}`);
           if (!groups.has(groupName)) {
             groups.set(groupName, []);
           }
@@ -343,6 +350,7 @@ export class TasksTab implements TabComponent {
       });
 
       groups.forEach((tasksInGroup, groupTag) => {
+        const isUnclassified = groupTag === '__unclassified__';
         const matchedSubject = (this.plugin.settings.subjects || []).find((s) =>
           matchesSubjectTag(s.tag, [groupTag])
         );
@@ -350,12 +358,15 @@ export class TasksTab implements TabComponent {
         const groupHeader = groupCard.createDiv({ cls: 'study-flow-subject-group-header' });
         const headerLeft = groupHeader.createDiv({ cls: 'study-flow-subject-header-left' });
         const gIcon = headerLeft.createSpan({ cls: 'study-flow-subject-icon' });
-        setIcon(gIcon, 'book-open');
+        setIcon(gIcon, isUnclassified ? 'inbox' : 'book-open');
         if (matchedSubject?.color) {
           gIcon.style.color = matchedSubject.color;
         }
+        const displayName = isUnclassified
+          ? t('tasks.unclassified')
+          : (matchedSubject ? matchedSubject.name : groupTag);
         const titleEl = headerLeft.createEl('h4', {
-          text: (matchedSubject ? matchedSubject.name : groupTag).toUpperCase(),
+          text: displayName.toUpperCase(),
           cls: 'study-flow-subject-title',
         });
         if (matchedSubject?.color) {
@@ -386,10 +397,12 @@ export class TasksTab implements TabComponent {
 
     // If a subject tag is actively selected, show breadcrumb back button
     if (this.selectedSubjectTag) {
+      const isUnclassified = this.selectedSubjectTag === '__unclassified__';
       const banner = listContainer.createDiv({ cls: 'study-flow-subject-active-banner' });
       const bIcon = banner.createSpan({ cls: 'study-flow-banner-icon' });
-      setIcon(bIcon, 'book-open');
-      banner.createSpan({ text: t('tasks.filteringBy', { tag: this.selectedSubjectTag }) });
+      setIcon(bIcon, isUnclassified ? 'inbox' : 'book-open');
+      const tagLabel = isUnclassified ? t('tasks.unclassified') : this.selectedSubjectTag;
+      banner.createSpan({ text: t('tasks.filteringBy', { tag: tagLabel }) });
       const clearSubBtn = banner.createEl('button', {
         cls: 'study-flow-filter-clear-btn',
         text: t('tasks.viewAllSubjects'),
@@ -406,92 +419,6 @@ export class TasksTab implements TabComponent {
     filtered.forEach((task) => {
       this.renderTaskCardItem(listContainer, task, rootContainer);
     });
-  }
-
-  private renderSpacedRepetitionSection(container: HTMLElement, items: SpacedRepetitionNoteItem[]): void {
-    const card = container.createDiv({ cls: 'study-flow-spaced-card' });
-    const header = card.createDiv({ cls: 'study-flow-spaced-header' });
-    const headerLeft = header.createDiv({ cls: 'study-flow-spaced-header-left' });
-    const icon = headerLeft.createSpan({ cls: 'study-flow-spaced-icon' });
-    setIcon(icon, 'repeat');
-    headerLeft.createEl('h4', { text: t('spaced.todayQueue') });
-    header.createSpan({
-      text: t('spaced.dueCount', { count: String(items.length) }),
-      cls: 'study-flow-count-pill',
-    });
-
-    if (items.length === 0) {
-      const emptyDiv = card.createDiv({ cls: 'study-flow-spaced-empty' });
-      emptyDiv.createEl('p', { text: t('spaced.emptyQueueTitle'), cls: 'study-flow-spaced-empty-title' });
-      emptyDiv.createEl('span', { text: t('spaced.emptyQueueDesc'), cls: 'study-flow-card-sub' });
-      return;
-    }
-
-    const list = card.createDiv({ cls: 'study-flow-spaced-list' });
-    for (const item of items) {
-      const row = list.createDiv({ cls: 'study-flow-spaced-item' });
-      const rowLeft = row.createDiv({ cls: 'study-flow-spaced-item-left' });
-      const docIcon = rowLeft.createSpan({ cls: 'study-flow-spaced-doc-icon' });
-      setIcon(docIcon, 'file-text');
-
-      const titleLink = rowLeft.createSpan({
-        text: item.title,
-        cls: 'study-flow-spaced-title-link',
-        attr: { 'aria-label': item.path },
-      });
-      titleLink.addEventListener('click', () => {
-        void this.app.workspace.openLinkText(item.path, '', false);
-      });
-
-      const badges = rowLeft.createDiv({ cls: 'study-flow-spaced-badges' });
-      badges.createSpan({
-        text: t('spaced.intervalBadge', { interval: String(item.interval) }),
-        cls: 'study-flow-spaced-interval-badge',
-      });
-
-      if (item.daysOverdue > 0) {
-        badges.createSpan({
-          text: t('spaced.overdueBadge', { days: String(item.daysOverdue) }),
-          cls: 'study-flow-spaced-overdue-badge',
-        });
-      } else {
-        badges.createSpan({
-          text: t('spaced.todayBadge'),
-          cls: 'study-flow-spaced-today-badge',
-        });
-      }
-
-      const actions = row.createDiv({ cls: 'study-flow-spaced-actions' });
-      const hardBtn = actions.createEl('button', {
-        text: t('spaced.hardBtn'),
-        cls: 'study-flow-spaced-btn-hard',
-      });
-      hardBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-          await reviewSpacedNote(this.app, item.file, 'dificil', undefined, this.plugin);
-          new Notice(t('spaced.reviewedHardNotice', { title: item.title }));
-          if (this.container) await this.render(this.container);
-        } catch (err) {
-          console.error('Error reviewing spaced note (dificil):', err);
-        }
-      });
-
-      const easyBtn = actions.createEl('button', {
-        text: t('spaced.easyBtn'),
-        cls: 'study-flow-btn-primary study-flow-spaced-btn-easy',
-      });
-      easyBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        try {
-          const res = await reviewSpacedNote(this.app, item.file, 'facil', undefined, this.plugin);
-          new Notice(t('spaced.reviewedEasyNotice', { title: item.title, next: res.nextReviewDate }));
-          if (this.container) await this.render(this.container);
-        } catch (err) {
-          console.error('Error reviewing spaced note (facil):', err);
-        }
-      });
-    }
   }
 
   private renderTaskCardItem(container: HTMLElement, task: TaskRecord, rootContainer: HTMLElement): void {
@@ -604,7 +531,7 @@ export class TasksTab implements TabComponent {
             tagChip.addEventListener('click', (e) => {
               e.stopPropagation();
               this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
-              this.taskFilter = 'subjects';
+              this.taskView = 'subjects';
               if (this.container) void this.render(this.container);
             });
           } else {
@@ -615,7 +542,7 @@ export class TasksTab implements TabComponent {
             tagChip.addEventListener('click', (e) => {
               e.stopPropagation();
               this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
-              this.taskFilter = 'subjects';
+              this.taskView = 'subjects';
               if (this.container) void this.render(this.container);
             });
           }

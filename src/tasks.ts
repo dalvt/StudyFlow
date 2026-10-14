@@ -377,8 +377,3 @@ export class QuickCaptureModal extends Modal {
   }
 }
 
-/**
- * Minimal task capture modal (replaces duplicate dashboard modal).
- */
-export class TasksManagerModal extends QuickCaptureModal {}
-

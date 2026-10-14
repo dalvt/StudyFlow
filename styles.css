@@ -2737,8 +2737,43 @@ body.is-study-flow-zen .workspace-split {
   height: 13px;
 }
 
-/* Cloud Trigger Bar (Zen minimal bar opening floating modal) */
-.study-flow-cloud-trigger-bar {
+/* Tasks Header Controls & Completed Toggle */
+.study-flow-tasks-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.study-flow-tasks-completed-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.study-flow-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.study-flow-toggle-label:hover {
+  color: var(--text-normal);
+}
+
+.study-flow-toggle-checkbox {
+  cursor: pointer;
+}
+
+/* Trigger Bar (Zen minimal bar opening floating modal) */
+.study-flow-cloud-trigger-bar,
+.study-flow-new-task-trigger-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2751,7 +2786,8 @@ body.is-study-flow-zen .workspace-split {
   user-select: none;
 }
 
-.study-flow-cloud-trigger-bar:hover {
+.study-flow-cloud-trigger-bar:hover,
+.study-flow-new-task-trigger-bar:hover {
   border-color: var(--interactive-accent);
   background: var(--background-primary);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--text-normal) 12%, transparent);
@@ -2795,7 +2831,8 @@ body.is-study-flow-zen .workspace-split {
   gap: 6px;
 }
 
-.study-flow-trigger-cloud-btn {
+.study-flow-trigger-cloud-btn,
+.study-flow-new-task-btn {
   font-size: 11px;
   font-weight: 600;
   padding: 4px 10px;
@@ -2807,7 +2844,8 @@ body.is-study-flow-zen .workspace-split {
   transition: all 0.15s ease;
 }
 
-.study-flow-trigger-cloud-btn:hover {
+.study-flow-trigger-cloud-btn:hover,
+.study-flow-new-task-btn:hover {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
 }

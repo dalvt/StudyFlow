@@ -15,11 +15,12 @@ Asistente integral de estudio y productividad académica para Obsidian. Combina 
 - **Registro en Nota Diaria:** Guarda automáticamente cada sesión completada en la nota diaria correspondiente.
 
 ### 📋 2. Gestor de Tareas & Icebox
-- **Separación de Tareas e Ideas:** Tareas accionables con checkboxes vs. notas e ideas espontáneas en `Icebox` sin saturar la lista de pendientes.
+- **4 Vistas Claras:** **Hoy** (incluye tareas vencidas y de hoy), **Próximas** (entregas futuras), **Por materia** (agrupadas por asignatura y sección **Sin clasificar**) e **Icebox** (ideas sin fecha).
+- **Interruptor de completadas:** Permite alternar la visualización de tareas hechas en la vista activa.
 - **Metadatos enriquecidos:** Prioridades (⏫ Alta, 🔼 Media, 🔽 Baja), estimaciones y pomodoros completados (🍅 1/3), fechas límite (📅 YYYY-MM-DD), tareas programadas (⏳) y recurrencias (🔁).
 - **Subtareas interactivas:** Soporte para listas anidadas con checkboxes interactivos.
 - **Indexación reactiva:** Escaneo en tiempo real de tareas en todo el vault con soporte para carpetas incluidas y excluidas (`taskIncludedFolders`, `taskExcludedFolders`).
-- **Captura rápida:** Modal veloz (`plus-circle` en ribbon) para registrar tareas o ideas directamente en `Inbox.md` o en la nota activa.
+- **Nueva tarea y Captura rápida:** Botón "Nueva tarea" en la pestaña y acceso veloz (`plus-circle` en ribbon) para registrar tareas o ideas directamente en `Inbox.md` o en la nota activa.
 
 ### 🔥 3. Hábitos y Rutinas
 - **Frecuencias flexibles:** Soporte para hábitos diarios (`diaria`), N veces por semana (`weekly`, ej. 3x/sem) o días específicos (`specific_days`, ej. Lun-Vie).
@@ -67,15 +68,17 @@ La interfaz mantiene una superficie minimalista con solo dos íconos esenciales:
 ### Paleta de Comandos (`Ctrl + P` / `Cmd + P`)
 - `Study Flow: Abrir interfaz completa (Pestaña central)`
 - `Study Flow: Abrir en panel lateral (Sidebar)`
-- `Study Flow: Abrir Calendario y Bloques de Tiempo`
+- `Study Flow: Abrir Calendario y Bloques de Tiempo` (Pestaña Calendario)
+- `Study Flow: Abrir gestor de tareas & Inbox` (Pestaña Tareas)
+- `Study Flow: Abrir registro de hábitos diarios` (Pestaña Hábitos)
+- `Study Flow: Abrir métricas y rendimiento de estudio` (Pestaña Métricas)
+- `Study Flow: Abrir temporizador Pomodoro` (Mini Timer flotante)
+- `Study Flow: Capturar tarea rápida`
+- `Study Flow: Planificar el día de mañana`
 - `Study Flow: Exportar bloques y deadlines a .ics`
 - `Study Flow: Generar revisión semanal`
 - `Study Flow: Iniciar repaso espaciado en la nota activa`
-- `Study Flow: Abrir temporizador Pomodoro` (Mini Timer)
-- `Study Flow: Abrir gestor de tareas & Inbox`
-- `Study Flow: Abrir registro de hábitos diarios`
-- `Study Flow: Abrir métricas y rendimiento de estudio`
-- `Study Flow: Capturar tarea rápida`
+- `Study Flow: Migrar logs de Pomodoro a nuevo formato`
 - `Study Flow: Modo Zen: Alternar enfoque sin distracciones`
 - `Study Flow: Pomodoro: Iniciar / Pausar`
 - `Study Flow: Pomodoro: Reiniciar`
