@@ -1,6 +1,6 @@
 {
   "name": "study-flow-assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pomodoro timer, lightweight task management, and daily planner for Obsidian.",
   "main": "main.js",
   "scripts": {
