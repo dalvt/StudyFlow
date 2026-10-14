@@ -242,6 +242,25 @@ export class SubjectSelectModal extends Modal {
       await this.onSelect(null);
     });
 
+    // "+ Añadir materia" option
+    const addSubjectBtn = listContainer.createEl('button', {
+      cls: 'study-flow-subject-select-item is-add',
+    });
+    const addIcon = addSubjectBtn.createSpan({ cls: 'study-flow-subject-color-dot is-add' });
+    setIcon(addIcon, 'plus');
+    addSubjectBtn.createSpan({ text: `+ ${t('subjects.addSubjectBtn')}`, cls: 'study-flow-subject-item-name' });
+    addSubjectBtn.addEventListener('click', () => {
+      this.close();
+      new SubjectEditModal(this.app, this.plugin, null, async (newSub) => {
+        if (!this.plugin.settings.subjects) {
+          this.plugin.settings.subjects = [];
+        }
+        this.plugin.settings.subjects.push(newSub);
+        await this.plugin.saveSettings();
+        await this.onSelect(newSub);
+      }).open();
+    });
+
     // Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
     const cancelBtn = footer.createEl('button', { text: t('common.cancel') });

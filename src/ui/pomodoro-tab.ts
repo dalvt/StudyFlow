@@ -1,7 +1,13 @@
 import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
-import { parseTaskPomodoroEstimate, PendingTaskItem, getCleanTaskDisplayTitle } from '../utils';
+import {
+  parseTaskPomodoroEstimate,
+  PendingTaskItem,
+  getCleanTaskDisplayTitle,
+  getOrCreateFile,
+  appendTaskToMarkdownSection,
+} from '../utils';
 import { SubjectSelectModal } from '../subject-modal';
 import { t } from '../i18n/index.ts';
 
@@ -408,7 +414,7 @@ export class PomodoroTab implements TabComponent {
           if (this.container) await this.render(this.container);
         });
 
-        if (!status.activeSubject && (this.plugin.settings.subjects?.length || 0) > 0) {
+        if (!status.activeSubject) {
           const linkSubBtn = btnRow.createEl('button', { cls: 'study-flow-link-task-btn study-flow-link-subject-btn' });
           const subIcon = linkSubBtn.createSpan();
           setIcon(subIcon, 'book-open');
@@ -423,6 +429,48 @@ export class PomodoroTab implements TabComponent {
       } else {
         const pickerBox = taskSection.createDiv({ cls: 'study-flow-task-picker-box' });
         pickerBox.createEl('div', { text: t('pomodoro.selectInboxTask'), cls: 'study-flow-picker-title' });
+
+        // Quick add task input
+        const quickRow = pickerBox.createDiv({ cls: 'study-flow-search-bar study-flow-task-add-bar study-flow-picker-add-row' });
+        const quickInput = quickRow.createEl('input', {
+          type: 'text',
+          placeholder: t('pomodoro.quickTaskPlaceholder'),
+          cls: 'study-flow-task-input',
+        });
+        const quickBtn = quickRow.createEl('button', { cls: 'mod-cta' });
+        quickBtn.createSpan({ text: t('pomodoro.linkQuickTaskBtn') });
+
+        const handleQuickLink = async () => {
+          const val = quickInput.value.trim();
+          if (!val) return;
+          const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+          const defaultContent = `# Inbox\n\n## Tareas\n\n## Icebox\n\n`;
+          const file = await getOrCreateFile(this.app, inboxPath, defaultContent);
+          await this.app.vault.process(file, (content) => {
+            return appendTaskToMarkdownSection(content, val, this.plugin.settings.tasksSectionHeader);
+          });
+          if (this.plugin.taskIndex) {
+            await this.plugin.taskIndex.indexFile(file);
+          }
+          await this.plugin.pomodoro.setActiveTask({
+            id: `${file.path}#${val}`,
+            text: val,
+            sourceFile: file.path,
+          });
+          this.isSelectingTaskForPomodoro = false;
+          new Notice(t('pomodoro.focusedOnNotice', { task: val }));
+          if (this.container) await this.render(this.container);
+        };
+
+        quickBtn.addEventListener('click', () => {
+          void handleQuickLink();
+        });
+        quickInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            void handleQuickLink();
+          }
+        });
 
         if (this.pendingInboxTasks.length === 0) {
           pickerBox.createDiv({ cls: 'study-flow-empty-tasks', text: t('pomodoro.noPendingTasks') });

@@ -552,9 +552,13 @@ textarea:focus-visible,
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-height: 160px;
+  gap: 6px;
+  max-height: 240px;
   overflow-y: auto;
+}
+
+.study-flow-picker-add-row {
+  margin-bottom: 4px;
 }
 
 .study-flow-picker-title {

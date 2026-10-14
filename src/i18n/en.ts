@@ -99,6 +99,8 @@ export const en = {
   'pomodoro.linkTaskDots': 'Link task...',
   'pomodoro.selectInboxTask': 'Select a task from your Inbox:',
   'pomodoro.selectTaskPrompt': '— Select a task —',
+  'pomodoro.quickTaskPlaceholder': 'Type a task to focus on...',
+  'pomodoro.linkQuickTaskBtn': 'Link',
   'pomodoro.noPendingTasks': 'No pending tasks in Inbox.',
   'pomodoro.noPendingTasksShort': 'No pending tasks',
   'pomodoro.selectTaskLabel': 'Select task: {text}',

@@ -101,6 +101,8 @@ export const es: TranslationDict = {
   'pomodoro.linkTaskDots': 'Vincular tarea...',
   'pomodoro.selectInboxTask': 'Selecciona una tarea de tu Inbox:',
   'pomodoro.selectTaskPrompt': '— Selecciona una tarea —',
+  'pomodoro.quickTaskPlaceholder': 'Escribe una tarea para enfocar...',
+  'pomodoro.linkQuickTaskBtn': 'Vincular',
   'pomodoro.noPendingTasks': 'No hay tareas pendientes en el Inbox.',
   'pomodoro.noPendingTasksShort': 'Sin tareas pendientes',
   'pomodoro.selectTaskLabel': 'Seleccionar tarea: {text}',
