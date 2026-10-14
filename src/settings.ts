@@ -1,9 +1,9 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { playPomodoroChime } from './audio';
+import { playPomodoroSound } from './audio';
 import type { FocusSessionRecord } from './analytics';
 
-import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, cloneDefaultSettings, validateSettingNumber } from './settings-utils';
+import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, cloneDefaultSettings, validateSettingNumber, type PomodoroSoundType } from './settings-utils';
 export * from './settings-utils';
 import { t, setLanguage, getEffectiveLanguage } from './i18n/index.ts';
 import { getDefaultWeeklyReviewTemplate } from './conventions.ts';
@@ -105,6 +105,22 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(t('settings.soundSelectorName'))
+      .setDesc(t('settings.soundSelectorDesc'))
+      .addDropdown((drop) =>
+        drop
+          .addOption('bell', t('settings.soundBell'))
+          .addOption('soft', t('settings.soundSoft'))
+          .addOption('click', t('settings.soundClick'))
+          .addOption('silent', t('settings.soundSilent'))
+          .setValue(this.plugin.settings.pomodoroSound || 'bell')
+          .onChange(async (value) => {
+            this.plugin.settings.pomodoroSound = value as PomodoroSoundType;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName(t('settings.chimeVolumeName'))
       .setDesc(t('settings.chimeVolumeDesc'))
       .addSlider((slider) =>
@@ -122,7 +138,31 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setButtonText(t('settings.testSoundBtn'))
           .setIcon('bell')
           .onClick(() => {
-            playPomodoroChime('work', this.plugin.settings.chimeVolume);
+            playPomodoroSound(this.plugin.settings.pomodoroSound || 'bell', 'work', this.plugin.settings.chimeVolume);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.closingReviewName'))
+      .setDesc(t('settings.closingReviewDesc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableSessionClosingReview)
+          .onChange(async (value) => {
+            this.plugin.settings.enableSessionClosingReview = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.breakTipsName'))
+      .setDesc(t('settings.breakTipsDesc'))
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.enableBreakTips)
+          .onChange(async (value) => {
+            this.plugin.settings.enableBreakTips = value;
+            await this.plugin.saveSettings();
           })
       );
 

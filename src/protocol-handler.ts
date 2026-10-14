@@ -1,5 +1,6 @@
 import { type App, Notice } from 'obsidian';
 import type StudyFlowPlugin from './main';
+import type { ActiveTab } from './ui/types';
 import { getOrCreateFile } from './utils';
 import { appendTaskToMarkdownSection } from './markdown-utils';
 import { QuickCaptureModal } from './tasks';
@@ -47,6 +48,24 @@ export async function handleStudyFlowProtocol(
 
   switch (parsed.action) {
     case 'start': {
+      if (parsed.task) {
+        await plugin.pomodoro.setActiveTask({
+          id: `protocol#${parsed.task}`,
+          text: parsed.task,
+          sourceFile: plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md',
+        });
+      }
+
+      if (parsed.subject) {
+        const needle = parsed.subject.toLowerCase().replace(/^#/, '');
+        const sub = (plugin.settings.subjects || []).find(
+          (s) => s.name.toLowerCase() === needle || s.tag.toLowerCase().replace(/^#/, '') === needle
+        );
+        if (sub) {
+          await plugin.pomodoro.setActiveSubject(sub);
+        }
+      }
+
       if (plugin.pomodoro.getStatus().state === 'running') {
         new Notice(t('protocol.timerAlreadyRunning'));
       } else {
@@ -62,6 +81,36 @@ export async function handleStudyFlowProtocol(
       } else {
         new Notice(t('protocol.timerNotRunning'));
       }
+      break;
+    }
+    case 'reset': {
+      await plugin.pomodoro.reset();
+      new Notice(t('protocol.timerResetNotice'));
+      break;
+    }
+    case 'skip': {
+      await plugin.pomodoro.skipCycle();
+      new Notice(t('protocol.timerSkippedNotice'));
+      break;
+    }
+    case 'complete-task': {
+      const activeTask = plugin.pomodoro.getActiveTask();
+      if (activeTask) {
+        const taskName = activeTask.text;
+        await plugin.pomodoro.completeActiveTask();
+        new Notice(t('protocol.taskCompletedNotice', { task: taskName }));
+      } else {
+        new Notice(t('protocol.noActiveTaskNotice'));
+      }
+      break;
+    }
+    case 'open': {
+      const validTabs: ActiveTab[] = ['today', 'pomodoro', 'calendar', 'tasks', 'habits', 'analytics'];
+      const targetTab = (parsed.tab && validTabs.includes(parsed.tab.toLowerCase() as ActiveTab))
+        ? (parsed.tab.toLowerCase() as ActiveTab)
+        : 'today';
+      await plugin.activateView(true, targetTab);
+      new Notice(t('protocol.tabOpenedNotice', { tab: targetTab }));
       break;
     }
     case 'capture': {

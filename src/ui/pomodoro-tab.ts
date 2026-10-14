@@ -1,6 +1,7 @@
-import { App, Notice, setIcon } from 'obsidian';
+import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
+import type { PomodoroPreset } from '../settings-utils';
 import {
   parseTaskPomodoroEstimate,
   PendingTaskItem,
@@ -14,11 +15,81 @@ import { t } from '../i18n/index.ts';
 const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 
+export class PomodoroCreatePresetModal extends Modal {
+  private plugin: StudyFlowPlugin;
+  private onSaved: () => void;
+  private name: string = '';
+  private workMinutes: number = 45;
+  private breakMinutes: number = 15;
+
+  constructor(app: App, plugin: StudyFlowPlugin, onSaved: () => void) {
+    super(app);
+    this.plugin = plugin;
+    this.onSaved = onSaved;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('study-flow-modal');
+
+    contentEl.createEl('h2', { text: t('pomodoro.createPresetTitle') });
+
+    new Setting(contentEl)
+      .setName(t('pomodoro.presetName'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('pomodoro.presetNamePlaceholder'))
+          .onChange((val) => {
+            this.name = val;
+          });
+      });
+
+    new Setting(contentEl)
+      .setName(t('pomodoro.presetWork'))
+      .addText((text) => {
+        text
+          .setValue(String(this.workMinutes))
+          .onChange((val) => {
+            const num = parseInt(val, 10);
+            if (!isNaN(num) && num > 0) this.workMinutes = num;
+          });
+      });
+
+    new Setting(contentEl)
+      .setName(t('pomodoro.presetBreak'))
+      .addText((text) => {
+        text
+          .setValue(String(this.breakMinutes))
+          .onChange((val) => {
+            const num = parseInt(val, 10);
+            if (!isNaN(num) && num > 0) this.breakMinutes = num;
+          });
+      });
+
+    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
+    const cancelBtn = footer.createEl('button', { text: t('common.cancel'), cls: 'study-flow-btn-secondary' });
+    cancelBtn.addEventListener('click', () => this.close());
+
+    const saveBtn = footer.createEl('button', { text: t('common.save'), cls: 'mod-cta' });
+    saveBtn.addEventListener('click', async () => {
+      const presetName = this.name.trim() || `${this.workMinutes}/${this.breakMinutes}`;
+      await this.plugin.pomodoro.addCustomPreset(presetName, this.workMinutes, this.breakMinutes);
+      new Notice(t('pomodoro.presetAddedNotice', { name: presetName }));
+      this.close();
+      this.onSaved();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 export class PomodoroTab implements TabComponent {
   private app: App;
   private plugin: StudyFlowPlugin;
   private container: HTMLElement | null = null;
-  private isAdjustingPomodoroTimes: boolean = false;
   private isSelectingTaskForPomodoro: boolean = false;
   private pendingInboxTasks: PendingTaskItem[] = [];
   private lastAnnouncedMode: 'work' | 'break' | null = null;
@@ -37,36 +108,68 @@ export class PomodoroTab implements TabComponent {
 
     // Presets bar
     const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
-    const presets = [
-      { label: '25m', mins: 25, mode: 'work' as const },
-      { label: '50m', mins: 50, mode: 'work' as const },
-      { label: '5m', mins: 5, mode: 'break' as const },
-      { label: '15m', mins: 15, mode: 'break' as const },
-    ];
+    const presets: PomodoroPreset[] = this.plugin.settings.pomodoroPresets || [];
 
-    presets.forEach((p) => {
-      const chip = presetsRow.createEl('button', {
-        text: p.label,
-        cls: 'study-flow-preset-chip',
+    for (const p of presets) {
+      const isPresetActive =
+        !status.isCountUp &&
+        this.plugin.settings.pomodoroWorkDuration === p.workMinutes &&
+        this.plugin.settings.pomodoroBreakDuration === p.breakMinutes;
+
+      const chipWrapper = presetsRow.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
+      const chip = chipWrapper.createEl('button', {
+        text: p.name,
+        cls: `study-flow-preset-chip ${isPresetActive ? 'is-active' : ''}`,
+        attr: { 'aria-label': `${p.name} (${p.workMinutes}m / ${p.breakMinutes}m)` },
       });
-      chip.addEventListener('click', () => {
-        this.plugin.pomodoro.setCustomMinutes(p.mins, p.mode);
+      chip.addEventListener('click', async () => {
+        await this.plugin.pomodoro.applyPreset(p);
+        if (this.container) await this.render(this.container);
       });
+
+      if (p.isCustom) {
+        const delBtn = chipWrapper.createEl('button', {
+          cls: 'study-flow-preset-del-btn clickable-icon',
+          attr: { 'aria-label': t('pomodoro.deletePresetTooltip') },
+        });
+        setIcon(delBtn, 'x');
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await this.plugin.pomodoro.deleteCustomPreset(p.id);
+          new Notice(t('pomodoro.presetDeletedNotice'));
+          if (this.container) await this.render(this.container);
+        });
+      }
+    }
+
+    // Add preset button
+    const addPresetBtn = presetsRow.createEl('button', {
+      cls: 'study-flow-preset-chip study-flow-add-preset-chip',
+      text: t('pomodoro.addPresetBtn'),
+      attr: { 'aria-label': t('pomodoro.addPreset') },
+    });
+    addPresetBtn.addEventListener('click', () => {
+      new PomodoroCreatePresetModal(this.app, this.plugin, () => {
+        if (this.container) void this.render(this.container);
+      }).open();
     });
 
-    // In-place adjust toggle chip
-    const adjustBtn = presetsRow.createEl('button', {
-      cls: `study-flow-preset-chip study-flow-adjust-toggle-chip ${this.isAdjustingPomodoroTimes ? 'is-active' : ''}`,
-      attr: { 'aria-label': t('pomodoro.configureTimes') },
+    // Count-up mode chip (Modo sin límite)
+    const countUpBtn = presetsRow.createEl('button', {
+      cls: `study-flow-preset-chip study-flow-countup-chip ${status.isCountUp ? 'is-active' : ''}`,
+      text: t('pomodoro.presetCountUp'),
+      attr: { 'aria-label': t('pomodoro.presetCountUpTooltip') },
     });
-    const adjIcon = adjustBtn.createSpan();
-    setIcon(adjIcon, 'sliders');
-    adjustBtn.createSpan({ text: this.isAdjustingPomodoroTimes ? t('common.close') : t('pomodoro.adjust') });
-    adjustBtn.addEventListener('click', () => {
-      this.isAdjustingPomodoroTimes = !this.isAdjustingPomodoroTimes;
-      if (this.container) void this.render(this.container);
+    countUpBtn.addEventListener('click', async () => {
+      if (!status.isCountUp) {
+        await this.plugin.pomodoro.startCountUp();
+      } else {
+        await this.plugin.pomodoro.finishCountUpSession();
+      }
+      if (this.container) await this.render(this.container);
     });
 
+    // Zen toggle chip
     const zenBtn = presetsRow.createEl('button', {
       cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
       attr: { 'aria-label': t('pomodoro.toggleZenTooltip') },
@@ -78,102 +181,6 @@ export class PomodoroTab implements TabComponent {
       this.plugin.zen.toggleZen();
       if (this.container) void this.render(this.container);
     });
-
-    // In-place Custom Durations Panel
-    if (this.isAdjustingPomodoroTimes) {
-      const customPanel = card.createDiv({ cls: 'study-flow-pomodoro-custom-panel' });
-
-      const panelTitle = customPanel.createDiv({ cls: 'study-flow-custom-panel-title' });
-      const titleIcon = panelTitle.createSpan({ cls: 'study-flow-panel-title-icon' });
-      setIcon(titleIcon, 'clock');
-      panelTitle.createSpan({ text: ` ${t('pomodoro.customTimesTitle')}` });
-
-      const controlsRow = customPanel.createDiv({ cls: 'study-flow-custom-controls-row' });
-
-      // Work Duration Stepper
-      const workCol = controlsRow.createDiv({ cls: 'study-flow-stepper-col' });
-      workCol.createEl('span', { text: t('pomodoro.focusMinutes'), cls: 'study-flow-stepper-label' });
-      const workControls = workCol.createDiv({ cls: 'study-flow-stepper-controls' });
-      const workMinusBtn = workControls.createEl('button', {
-        text: '−',
-        cls: 'study-flow-stepper-btn',
-        attr: { 'aria-label': t('pomodoro.decreaseFocus') },
-      });
-      const workInput = workControls.createEl('input', {
-        type: 'number',
-        cls: 'study-flow-stepper-input',
-        value: String(this.plugin.settings.pomodoroWorkDuration),
-        attr: { min: '1', max: '180', step: '5', 'aria-label': t('pomodoro.focusMinutesAria') },
-      });
-      const workPlusBtn = workControls.createEl('button', {
-        text: '+',
-        cls: 'study-flow-stepper-btn',
-        attr: { 'aria-label': t('pomodoro.increaseFocus') },
-      });
-
-      workMinusBtn.addEventListener('click', () => {
-        const val = Math.max(1, (parseInt(workInput.value, 10) || 25) - 5);
-        workInput.value = String(val);
-      });
-      workPlusBtn.addEventListener('click', () => {
-        const val = Math.min(180, (parseInt(workInput.value, 10) || 25) + 5);
-        workInput.value = String(val);
-      });
-
-      // Break Duration Stepper
-      const breakCol = controlsRow.createDiv({ cls: 'study-flow-stepper-col' });
-      breakCol.createEl('span', { text: t('pomodoro.breakMinutes'), cls: 'study-flow-stepper-label' });
-      const breakControls = breakCol.createDiv({ cls: 'study-flow-stepper-controls' });
-      const breakMinusBtn = breakControls.createEl('button', {
-        text: '−',
-        cls: 'study-flow-stepper-btn',
-        attr: { 'aria-label': t('pomodoro.decreaseBreak') },
-      });
-      const breakInput = breakControls.createEl('input', {
-        type: 'number',
-        cls: 'study-flow-stepper-input',
-        value: String(this.plugin.settings.pomodoroBreakDuration),
-        attr: { min: '1', max: '60', step: '1', 'aria-label': t('pomodoro.breakMinutesAria') },
-      });
-      const breakPlusBtn = breakControls.createEl('button', {
-        text: '+',
-        cls: 'study-flow-stepper-btn',
-        attr: { 'aria-label': t('pomodoro.increaseBreak') },
-      });
-
-      breakMinusBtn.addEventListener('click', () => {
-        const val = Math.max(1, (parseInt(breakInput.value, 10) || 5) - 1);
-        breakInput.value = String(val);
-      });
-      breakPlusBtn.addEventListener('click', () => {
-        const val = Math.min(60, (parseInt(breakInput.value, 10) || 5) + 1);
-        breakInput.value = String(val);
-      });
-
-      // Default Checkbox & Apply button
-      const actionsRow = customPanel.createDiv({ cls: 'study-flow-custom-actions-row' });
-      const checkWrap = actionsRow.createDiv({ cls: 'study-flow-custom-check-wrap' });
-      const defaultCheck = checkWrap.createEl('input', {
-        type: 'checkbox',
-        cls: 'study-flow-checkbox',
-        attr: { id: 'sf-save-default' },
-      });
-      defaultCheck.checked = true;
-      checkWrap.createEl('label', { text: t('pomodoro.saveAsDefault'), attr: { for: 'sf-save-default' } });
-
-      const applyBtn = actionsRow.createEl('button', {
-        cls: 'mod-cta study-flow-btn-sm',
-        text: t('pomodoro.applyTimes'),
-      });
-      applyBtn.addEventListener('click', async () => {
-        const workVal = Math.max(1, parseInt(workInput.value, 10) || 25);
-        const breakVal = Math.max(1, parseInt(breakInput.value, 10) || 5);
-        await this.plugin.pomodoro.setCustomWorkAndBreak(workVal, breakVal, defaultCheck.checked);
-        new Notice(t('pomodoro.timesConfiguredNotice', { work: String(workVal), break: String(breakVal) }));
-        this.isAdjustingPomodoroTimes = false;
-        if (this.container) await this.render(this.container);
-      });
-    }
 
     // Active Task Linking Section
     await this.renderActiveTaskBanner(card, status);
@@ -212,9 +219,11 @@ export class PomodoroTab implements TabComponent {
     // Dial center text
     const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
 
-    const pillText = status.mode === 'work'
-      ? t('pomodoro.pillFocus')
-      : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak'));
+    const pillText = status.isCountUp
+      ? t('pomodoro.countUpActive')
+      : (status.mode === 'work'
+          ? t('pomodoro.pillFocus')
+          : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak')));
 
     centerInfo.createDiv({
       text: pillText,
@@ -250,7 +259,7 @@ export class PomodoroTab implements TabComponent {
     });
     setIcon(resetBtn, 'rotate-ccw');
     resetBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.reset();
+      this.plugin.pomodoro.promptReset();
     });
 
     const isRunning = status.state === 'running';
@@ -264,25 +273,37 @@ export class PomodoroTab implements TabComponent {
       this.plugin.pomodoro.toggleStartPause();
     });
 
-    const skipBtn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
-      attr: { 'aria-label': t('pomodoro.skip') },
-    });
-    setIcon(skipBtn, 'skip-forward');
-    skipBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.skipCycle();
-    });
+    if (status.isCountUp) {
+      const finishBtn = controlDeck.createEl('button', {
+        cls: 'study-flow-deck-btn study-flow-deck-btn-finish clickable-icon',
+        attr: { 'aria-label': t('pomodoro.finishSession') },
+      });
+      setIcon(finishBtn, 'check-square');
+      finishBtn.addEventListener('click', async () => {
+        await this.plugin.pomodoro.finishCountUpSession();
+        if (this.container) await this.render(this.container);
+      });
+    } else {
+      const skipBtn = controlDeck.createEl('button', {
+        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
+        attr: { 'aria-label': t('pomodoro.skip') },
+      });
+      setIcon(skipBtn, 'skip-forward');
+      skipBtn.addEventListener('click', () => {
+        this.plugin.pomodoro.skipCycle();
+      });
 
-    const add5Btn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
-      attr: { 'aria-label': t('pomodoro.add5mTooltip') },
-    });
-    const plusIcon = add5Btn.createSpan();
-    setIcon(plusIcon, 'plus');
-    add5Btn.createSpan({ text: '5m', cls: 'study-flow-deck-btn-label' });
-    add5Btn.addEventListener('click', () => {
-      this.plugin.pomodoro.addMinutes(5);
-    });
+      const add5Btn = controlDeck.createEl('button', {
+        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
+        attr: { 'aria-label': t('pomodoro.add5mTooltip') },
+      });
+      const plusIcon = add5Btn.createSpan();
+      setIcon(plusIcon, 'plus');
+      add5Btn.createSpan({ text: '5m', cls: 'study-flow-deck-btn-label' });
+      add5Btn.addEventListener('click', () => {
+        this.plugin.pomodoro.addMinutes(5);
+      });
+    }
 
     this.updateProgressRing(status);
   }
@@ -496,9 +517,11 @@ export class PomodoroTab implements TabComponent {
     const pillEl = this.container.querySelector('.study-flow-luxury-pill');
     if (pillEl) {
       pillEl.setText(
-        status.mode === 'work'
-          ? t('pomodoro.pillFocus')
-          : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak'))
+        status.isCountUp
+          ? t('pomodoro.countUpActive')
+          : (status.mode === 'work'
+              ? t('pomodoro.pillFocus')
+              : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak')))
       );
       pillEl.className = `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
     }

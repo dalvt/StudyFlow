@@ -12,6 +12,8 @@ export interface FocusSessionRecord {
   taskText?: string;
   tags: string[];
   interrupted?: boolean;
+  notes?: string;
+  distractions?: number;
 }
 
 export interface DayFocusStat {

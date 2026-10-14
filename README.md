@@ -7,12 +7,15 @@ Asistente integral de estudio y productividad académica para Obsidian. Combina 
 ## 🚀 Características Principales
 
 ### 🍅 1. Temporizador Pomodoro
-- **Fases personalizables:** Configuración de minutos de trabajo, descanso corto, descanso largo e intervalo de sesiones.
+- **Presets guardables:** Accesos directos predeterminados (25/5, 50/10, 90/20) y presets personalizados con nombre, seleccionables desde la pestaña y el menú contextual del status bar.
+- **Modo sin límite (Flujo):** Modo cronómetro ascendente para sesiones de estudio abiertas, registrado con la misma precisión que los bloques tradicionales.
+- **Selector de audio:** Sonidos sintetizados mediante Web Audio API (campana armónica, tono suave, clic táctil y silencio) con botón de prueba interactivo.
+- **Cierre de sesión reflexivo:** Modal opcional y configurable al terminar cada sesión de enfoque para responder "¿Qué avanzaste?" y registrar distracciones.
+- **Pausas activas rotativas:** Notificaciones con consejos de estiramiento, hidratación y descanso visual (regla 20-20-20).
 - **Auto-inicio opcional:** Transición automática entre ciclos de estudio y descanso.
 - **Mini Timer Modal:** Ventana emergente compacta y minimalista para controlar el temporizador sin abrir la vista completa.
-- **Audio Zen (Web Audio API):** Campana armónica sintetizada sin archivos de audio externos.
-- **Persistencia de estado:** El temporizador mantiene su cuenta y fase activa incluso si recargas Obsidian.
-- **Registro en Nota Diaria:** Guarda automáticamente cada sesión completada en la nota diaria correspondiente.
+- **Persistencia de estado:** El temporizador mantiene su cuenta y fase activa en almacenamiento local del dispositivo incluso al recargar Obsidian.
+- **Registro en Nota Diaria:** Guarda automáticamente cada sesión completada en la nota diaria correspondiente bajo viñetas de Pomodoro.
 
 ### 📋 2. Gestor de Tareas & Icebox
 - **4 Vistas Claras:** **Hoy** (incluye tareas vencidas y de hoy), **Próximas** (entregas futuras), **Por materia** (agrupadas por asignatura y sección **Sin clasificar**) e **Icebox** (ideas sin fecha).
@@ -43,16 +46,25 @@ Asistente integral de estudio y productividad académica para Obsidian. Combina 
 
 Study Flow registra el manejador de protocolo `study-flow` para controlar el plugin externamente mediante URIs de Obsidian (compatible con Raycast, Alfred, Atajos de iOS, cron o terminal):
 
-| Acción | URI de Ejemplo | Descripción |
-|---|---|---|
-| **Iniciar Pomodoro** | `obsidian://study-flow?action=start` | Inicia una nueva sesión de enfoque o reanuda el temporizador activo. |
-| **Pausar Pomodoro** | `obsidian://study-flow?action=pause` | Pausa el temporizador Pomodoro en ejecución. |
-| **Captura Rápida** | `obsidian://study-flow?action=capture&text=Repasar%20Álgebra` | Guarda la tarea directamente en `Inbox.md` bajo `## Tareas` y reindexa. Si se omite `text`, abre el modal de captura. |
+| Acción | URI de Ejemplo | Descripción | Parámetros Opcionales |
+|---|---|---|---|
+| **Iniciar Pomodoro** | `obsidian://study-flow?action=start` | Inicia una nueva sesión de enfoque o reanuda el temporizador. | `task=Texto`: Vincula y enfoca una tarea.<br>`subject=Nombre`: Vincula una materia configurada. |
+| **Pausar Pomodoro** | `obsidian://study-flow?action=pause` | Pausa el temporizador Pomodoro en ejecución. | — |
+| **Reiniciar Pomodoro** | `obsidian://study-flow?action=reset` | Reinicia el temporizador a su duración base o detiene el modo flujo. | — |
+| **Saltar Fase** | `obsidian://study-flow?action=skip` | Salta a la siguiente fase (trabajo ↔ descanso). | — |
+| **Completar Tarea** | `obsidian://study-flow?action=complete-task` | Marca como completada la tarea actualmente vinculada en el temporizador. | — |
+| **Captura Rápida** | `obsidian://study-flow?action=capture&text=Repasar%20Álgebra` | Guarda la tarea en `Inbox.md` bajo `## Tareas` y reindexa. Si se omite `text`, abre el modal de captura. | `text=Texto`: Contenido de la tarea. |
+| **Abrir Pestaña Hub** | `obsidian://study-flow?action=open&tab=calendar` | Abre la vista interactiva de Study Flow en la pestaña indicada (`today`, `pomodoro`, `calendar`, `tasks`, `habits`, `analytics`). Por defecto `today`. | `tab=NombrePestaña` |
 
-*Ejemplo en terminal (macOS/Linux):*
+*Ejemplos en terminal (macOS/Linux):*
 ```bash
-xdg-open "obsidian://study-flow?action=start"
-# o
+# Iniciar sesión de 25m enfocada en Álgebra
+xdg-open "obsidian://study-flow?action=start&task=Resolver%20guia%203&subject=Matematicas"
+
+# Abrir directamente la pestaña de hábitos en Obsidian
+xdg-open "obsidian://study-flow?action=open&tab=habits"
+
+# Capturar tarea rápida en el Inbox
 open "obsidian://study-flow?action=capture&text=Comprar%20cuaderno"
 ```
 

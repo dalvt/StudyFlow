@@ -1,13 +1,32 @@
 import { App, Menu, Modal, Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { playPomodoroChime } from './audio';
+import { playPomodoroSound, playPomodoroChime } from './audio';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils';
 import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, TaskRecord } from './tasks';
 import { extractTagsFromText, FocusSessionRecord } from './analytics';
 import { appendFocusSessionToFile } from './storage-migration';
-import { PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
+import { PomodoroClosingReviewModal, PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
 import { t } from './i18n/index.ts';
 import { formatPomodoroLogLine } from './conventions.ts';
+import type { Subject, PomodoroPreset } from './settings-utils';
+import { SubjectSelectModal } from './subject-modal';
+import { normalizeTag } from './subject-analytics';
+import {
+  countCompletedSessionsToday,
+  shouldTriggerLongBreak,
+  calculateCycleStreak,
+  checkSessionInterrupted,
+  restorePomodoroState,
+  shouldSendSystemNotification,
+  formatStatusBarDisplay,
+  PomodoroState,
+  PomodoroMode,
+  ActivePomodoroTask,
+  PersistedPomodoroState,
+  PomodoroMachineConfig,
+} from './pomodoro-state';
+
+export type { PomodoroState, PomodoroMode, ActivePomodoroTask, PersistedPomodoroState };
 
 export class PomodoroConfirmResetModal extends Modal {
   private onConfirm: () => void;
@@ -46,30 +65,12 @@ export class PomodoroConfirmResetModal extends Modal {
     this.contentEl.empty();
   }
 }
-import type { Subject } from './settings-utils';
-import { SubjectSelectModal } from './subject-modal';
-import { normalizeTag } from './subject-analytics';
-import {
-  countCompletedSessionsToday,
-  shouldTriggerLongBreak,
-  calculateCycleStreak,
-  checkSessionInterrupted,
-  restorePomodoroState,
-  shouldSendSystemNotification,
-  formatStatusBarDisplay,
-  PomodoroState,
-  PomodoroMode,
-  ActivePomodoroTask,
-  PersistedPomodoroState,
-  PomodoroMachineConfig,
-} from './pomodoro-state';
-
-export type { PomodoroState, PomodoroMode, ActivePomodoroTask, PersistedPomodoroState };
 
 export interface PomodoroStatus {
   state: PomodoroState;
   mode: PomodoroMode;
   isLongBreak: boolean;
+  isCountUp: boolean;
   remainingSeconds: number;
   totalDurationSeconds: number;
   completedSessionsToday: number;
@@ -90,6 +91,8 @@ export class PomodoroManager {
   private state: PomodoroState = 'idle';
   private mode: PomodoroMode = 'work';
   private isLongBreak: boolean = false;
+  private isCountUp: boolean = false;
+  private breakTipIndex: number = 0;
   private remainingSeconds: number = 25 * 60;
   private totalDurationSeconds: number = 25 * 60;
   private endTime: number = 0;
@@ -166,20 +169,25 @@ export class PomodoroManager {
 
     menu.addSeparator();
 
-    const presets = [
-      { label: t('pomodoro.preset25m'), mins: 25, mode: 'work' as const },
-      { label: t('pomodoro.preset50m'), mins: 50, mode: 'work' as const },
-      { label: t('pomodoro.preset5m'), mins: 5, mode: 'break' as const },
-      { label: t('pomodoro.preset15m'), mins: 15, mode: 'break' as const },
-    ];
+    menu.addItem((item) => {
+      item
+        .setTitle(t('pomodoro.presetCountUp'))
+        .setIcon('play-circle')
+        .onClick(() => {
+          void this.startCountUp();
+        });
+    });
 
+    menu.addSeparator();
+
+    const presets = this.plugin.settings.pomodoroPresets || [];
     for (const p of presets) {
       menu.addItem((item) => {
         item
-          .setTitle(p.label)
+          .setTitle(`${p.name} (${p.workMinutes}m / ${p.breakMinutes}m)`)
           .setIcon('timer')
           .onClick(() => {
-            void this.setCustomMinutes(p.mins, p.mode);
+            void this.applyPreset(p);
           });
       });
     }
@@ -198,7 +206,7 @@ export class PomodoroManager {
   public getStatus(): PomodoroStatus {
     const progressPercent = this.totalDurationSeconds > 0
       ? Math.min(100, Math.max(0, (this.remainingSeconds / this.totalDurationSeconds) * 100))
-      : 0;
+      : (this.isCountUp ? 100 : 0);
 
     const completedToday = this.getCompletedSessionsToday();
     const interval = this.plugin.settings.pomodoroLongBreakInterval || 4;
@@ -208,6 +216,7 @@ export class PomodoroManager {
       state: this.state,
       mode: this.mode,
       isLongBreak: this.isLongBreak,
+      isCountUp: this.isCountUp,
       remainingSeconds: this.remainingSeconds,
       totalDurationSeconds: this.totalDurationSeconds,
       completedSessionsToday: completedToday,
@@ -300,6 +309,7 @@ export class PomodoroManager {
         remainingSeconds: this.remainingSeconds,
         totalDurationSeconds: this.totalDurationSeconds,
         isLongBreak: this.isLongBreak,
+        isCountUp: this.isCountUp,
         activeTask: this.activeTask,
         activeSubject: this.activeSubject,
       };
@@ -361,6 +371,7 @@ export class PomodoroManager {
     this.activeTask = restored.activeTask;
     this.activeSubject = restored.activeSubject || null;
     this.isLongBreak = restored.isLongBreak;
+    this.isCountUp = Boolean(restored.isCountUp);
     this.mode = restored.mode;
     this.totalDurationSeconds = restored.totalDurationSeconds;
     this.remainingSeconds = restored.remainingSeconds;
@@ -369,7 +380,7 @@ export class PomodoroManager {
     if (completedSessionOnRestore && completedMode) {
       if (completedMode === 'work') {
         const durationMin = Math.round(persisted.totalDurationSeconds / 60) || this.plugin.settings.pomodoroWorkDuration;
-        await this.recordFocusSession(durationMin, false);
+        const sessionRecord = await this.recordFocusSession(durationMin, false);
         if (this.plugin.settings.logPomodoroToDailyNote) {
           await this.logSession();
         }
@@ -383,7 +394,11 @@ export class PomodoroManager {
           } catch (e) {
             console.error('Error incrementing pomodoro count on task during restore:', e);
           }
-          new PomodoroTaskCheckModal(this.plugin.app, this.plugin, restoredTask).open();
+          if (this.plugin.settings.enableSessionClosingReview) {
+            new PomodoroClosingReviewModal(this.plugin.app, this.plugin, restoredTask, sessionRecord).open();
+          } else {
+            new PomodoroTaskCheckModal(this.plugin.app, this.plugin, restoredTask, sessionRecord).open();
+          }
         }
         new Notice(t('pomodoro.completedOfflineNotice'));
       } else {
@@ -410,7 +425,7 @@ export class PomodoroManager {
   }
 
   public async onSettingsUpdated(): Promise<void> {
-    if (this.state === 'idle') {
+    if (this.state === 'idle' && !this.isCountUp) {
       const durationMin =
         this.mode === 'work'
           ? this.plugin.settings.pomodoroWorkDuration
@@ -425,6 +440,102 @@ export class PomodoroManager {
     }
   }
 
+  public async applyPreset(preset: PomodoroPreset): Promise<void> {
+    await this.handleInterruptedSessionIfNeeded();
+
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    this.isCountUp = false;
+    this.mode = 'work';
+    this.isLongBreak = false;
+    this.state = 'idle';
+    this.plugin.settings.pomodoroWorkDuration = Math.max(1, preset.workMinutes);
+    this.plugin.settings.pomodoroBreakDuration = Math.max(1, preset.breakMinutes);
+    await this.plugin.saveSettings();
+
+    this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    this.remainingSeconds = this.totalDurationSeconds;
+    this.endTime = 0;
+    await this.savePomodoroState();
+    this.updateDisplay();
+    this.notifyListeners();
+  }
+
+  public async addCustomPreset(name: string, workMinutes: number, breakMinutes: number): Promise<PomodoroPreset> {
+    const newPreset: PomodoroPreset = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: name.trim() || `${workMinutes}/${breakMinutes}`,
+      workMinutes: Math.max(1, workMinutes),
+      breakMinutes: Math.max(1, breakMinutes),
+      isCustom: true,
+    };
+    if (!this.plugin.settings.pomodoroPresets) {
+      this.plugin.settings.pomodoroPresets = [];
+    }
+    this.plugin.settings.pomodoroPresets.push(newPreset);
+    await this.plugin.saveSettings();
+    this.notifyListeners();
+    return newPreset;
+  }
+
+  public async deleteCustomPreset(presetId: string): Promise<void> {
+    if (!this.plugin.settings.pomodoroPresets) return;
+    this.plugin.settings.pomodoroPresets = this.plugin.settings.pomodoroPresets.filter((p) => p.id !== presetId);
+    await this.plugin.saveSettings();
+    this.notifyListeners();
+  }
+
+  public async startCountUp(): Promise<void> {
+    await this.handleInterruptedSessionIfNeeded();
+
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    this.isCountUp = true;
+    this.mode = 'work';
+    this.isLongBreak = false;
+    this.state = 'running';
+    this.totalDurationSeconds = 0;
+    this.remainingSeconds = 0;
+    this.endTime = Date.now();
+
+    this.intervalId = window.setInterval(() => {
+      this.tick();
+    }, 1000);
+    this.plugin.registerInterval(this.intervalId);
+
+    if (this.plugin.settings.autoZenMode && !this.plugin.zen.isZen()) {
+      this.plugin.zen.enableZen(true);
+    }
+
+    await this.savePomodoroState();
+    this.updateDisplay();
+    this.notifyListeners();
+    new Notice(t('pomodoro.countUpActive'));
+  }
+
+  public async finishCountUpSession(): Promise<void> {
+    if (!this.isCountUp) return;
+
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    const elapsedSeconds = this.state === 'running'
+      ? Math.max(0, Math.floor((Date.now() - this.endTime) / 1000))
+      : this.remainingSeconds;
+
+    const durationMin = Math.max(1, Math.round(elapsedSeconds / 60));
+    this.isCountUp = false;
+    await this.onCycleComplete(durationMin);
+  }
+
   public async setCustomMinutes(minutes: number, mode: PomodoroMode = 'work'): Promise<void> {
     await this.handleInterruptedSessionIfNeeded();
 
@@ -432,6 +543,7 @@ export class PomodoroManager {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.isCountUp = false;
     this.mode = mode;
     this.isLongBreak = false;
     this.state = 'idle';
@@ -458,6 +570,17 @@ export class PomodoroManager {
   }
 
   public async toggleStartPause(): Promise<void> {
+    if (this.isCountUp) {
+      if (this.state === 'running') {
+        await this.pause();
+      } else if (this.state === 'paused') {
+        await this.start();
+      } else {
+        await this.startCountUp();
+      }
+      return;
+    }
+
     if (this.state === 'running') {
       await this.pause();
     } else if (this.state === 'paused') {
@@ -481,6 +604,25 @@ export class PomodoroManager {
   }
 
   public async start(): Promise<void> {
+    if (this.isCountUp) {
+      this.state = 'running';
+      this.endTime = Date.now() - (this.remainingSeconds * 1000);
+      if (this.intervalId !== null) {
+        window.clearInterval(this.intervalId);
+      }
+      this.intervalId = window.setInterval(() => {
+        this.tick();
+      }, 1000);
+      this.plugin.registerInterval(this.intervalId);
+      if (this.plugin.settings.autoZenMode && !this.plugin.zen.isZen()) {
+        this.plugin.zen.enableZen(true);
+      }
+      await this.savePomodoroState();
+      this.updateDisplay();
+      this.notifyListeners();
+      return;
+    }
+
     if (this.remainingSeconds <= 0) {
       await this.reset();
     }
@@ -509,6 +651,20 @@ export class PomodoroManager {
   public async pause(): Promise<void> {
     if (this.state !== 'running') return;
 
+    if (this.isCountUp) {
+      this.state = 'paused';
+      if (this.intervalId !== null) {
+        window.clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
+      this.remainingSeconds = Math.max(0, Math.floor((Date.now() - this.endTime) / 1000));
+      this.endTime = 0;
+      await this.savePomodoroState();
+      this.updateDisplay();
+      this.notifyListeners();
+      return;
+    }
+
     this.state = 'paused';
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
@@ -534,6 +690,7 @@ export class PomodoroManager {
       this.plugin.zen.disableZen(true);
     }
 
+    this.isCountUp = false;
     this.state = 'idle';
     this.isLongBreak = false;
     const durationMin =
@@ -619,6 +776,18 @@ export class PomodoroManager {
       return;
     }
 
+    if (this.isCountUp) {
+      const elapsedSeconds = this.state === 'running'
+        ? Math.max(0, Math.floor((Date.now() - this.endTime) / 1000))
+        : this.remainingSeconds;
+      if (elapsedSeconds >= 300) {
+        const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+        await this.recordFocusSession(elapsedMinutes, true);
+        new Notice(t('pomodoro.sessionInterruptedNotice', { minutes: elapsedMinutes }));
+      }
+      return;
+    }
+
     const currentRemaining = this.state === 'running'
       ? Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000))
       : this.remainingSeconds;
@@ -651,6 +820,21 @@ export class PomodoroManager {
   }
 
   private tick(): void {
+    if (this.isCountUp) {
+      const elapsed = Math.max(0, Math.floor((Date.now() - this.endTime) / 1000));
+      this.remainingSeconds = elapsed;
+
+      const currentDate = getLocalDateString(new Date());
+      if (currentDate !== this.lastKnownDate) {
+        this.lastKnownDate = currentDate;
+        this.notifyListeners();
+      }
+
+      this.updateDisplay();
+      this.notifyListeners();
+      return;
+    }
+
     const remaining = Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000));
     this.remainingSeconds = remaining;
 
@@ -668,28 +852,45 @@ export class PomodoroManager {
     }
   }
 
-  private async onCycleComplete(): Promise<void> {
+  private async onCycleComplete(forcedWorkDurationMin?: number): Promise<void> {
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
     }
 
     if (this.mode === 'work') {
-      const durationMin = Math.round(this.totalDurationSeconds / 60) || this.plugin.settings.pomodoroWorkDuration;
-      await this.recordFocusSession(durationMin, false);
+      const durationMin =
+        forcedWorkDurationMin ??
+        (Math.round(this.totalDurationSeconds / 60) || this.plugin.settings.pomodoroWorkDuration);
+      const sessionRecord = await this.recordFocusSession(durationMin, false);
 
       const completedToday = this.getCompletedSessionsToday();
       const isLong = shouldTriggerLongBreak(completedToday, this.plugin.settings.pomodoroLongBreakInterval);
       this.isLongBreak = isLong;
 
+      let breakTipText = '';
+      if (this.plugin.settings.enableBreakTips) {
+        const tips = [
+          'pomodoro.breakTip1',
+          'pomodoro.breakTip2',
+          'pomodoro.breakTip3',
+          'pomodoro.breakTip4',
+          'pomodoro.breakTip5',
+        ];
+        const tipKey = tips[this.breakTipIndex % tips.length];
+        this.breakTipIndex = (this.breakTipIndex + 1) % tips.length;
+        breakTipText = ` • ${t(tipKey as any)}`;
+      }
+
       // Single Notice at session end
-      const noticeMsg = this.activeTask
-        ? (isLong
-            ? t('pomodoro.pomodoroFinishedTaskLongBreak', { task: this.activeTask.text })
-            : t('pomodoro.pomodoroFinishedTask', { task: this.activeTask.text }))
-        : (isLong
-            ? t('pomodoro.pomodoroFinishedLongBreak')
-            : t('pomodoro.pomodoroFinished'));
+      const noticeMsg =
+        (this.activeTask
+          ? (isLong
+              ? t('pomodoro.pomodoroFinishedTaskLongBreak', { task: this.activeTask.text })
+              : t('pomodoro.pomodoroFinishedTask', { task: this.activeTask.text }))
+          : (isLong
+              ? t('pomodoro.pomodoroFinishedLongBreak')
+              : t('pomodoro.pomodoroFinished'))) + breakTipText;
       new Notice(noticeMsg);
 
       this.sendSystemNotification(
@@ -698,7 +899,7 @@ export class PomodoroManager {
       );
 
       if (this.plugin.settings.enableChimeSound) {
-        playPomodoroChime('work', this.plugin.settings.chimeVolume);
+        playPomodoroSound(this.plugin.settings.pomodoroSound || 'bell', 'work', this.plugin.settings.chimeVolume);
       }
 
       const activeTaskRef = this.activeTask;
@@ -722,6 +923,7 @@ export class PomodoroManager {
       }
 
       this.mode = 'break';
+      this.isCountUp = false;
       const breakDuration = isLong
         ? this.plugin.settings.pomodoroLongBreakDuration
         : this.plugin.settings.pomodoroBreakDuration;
@@ -744,18 +946,21 @@ export class PomodoroManager {
       this.updateDisplay();
       this.notifyListeners();
 
-      if (activeTaskRef) {
-        new PomodoroTaskCheckModal(this.plugin.app, this.plugin, activeTaskRef).open();
+      if (this.plugin.settings.enableSessionClosingReview) {
+        new PomodoroClosingReviewModal(this.plugin.app, this.plugin, activeTaskRef, sessionRecord).open();
+      } else if (activeTaskRef) {
+        new PomodoroTaskCheckModal(this.plugin.app, this.plugin, activeTaskRef, sessionRecord).open();
       }
     } else {
       new Notice(t('pomodoro.breakFinishedNotice'));
       this.sendSystemNotification('Study Flow Assistant', t('pomodoro.breakFinishedNotice'));
 
       if (this.plugin.settings.enableChimeSound) {
-        playPomodoroChime('break', this.plugin.settings.chimeVolume);
+        playPomodoroSound(this.plugin.settings.pomodoroSound || 'bell', 'break', this.plugin.settings.chimeVolume);
       }
 
       this.mode = 'work';
+      this.isCountUp = false;
       this.isLongBreak = false;
       this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
       this.remainingSeconds = this.totalDurationSeconds;
@@ -802,7 +1007,7 @@ export class PomodoroManager {
     }
   }
 
-  private async recordFocusSession(durationMin: number, interrupted: boolean = false): Promise<void> {
+  private async recordFocusSession(durationMin: number, interrupted: boolean = false): Promise<FocusSessionRecord | null> {
     try {
       const now = new Date();
       const dateStr = getLocalDateString(now);
@@ -831,8 +1036,10 @@ export class PomodoroManager {
       this.plugin.focusSessions.push(session);
 
       await appendFocusSessionToFile(this.plugin.app, session);
+      return session;
     } catch (err) {
       console.error('Study Flow Assistant: Error guardando métricas de sesión de enfoque', err);
+      return null;
     }
   }
 
@@ -851,7 +1058,8 @@ export class PomodoroManager {
       formatted,
       this.isLongBreak,
       this.state,
-      this.activeTask?.text
+      this.activeTask?.text,
+      this.isCountUp
     );
 
     this.statusBarEl.removeClass('is-running', 'is-break', 'is-paused');

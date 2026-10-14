@@ -469,6 +469,46 @@
   transform: translateY(-1px);
 }
 
+.study-flow-preset-chip.is-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-preset-chip.is-active:hover {
+  background-color: var(--interactive-accent-hover, var(--interactive-accent));
+  color: var(--text-on-accent);
+}
+
+.study-flow-preset-chip-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+}
+
+.study-flow-preset-del-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  margin-left: -4px;
+  border-radius: var(--radius-s);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.study-flow-preset-del-btn:hover {
+  color: var(--color-red, var(--text-error));
+}
+
+.study-flow-preset-del-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* Active Task Banner in Pomodoro */
 .study-flow-active-task-container {
   display: flex;
@@ -766,6 +806,46 @@
   font-size: 10px;
   font-weight: 700;
   margin-left: 2px;
+}
+
+.study-flow-deck-btn-finish {
+  background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-green, var(--text-success)) 40%, transparent);
+  color: var(--color-green, var(--text-success));
+}
+
+.study-flow-deck-btn-finish:hover {
+  background-color: var(--color-green, var(--text-success));
+  color: var(--text-on-accent);
+}
+
+.study-flow-counter-display {
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  padding: 0 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.study-flow-stepper-btn {
+  font-size: var(--font-ui-small);
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  transition: all 0.15s ease;
+}
+
+.study-flow-stepper-btn:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-input-full {
+  width: 100%;
 }
 
 .study-flow-hero-play-btn {

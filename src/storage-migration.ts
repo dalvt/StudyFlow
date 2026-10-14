@@ -63,6 +63,38 @@ export async function appendFocusSessionToFile(
 }
 
 /**
+ * Updates an existing focus session record in Sessions.jsonl using vault.process.
+ */
+export async function updateFocusSessionInFile(
+  app: App,
+  session: FocusSessionRecord,
+  filePath: string = SESSIONS_FILE_PATH
+): Promise<void> {
+  const normalized = normalizePath(filePath);
+  const file = await getOrCreateFile(app, normalized, '');
+  await app.vault.process(file, (content) => {
+    const lines = content.split(/\r?\n/);
+    let found = false;
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) continue;
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && parsed.id === session.id) {
+          lines[i] = JSON.stringify(session);
+          found = true;
+          break;
+        }
+      } catch {}
+    }
+    if (!found) {
+      lines.push(JSON.stringify(session));
+    }
+    return lines.filter(Boolean).join('\n') + '\n';
+  });
+}
+
+/**
  * Executes one-time storage migration at plugin startup.
  * 1. Checks if schemaVersion < 2.
  * 2. Backs up data.json to data.json.bak.

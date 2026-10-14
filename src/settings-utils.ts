@@ -9,7 +9,25 @@ export interface FocusSessionRecord {
   taskText?: string;
   tags: string[];
   interrupted?: boolean;
+  notes?: string;
+  distractions?: number;
 }
+
+export type PomodoroSoundType = 'bell' | 'soft' | 'click' | 'silent';
+
+export interface PomodoroPreset {
+  id: string;
+  name: string;
+  workMinutes: number;
+  breakMinutes: number;
+  isCustom?: boolean;
+}
+
+export const DEFAULT_POMODORO_PRESETS: PomodoroPreset[] = [
+  { id: '25-5', name: '25 / 5', workMinutes: 25, breakMinutes: 5 },
+  { id: '50-10', name: '50 / 10', workMinutes: 50, breakMinutes: 10 },
+  { id: '90-20', name: '90 / 20', workMinutes: 90, breakMinutes: 20 },
+];
 
 export interface Subject {
   id: string;
@@ -37,6 +55,10 @@ export interface StudyFlowSettings {
   autoStartNextPhase: boolean;
   enableSystemNotifications: boolean;
   persistedPomodoro?: import('./pomodoro-state').PersistedPomodoroState | null;
+  pomodoroPresets: PomodoroPreset[];
+  pomodoroSound: PomodoroSoundType;
+  enableSessionClosingReview: boolean;
+  enableBreakTips: boolean;
   dailyNotesFolder: string;
   dailyNoteDateFormat: string;
   inboxFilePath: string;
@@ -91,6 +113,10 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   autoStartNextPhase: false,
   enableSystemNotifications: false,
   persistedPomodoro: null,
+  pomodoroPresets: [...DEFAULT_POMODORO_PRESETS],
+  pomodoroSound: 'bell',
+  enableSessionClosingReview: true,
+  enableBreakTips: true,
   dailyNotesFolder: 'Daily',
   dailyNoteDateFormat: 'YYYY-MM-DD',
   inboxFilePath: 'StudyFlow/Inbox.md',

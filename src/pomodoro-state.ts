@@ -14,10 +14,11 @@ export interface ActivePomodoroTask {
 export interface PersistedPomodoroState {
   mode: PomodoroMode;
   state: PomodoroState;
-  endTime: number; // unix timestamp in ms (future if running, 0 if idle/paused)
+  endTime: number; // unix timestamp in ms (future if running, 0 if idle/paused; or start timestamp if isCountUp)
   remainingSeconds: number;
   totalDurationSeconds: number;
   isLongBreak?: boolean;
+  isCountUp?: boolean;
   activeTask: ActivePomodoroTask | null;
   activeSubject?: Subject | null;
 }
@@ -34,6 +35,7 @@ export interface PomodoroStateSnapshot {
   state: PomodoroState;
   mode: PomodoroMode;
   isLongBreak: boolean;
+  isCountUp?: boolean;
   remainingSeconds: number;
   totalDurationSeconds: number;
   endTime: number;
@@ -198,6 +200,59 @@ export function restorePomodoroState(
     };
   }
 
+  if (persisted.isCountUp) {
+    if (persisted.state === 'running') {
+      const elapsedSeconds =
+        persisted.endTime > 0
+          ? Math.max(0, Math.floor((nowMs - persisted.endTime) / 1000))
+          : persisted.remainingSeconds || 0;
+      return {
+        restored: {
+          state: 'running',
+          mode: 'work',
+          isLongBreak: false,
+          isCountUp: true,
+          totalDurationSeconds: 0,
+          remainingSeconds: elapsedSeconds,
+          endTime: persisted.endTime,
+          activeTask: persisted.activeTask,
+          activeSubject: persisted.activeSubject || null,
+        },
+        completedSessionOnRestore: false,
+      };
+    }
+    if (persisted.state === 'paused') {
+      return {
+        restored: {
+          state: 'paused',
+          mode: 'work',
+          isLongBreak: false,
+          isCountUp: true,
+          totalDurationSeconds: 0,
+          remainingSeconds: Math.max(0, persisted.remainingSeconds || 0),
+          endTime: 0,
+          activeTask: persisted.activeTask,
+          activeSubject: persisted.activeSubject || null,
+        },
+        completedSessionOnRestore: false,
+      };
+    }
+    return {
+      restored: {
+        state: 'idle',
+        mode: 'work',
+        isLongBreak: false,
+        isCountUp: true,
+        totalDurationSeconds: 0,
+        remainingSeconds: 0,
+        endTime: 0,
+        activeTask: persisted.activeTask,
+        activeSubject: persisted.activeSubject || null,
+      },
+      completedSessionOnRestore: false,
+    };
+  }
+
   if (persisted.state === 'running') {
     if (persisted.endTime > 0 && nowMs >= persisted.endTime) {
       // End time already passed while Obsidian was closed/unloaded
@@ -307,10 +362,12 @@ export function formatStatusBarDisplay(
   formattedTime: string,
   isLongBreak: boolean = false,
   state: PomodoroState = 'idle',
-  activeTaskText?: string
+  activeTaskText?: string,
+  isCountUp: boolean = false
 ): string {
   const icon = mode === 'work' ? '🍅' : (isLongBreak ? '🌴' : '☕');
+  const countUpIndicator = isCountUp ? ' ↑' : '';
   const taskTag = activeTaskText ? ` [${activeTaskText.slice(0, 10)}...]` : '';
   const pauseSuffix = state === 'paused' ? ' ⏸' : '';
-  return `${icon} ${formattedTime}${pauseSuffix}${taskTag}`;
+  return `${icon} ${formattedTime}${countUpIndicator}${pauseSuffix}${taskTag}`;
 }
