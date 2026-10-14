@@ -19,6 +19,7 @@ import {
 } from './utils.ts';
 
 export * from './calendar-utils.ts';
+export * from './schedule.ts';
 
 export interface DeadlineItem extends PendingTaskItem {
   cleanTitle: string;
@@ -29,28 +30,51 @@ export interface DeadlineItem extends PendingTaskItem {
 }
 
 import { findOverlappingBlocks, parseTimeBlocksFromMarkdown } from './calendar-utils.ts';
+import { loadScheduleItems, getVirtualBlocksForDate } from './schedule.ts';
 
 /**
- * Retrieves time blocks for a given date directly from its Daily Note (sole source of truth).
+ * Retrieves time blocks for a given date directly from its Daily Note (sole source of truth),
+ * combined with virtual recurring class schedule blocks from StudyFlow/Schedule.md.
  */
 export async function getTimeBlocksForDate(
   app: App,
   settings: StudyFlowSettings,
-  dateStr: string
+  dateStr: string,
+  includeVirtual: boolean = true
 ): Promise<CalendarTimeBlock[]> {
   const dailyPath = getDailyNotePath(settings, dateStr);
   const file = app.vault.getAbstractFileByPath(dailyPath);
-  if (!(file instanceof TFile)) {
-    return [];
+  let dailyBlocks: CalendarTimeBlock[] = [];
+  if (file instanceof TFile) {
+    try {
+      const content = await app.vault.read(file);
+      dailyBlocks = parseTimeBlocksFromMarkdown(content, dateStr);
+    } catch (err) {
+      console.error(`Study Flow: Error leyendo bloques desde ${dailyPath}`, err);
+    }
   }
+
+  if (!includeVirtual) {
+    return dailyBlocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+
+  // Load virtual recurring blocks from StudyFlow/Schedule.md
   try {
-    const content = await app.vault.read(file);
-    const blocks = parseTimeBlocksFromMarkdown(content, dateStr);
-    return blocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const scheduleItems = await loadScheduleItems(app, settings.scheduleFilePath || 'StudyFlow/Schedule.md');
+    if (scheduleItems.length > 0) {
+      const virtualBlocks = getVirtualBlocksForDate(scheduleItems, dateStr, settings.subjects || []);
+      const mergedVirtual = virtualBlocks.filter((vb) => {
+        return !dailyBlocks.some(
+          (db) => db.startTime === vb.startTime && db.title.toLowerCase() === vb.title.toLowerCase()
+        );
+      });
+      return [...dailyBlocks, ...mergedVirtual].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    }
   } catch (err) {
-    console.error(`Study Flow: Error leyendo bloques desde ${dailyPath}`, err);
-    return [];
+    console.error('Study Flow: Error incorporando bloques recurrentes virtuales', err);
   }
+
+  return dailyBlocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
 /**
@@ -61,6 +85,10 @@ export async function saveTimeBlock(
   plugin: StudyFlowPlugin,
   block: CalendarTimeBlock
 ): Promise<void> {
+  const persistedBlock: CalendarTimeBlock = {
+    ...block,
+    isVirtual: false,
+  };
   const dailyPath = getDailyNotePath(plugin.settings, block.date);
   const targetFile = await getOrCreateFile(plugin.app, dailyPath, `# ${block.date}\n\n`);
 
@@ -68,17 +96,17 @@ export async function saveTimeBlock(
     const existing = parseTimeBlocksFromMarkdown(content, block.date);
 
     // Overlap detection: warning only, not blocking
-    const overlaps = findOverlappingBlocks(existing, block);
+    const overlaps = findOverlappingBlocks(existing, persistedBlock);
     if (overlaps.length > 0) {
       const names = overlaps.map((o) => `"${o.title}" (${o.startTime}—${o.endTime})`).join(', ');
       new Notice(t('calendar.overlapWarningNotice', { names }));
     }
 
-    const idx = existing.findIndex((b) => b.id === block.id);
+    const idx = existing.findIndex((b) => b.id === persistedBlock.id);
     if (idx >= 0) {
-      existing[idx] = block;
+      existing[idx] = persistedBlock;
     } else {
-      existing.push(block);
+      existing.push(persistedBlock);
     }
     existing.sort((a, b) => a.startTime.localeCompare(b.startTime));
     return syncBlocksToMarkdown(content, existing);

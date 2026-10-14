@@ -351,6 +351,49 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName(t('settings.startHourName'))
+      .setDesc(t('settings.startHourDesc'))
+      .addDropdown((drop) => {
+        for (let h = 0; h <= 12; h++) {
+          drop.addOption(String(h), `${String(h).padStart(2, '0')}:00`);
+        }
+        drop
+          .setValue(String(this.plugin.settings.calendarStartHour ?? 7))
+          .onChange(async (value) => {
+            this.plugin.settings.calendarStartHour = parseInt(value, 10);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.endHourName'))
+      .setDesc(t('settings.endHourDesc'))
+      .addDropdown((drop) => {
+        for (let h = 13; h <= 23; h++) {
+          drop.addOption(String(h), `${String(h).padStart(2, '0')}:00`);
+        }
+        drop
+          .setValue(String(this.plugin.settings.calendarEndHour ?? 22))
+          .onChange(async (value) => {
+            this.plugin.settings.calendarEndHour = parseInt(value, 10);
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.scheduleFilePathName'))
+      .setDesc(t('settings.scheduleFilePathDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('StudyFlow/Schedule.md')
+          .setValue(this.plugin.settings.scheduleFilePath || 'StudyFlow/Schedule.md')
+          .onChange(async (value) => {
+            this.plugin.settings.scheduleFilePath = value.trim() || 'StudyFlow/Schedule.md';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName(t('settings.autoZenName'))
       .setDesc(t('settings.autoZenDesc'))
       .addToggle((toggle) =>

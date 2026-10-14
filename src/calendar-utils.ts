@@ -228,11 +228,16 @@ export interface CalendarTimeBlock {
   title: string;
   linkedNote?: string;
   completed?: boolean;
+  subject?: string;
+  color?: string;
+  isVirtual?: boolean;
+  isRecurring?: boolean;
+  recurringDay?: number;
 }
 
 /**
  * Formats a single time block into markdown checklist item.
- * Format: - [ ] HH:mm—HH:mm Título [[nota]]
+ * Format: - [ ] HH:mm—HH:mm Título [subject:: ...] [color:: ...] [[nota]]
  */
 export function formatTimeBlockLine(block: {
   startTime: string;
@@ -240,19 +245,30 @@ export function formatTimeBlockLine(block: {
   title: string;
   completed?: boolean;
   linkedNote?: string;
+  subject?: string;
+  color?: string;
 }): string {
   const check = block.completed ? 'x' : ' ';
   const cleanTitle = block.title.trim();
   const cleanNote = block.linkedNote ? block.linkedNote.replace(/[\[\]]/g, '').trim() : '';
-  const noteSuffix = cleanNote ? ` [[${cleanNote}]]` : '';
-  return `- [${check}] ${block.startTime}—${block.endTime} ${cleanTitle}${noteSuffix}`;
+  let line = `- [${check}] ${block.startTime}—${block.endTime} ${cleanTitle}`;
+  if (block.subject) {
+    line += ` [subject:: ${block.subject.trim()}]`;
+  }
+  if (block.color) {
+    line += ` [color:: ${block.color.trim()}]`;
+  }
+  if (cleanNote) {
+    line += ` [[${cleanNote}]]`;
+  }
+  return line;
 }
 
 /**
  * Parses a single line representing a calendar time block.
  * Recognizes formats:
  * - [ ] HH:mm—HH:mm Título [[nota]]
- * - [x] HH:mm—HH:mm Título
+ * - [x] HH:mm—HH:mm Título [subject:: Álgebra]
  * Tolerates variations: em-dash, en-dash, hyphen, spaces, pipe separators.
  */
 export function parseTimeBlockLine(
@@ -271,20 +287,38 @@ export function parseTimeBlockLine(
   const endTime = match[3].padStart(5, '0');
   const rest = match[4].trim();
 
-  let title = rest;
+  let subject: string | undefined = undefined;
+  let color: string | undefined = undefined;
+
+  const subjectMatch = rest.match(/\[subject::\s*([^\]]+)\]/i);
+  if (subjectMatch) {
+    subject = subjectMatch[1].trim();
+  }
+
+  const colorMatch = rest.match(/\[color::\s*([^\]]+)\]/i);
+  if (colorMatch) {
+    color = colorMatch[1].trim();
+  }
+
+  const inlineCleanRest = rest
+    .replace(/\[subject::\s*[^\]]+\]/gi, '')
+    .replace(/\[color::\s*[^\]]+\]/gi, '')
+    .trim();
+
+  let title = inlineCleanRest;
   let linkedNote: string | undefined = undefined;
 
   // Check for pipe separator e.g. "Title | [[Note]]" or "Title | Note"
-  const pipeIndex = rest.indexOf('|');
+  const pipeIndex = inlineCleanRest.indexOf('|');
   if (pipeIndex !== -1) {
-    title = rest.substring(0, pipeIndex).trim();
-    const notePart = rest.substring(pipeIndex + 1).trim();
+    title = inlineCleanRest.substring(0, pipeIndex).trim();
+    const notePart = inlineCleanRest.substring(pipeIndex + 1).trim();
     if (notePart) {
       linkedNote = notePart.replace(/[\[\]]/g, '').trim();
     }
   } else {
     // Check for trailing [[Note]]
-    const linkMatch = rest.match(/^(.*?)\s*\[\[([^\]]+)\]\]\s*$/);
+    const linkMatch = inlineCleanRest.match(/^(.*?)\s*\[\[([^\]]+)\]\]\s*$/);
     if (linkMatch) {
       title = linkMatch[1].trim();
       linkedNote = linkMatch[2].trim();
@@ -305,6 +339,8 @@ export function parseTimeBlockLine(
     title,
     linkedNote: linkedNote || undefined,
     completed,
+    subject,
+    color,
   };
 }
 
@@ -387,5 +423,109 @@ export function findOverlappingBlocks<
     }
     return doBlocksOverlap(b, candidate);
   });
+}
+
+/**
+ * Snaps minutes to the nearest 15-minute interval.
+ */
+export function snapTo15Minutes(minutes: number): number {
+  return Math.round(minutes / 15) * 15;
+}
+
+/**
+ * Converts minutes since 00:00 to "HH:mm".
+ */
+export function minutesToTimeString(minutes: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, minutes));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+export interface BlockLayout {
+  block: CalendarTimeBlock;
+  startMin: number;
+  endMin: number;
+  colIndex: number;
+  totalCols: number;
+  hasOverlap: boolean;
+}
+
+/**
+ * Computes side-by-side columns and overlap status for a list of time blocks.
+ */
+export function computeBlockLayouts(blocks: CalendarTimeBlock[]): BlockLayout[] {
+  if (blocks.length === 0) return [];
+
+  const parsed = blocks.map((b) => ({
+    block: b,
+    startMin: timeStringToMinutes(b.startTime),
+    endMin: Math.max(timeStringToMinutes(b.startTime) + 15, timeStringToMinutes(b.endTime)),
+  }));
+
+  // Sort by start time, then longer duration first
+  parsed.sort((a, b) => a.startMin - b.startMin || (b.endMin - b.startMin) - (a.endMin - a.startMin));
+
+  // Partition into connected overlap clusters
+  const clusters: Array<typeof parsed> = [];
+  let currentCluster: typeof parsed = [];
+  let clusterMaxEnd = -1;
+
+  for (const item of parsed) {
+    if (currentCluster.length === 0) {
+      currentCluster.push(item);
+      clusterMaxEnd = item.endMin;
+    } else if (item.startMin < clusterMaxEnd) {
+      // Overlaps with current cluster
+      currentCluster.push(item);
+      clusterMaxEnd = Math.max(clusterMaxEnd, item.endMin);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [item];
+      clusterMaxEnd = item.endMin;
+    }
+  }
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  const results: BlockLayout[] = [];
+
+  for (const cluster of clusters) {
+    const colEnds: number[] = [];
+    const clusterLayouts: Array<{ item: (typeof parsed)[0]; colIndex: number }> = [];
+
+    for (const item of cluster) {
+      let assignedCol = -1;
+      for (let c = 0; c < colEnds.length; c++) {
+        if (colEnds[c] <= item.startMin) {
+          assignedCol = c;
+          colEnds[c] = item.endMin;
+          break;
+        }
+      }
+      if (assignedCol === -1) {
+        assignedCol = colEnds.length;
+        colEnds.push(item.endMin);
+      }
+      clusterLayouts.push({ item, colIndex: assignedCol });
+    }
+
+    const totalCols = colEnds.length;
+    const hasOverlap = totalCols > 1;
+
+    for (const cl of clusterLayouts) {
+      results.push({
+        block: cl.item.block,
+        startMin: cl.item.startMin,
+        endMin: cl.item.endMin,
+        colIndex: cl.colIndex,
+        totalCols,
+        hasOverlap,
+      });
+    }
+  }
+
+  return results;
 }
 

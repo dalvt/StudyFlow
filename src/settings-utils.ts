@@ -82,6 +82,9 @@ export interface StudyFlowSettings {
   weeklyReviewsFolder: string;
   weeklyReviewTemplate: string;
   todaySections?: TodayTabSectionsConfig;
+  calendarStartHour: number;
+  calendarEndHour: number;
+  scheduleFilePath: string;
   /** @deprecated Moved to StudyFlow/Sessions.jsonl */
   focusHistory?: FocusSessionRecord[];
   /** @deprecated Moved to Daily Notes "## Bloques de Tiempo" */
@@ -121,6 +124,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   dailyNoteDateFormat: 'YYYY-MM-DD',
   inboxFilePath: 'StudyFlow/Inbox.md',
   habitsFilePath: 'StudyFlow/Habits.md',
+  scheduleFilePath: 'StudyFlow/Schedule.md',
   logPomodoroToDailyNote: true,
   enableChimeSound: true,
   chimeVolume: 0.7,
@@ -139,6 +143,8 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   subjects: [],
   weeklyReviewsFolder: 'StudyFlow/Reviews',
   weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
+  calendarStartHour: 7,
+  calendarEndHour: 22,
   todaySections: {
     showNowNext: true,
     showMiniTimer: true,

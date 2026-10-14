@@ -2220,6 +2220,361 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
 }
 
+/* =========================================
+   Interactive Hourly Calendar Grid (Day & Week)
+   ========================================= */
+.study-flow-calendar-grid-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  margin-top: 8px;
+  user-select: none;
+}
+
+.study-flow-grid-header-row {
+  display: flex;
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border-bottom: 2px solid var(--background-modifier-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.study-flow-grid-gutter-header {
+  width: 52px;
+  min-width: 52px;
+  border-right: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-grid-days-header {
+  display: flex;
+  flex: 1;
+}
+
+.study-flow-grid-day-header {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-right: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-grid-day-header:last-child {
+  border-right: none;
+}
+
+.study-flow-grid-day-header:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.study-flow-grid-day-header.is-selected {
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+}
+
+.study-flow-grid-day-header.is-today {
+  color: var(--interactive-accent);
+}
+
+.study-flow-grid-today-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+}
+
+.study-flow-grid-scroll-body {
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.study-flow-grid-content-row {
+  display: flex;
+  position: relative;
+}
+
+.study-flow-grid-gutter {
+  width: 52px;
+  min-width: 52px;
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.study-flow-grid-hour-label {
+  height: 52px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 6px;
+  padding-top: 2px;
+  font-size: 10px;
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+  box-sizing: border-box;
+}
+
+.study-flow-grid-columns-wrap {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+.study-flow-grid-day-col {
+  flex: 1;
+  position: relative;
+  border-right: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  touch-action: none;
+}
+
+.study-flow-grid-day-col:last-child {
+  border-right: none;
+}
+
+.study-flow-grid-day-col.is-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 2%, var(--background-primary));
+}
+
+.study-flow-grid-day-col.is-drag-over {
+  background: color-mix(in srgb, var(--interactive-accent) 15%, var(--background-primary));
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.study-flow-grid-lines-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.study-flow-grid-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--background-modifier-border);
+  box-sizing: border-box;
+}
+
+.study-flow-grid-half-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+}
+
+/* Time Block in Grid */
+.study-flow-grid-block {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
+  border-radius: var(--radius-s);
+  padding: 3px 6px;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-normal) 6%, transparent);
+  cursor: grab;
+  overflow: hidden;
+  touch-action: none;
+  z-index: 2;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.study-flow-grid-block:hover {
+  z-index: 5;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--text-normal) 14%, transparent);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-grid-block.is-dragging {
+  opacity: 0.85;
+  cursor: grabbing;
+  z-index: 10;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+.study-flow-grid-block.is-completed {
+  opacity: 0.65;
+  background: color-mix(in srgb, var(--background-modifier-hover) 80%, transparent);
+}
+
+.study-flow-grid-block.is-completed .study-flow-grid-block-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.study-flow-grid-block.is-virtual {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--background-secondary) 85%, transparent);
+}
+
+.study-flow-grid-block.is-overlapping {
+  border-top-color: var(--color-orange, #f59e0b);
+}
+
+.study-flow-grid-block.is-creation-preview {
+  background: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+  border: 2px dashed var(--interactive-accent);
+  color: var(--interactive-accent);
+  font-weight: 700;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 8;
+}
+
+/* Resize handles (Top & Bottom borders) */
+.study-flow-grid-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 6;
+  cursor: ns-resize;
+}
+
+.study-flow-grid-resize-top {
+  top: 0;
+}
+
+.study-flow-grid-resize-bottom {
+  bottom: 0;
+}
+
+.study-flow-grid-resize-handle:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+}
+
+.study-flow-grid-block-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.study-flow-grid-block-content > * {
+  pointer-events: auto;
+}
+
+.study-flow-grid-block-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
+.study-flow-grid-block-time {
+  font-weight: 700;
+}
+
+.study-flow-grid-virtual-pill {
+  font-size: 8px;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: var(--background-modifier-border);
+  color: var(--text-normal);
+  font-weight: 700;
+}
+
+.study-flow-grid-overlap-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-orange, #f59e0b);
+}
+
+.study-flow-grid-overlap-pill svg {
+  width: 10px;
+  height: 10px;
+}
+
+.study-flow-grid-block-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.study-flow-grid-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+}
+
+.study-flow-grid-block-actions .study-flow-icon-action-btn {
+  padding: 1px;
+}
+
+.study-flow-grid-block-actions .study-flow-icon-action-btn svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Draggable Task in Planner Selector */
+.study-flow-draggable-task {
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.study-flow-draggable-task:hover {
+  transform: translateX(2px);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-draggable-task.is-dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.study-flow-pomo-chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-red, #ef4444) 15%, transparent);
+  color: var(--color-red, #ef4444);
+}
+
+/* Mobile Touch Targets */
+.is-mobile .study-flow-grid-resize-handle {
+  height: 12px;
+}
+
+.is-mobile .study-flow-grid-day-header {
+  min-height: 44px;
+}
+
+.is-mobile .study-flow-grid-block-actions .study-flow-icon-action-btn {
+  min-width: 32px;
+  min-height: 32px;
+}
+
 /* Day Detail Panel */
 .study-flow-day-detail-panel {
   background: var(--background-secondary-alt, var(--background-secondary));

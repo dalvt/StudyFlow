@@ -72,6 +72,15 @@ export function createStableIcsUid(prefix: string, raw: string): string {
   return `study-flow-${prefix}-${slug || 'event'}@studyflow`;
 }
 
+import { rruleByDayFromDayOfWeek, type ScheduleItem, loadScheduleItems } from './schedule.ts';
+
+export function isExamDeadline(item: { text: string; priority?: string }): boolean {
+  if (!item.text) return false;
+  const examKeywords = /\b(examen|parcial|final|recuperatorio|quiz|test|evaluaci[oó]n|midterm|exam)\b/i;
+  const examTags = /#(?:examen|parcial|final|quiz|exam)\b/i;
+  return examKeywords.test(item.text) || examTags.test(item.text);
+}
+
 /**
  * Pure generator: constructs an RFC 5545 iCalendar string
  * from time blocks and deadlines with deterministic, stable UIDs.
@@ -81,6 +90,7 @@ export function buildIcsCalendar(params: {
   deadlines: IcsDeadlineItem[];
   calendarName?: string;
   now?: Date;
+  recurringBlocks?: ScheduleItem[];
 }): string {
   const now = params.now || new Date();
   const stamp = formatIcsStamp(now);
@@ -122,14 +132,15 @@ export function buildIcsCalendar(params: {
     );
   }
 
-  // 2. Deadlines / Entregas
+  // 2. Deadlines / Entregas (Exams as all-day events, regular deadlines with time if present)
   for (const dl of params.deadlines) {
     if (!dl.dueDate) continue;
     const uid = dl.id && dl.id.startsWith('dl-')
       ? `study-flow-${dl.id}@studyflow`
       : createStableIcsUid('deadline', `${dl.sourceFile || ''}-${dl.text}-${dl.dueDate}`);
 
-    const summary = escapeIcsText(dl.text || 'Entrega pendiente');
+    const isExam = isExamDeadline(dl);
+    const summary = escapeIcsText(dl.text || (isExam ? 'Examen' : 'Entrega pendiente'));
     let desc = `Fecha límite: ${dl.dueDate}`;
     if (dl.priority && dl.priority !== 'none') {
       desc += ` | Prioridad: ${dl.priority}`;
@@ -149,10 +160,16 @@ export function buildIcsCalendar(params: {
       const endMStr = String(endM).padStart(2, '0');
       const dtEnd = formatIcsDateTime(dl.dueDate, `${endHStr}:${endMStr}`);
       lines.push(`DTSTART:${dtStart}`, `DTEND:${dtEnd}`);
+      if (isExam) {
+        lines.push('CATEGORIES:EXAM');
+      }
     } else {
       const dtStart = formatIcsDate(dl.dueDate);
       const dtEnd = getNextDateIcs(dl.dueDate);
       lines.push(`DTSTART;VALUE=DATE:${dtStart}`, `DTEND;VALUE=DATE:${dtEnd}`);
+      if (isExam) {
+        lines.push('CATEGORIES:EXAM');
+      }
     }
 
     lines.push(
@@ -161,6 +178,44 @@ export function buildIcsCalendar(params: {
       dl.completed ? 'STATUS:COMPLETED' : 'STATUS:CONFIRMED',
       'END:VEVENT'
     );
+  }
+
+  // 3. Recurring Schedule Blocks (from StudyFlow/Schedule.md) with RRULE
+  if (params.recurringBlocks) {
+    for (const item of params.recurringBlocks) {
+      if (!item.startTime || !item.endTime) continue;
+      const byDay = rruleByDayFromDayOfWeek(item.dayOfWeek);
+      const uid = createStableIcsUid('rrule', `${byDay}-${item.startTime}-${item.endTime}-${item.title}`);
+
+      // Base anchor date in current year matching item.dayOfWeek
+      const anchor = new Date(now.getFullYear(), 0, 1);
+      while (anchor.getDay() !== item.dayOfWeek) {
+        anchor.setDate(anchor.getDate() + 1);
+      }
+      const anchorY = anchor.getFullYear();
+      const anchorM = String(anchor.getMonth() + 1).padStart(2, '0');
+      const anchorD = String(anchor.getDate()).padStart(2, '0');
+      const anchorDateStr = `${anchorY}-${anchorM}-${anchorD}`;
+
+      const dtStart = formatIcsDateTime(anchorDateStr, item.startTime);
+      const dtEnd = formatIcsDateTime(anchorDateStr, item.endTime);
+      const summary = escapeIcsText(item.title);
+      let desc = item.subject ? `Materia: ${item.subject}` : 'Horario de clase recurrente';
+      if (item.linkedNote) desc += ` | Nota: [[${item.linkedNote}]]`;
+
+      lines.push(
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTAMP:${stamp}`,
+        `DTSTART:${dtStart}`,
+        `DTEND:${dtEnd}`,
+        `RRULE:FREQ=WEEKLY;BYDAY=${byDay}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${escapeIcsText(desc)}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT'
+      );
+    }
   }
 
   lines.push('END:VCALENDAR', '');

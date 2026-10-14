@@ -372,6 +372,15 @@ export default class StudyFlowPlugin extends Plugin {
     if (!this.settings.weeklyReviewTemplate) {
       this.settings.weeklyReviewTemplate = defaults.weeklyReviewTemplate;
     }
+    if (this.settings.calendarStartHour === undefined) {
+      this.settings.calendarStartHour = defaults.calendarStartHour;
+    }
+    if (this.settings.calendarEndHour === undefined) {
+      this.settings.calendarEndHour = defaults.calendarEndHour;
+    }
+    if (!this.settings.scheduleFilePath) {
+      this.settings.scheduleFilePath = defaults.scheduleFilePath;
+    }
   }
 
   async saveSettings(): Promise<void> {
