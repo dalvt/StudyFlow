@@ -10,6 +10,7 @@ export class PomodoroTaskCheckModal extends Modal {
   private task: ActivePomodoroTask;
   private isCompleted: boolean = true;
   private closingNote: string = '';
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin, task: ActivePomodoroTask) {
     super(app);
@@ -18,6 +19,7 @@ export class PomodoroTaskCheckModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-task-check-modal');
@@ -106,5 +108,8 @@ export class PomodoroTaskCheckModal extends Modal {
   onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }

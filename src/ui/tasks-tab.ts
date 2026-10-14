@@ -1,4 +1,4 @@
-import { App, Notice, setIcon } from 'obsidian';
+import { App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
 import { PromptModal } from './prompt-modal';
@@ -20,8 +20,26 @@ import {
   formatDateKey,
   getCleanTaskDisplayTitle,
 } from '../utils';
+import { locateTaskLineIndex, mutateTaskLineInContent } from '../markdown-utils';
 import { matchesSubjectTag } from '../subject-analytics';
 import { t } from '../i18n/index.ts';
+
+function showUndoNotice(message: string, onUndo: () => Promise<void>): void {
+  const notice = new Notice('', 8000);
+  const el = notice.noticeEl;
+  el.empty();
+  const wrapper = el.createDiv({ cls: 'study-flow-notice-undo-wrapper' });
+  wrapper.createSpan({ text: message, cls: 'study-flow-notice-undo-msg' });
+  const btn = wrapper.createEl('button', {
+    text: t('common.undo'),
+    cls: 'study-flow-notice-undo-btn mod-cta',
+  });
+  btn.addEventListener('click', async (e: MouseEvent) => {
+    e.stopPropagation();
+    notice.hide();
+    await onUndo();
+  });
+}
 
 export class TasksTab implements TabComponent {
   private app: App;
@@ -106,6 +124,40 @@ export class TasksTab implements TabComponent {
       });
     });
 
+    // Native dropdown Menu for narrow / mobile container (<400px)
+    const filterMenuBtn = headerControls.createEl('button', {
+      cls: 'study-flow-tasks-filter-menu-btn dropdown clickable-icon',
+      attr: { 'aria-label': t('tasks.filterMenuLabel') },
+    });
+    const currentViewObj = views.find((v) => v.id === this.taskView) || views[0];
+    const fIcon = filterMenuBtn.createSpan({ cls: 'study-flow-btn-icon' });
+    setIcon(fIcon, currentViewObj.icon);
+    filterMenuBtn.createSpan({
+      text: `${currentViewObj.label} (${currentViewObj.count})`,
+      cls: 'study-flow-filter-btn-label',
+    });
+    const fChevron = filterMenuBtn.createSpan({ cls: 'study-flow-chevron-icon' });
+    setIcon(fChevron, 'chevron-down');
+
+    filterMenuBtn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      const menu = new Menu();
+      views.forEach((v) => {
+        menu.addItem((item) => {
+          item
+            .setTitle(`${v.label} (${v.count})`)
+            .setIcon(v.icon)
+            .setChecked(this.taskView === v.id)
+            .onClick(async () => {
+              this.taskView = v.id;
+              this.selectedSubjectTag = null;
+              if (this.container) await this.render(this.container);
+            });
+        });
+      });
+      menu.showAtMouseEvent(e);
+    });
+
     // Completed tasks toggle switch
     const toggleWrap = headerControls.createDiv({ cls: 'study-flow-tasks-completed-toggle-wrap' });
     const toggleLabel = toggleWrap.createEl('label', { cls: 'study-flow-toggle-label' });
@@ -140,7 +192,7 @@ export class TasksTab implements TabComponent {
 
     if (this.taskSearchQuery) {
       const clearBtn = searchWrap.createEl('button', {
-        cls: 'study-flow-search-clear-btn',
+        cls: 'study-flow-search-clear-btn clickable-icon',
         attr: { 'aria-label': t('tasks.clearSearch') },
       });
       setIcon(clearBtn, 'x');
@@ -152,7 +204,7 @@ export class TasksTab implements TabComponent {
     }
 
     const sortSelect = searchRow.createEl('select', {
-      cls: 'study-flow-tasks-sort-select',
+      cls: 'study-flow-tasks-sort-select dropdown',
       attr: { 'aria-label': t('tasks.sortLabel') },
     });
     sortSelect.createEl('option', { value: 'urgency', text: t('tasks.sortUrgency') });
@@ -427,6 +479,157 @@ export class TasksTab implements TabComponent {
       cls: `study-flow-task-card ${task.completed ? 'is-done' : ''} ${isEditing ? 'is-editing' : ''}`,
     });
 
+    const handleToggleCompletion = async (newCompleted: boolean) => {
+      const success = await toggleTaskCompletionInFile(this.app, task, newCompleted);
+      if (!success) return;
+      task.completed = newCompleted;
+      if (this.container) await this.render(this.container);
+
+      if (newCompleted) {
+        showUndoNotice(
+          t('tasks.taskCompletedWithUndo'),
+          async () => {
+            await toggleTaskCompletionInFile(this.app, task, false);
+            task.completed = false;
+            new Notice(t('tasks.taskRestoredNotice'));
+            if (this.container) await this.render(this.container);
+          }
+        );
+      } else {
+        new Notice(t('tasks.unmarkedNotice'));
+      }
+    };
+
+    const handleDeleteTask = async () => {
+      const taskToRestore = { ...task };
+      const file = this.app.vault.getAbstractFileByPath(task.sourceFile);
+      if (!(file instanceof TFile)) {
+        await deleteTaskFromFile(this.app, task);
+        new Notice(t('tasks.entryDeletedNotice'));
+        if (this.container) await this.render(this.container);
+        return;
+      }
+
+      let rawDeletedLines: string[] = [];
+      let deletedIndex = taskToRestore.lineNumber ?? -1;
+
+      await this.app.vault.process(file, (content) => {
+        const lines = content.split(/\r?\n/);
+        const locate = locateTaskLineIndex(lines, task);
+        if (locate.status !== 'ambiguous' && locate.status !== 'not_found' && locate.index !== -1) {
+          deletedIndex = locate.index;
+          let count = 1;
+          while (locate.index + count < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[locate.index + count])) {
+            count++;
+          }
+          rawDeletedLines = lines.slice(locate.index, locate.index + count);
+        }
+        const mut = mutateTaskLineInContent(content, task, { action: 'delete' });
+        return mut.success ? mut.updatedContent : content;
+      });
+
+      if (this.container) await this.render(this.container);
+
+      showUndoNotice(
+        t('tasks.taskDeletedWithUndo'),
+        async () => {
+          if (rawDeletedLines.length > 0) {
+            await this.app.vault.process(file, (content) => {
+              const lines = content.split(/\r?\n/);
+              const insertIdx = deletedIndex >= 0 && deletedIndex <= lines.length ? deletedIndex : lines.length;
+              lines.splice(insertIdx, 0, ...rawDeletedLines);
+              return lines.join('\n');
+            });
+            new Notice(t('tasks.taskRestoredNotice'));
+            if (this.container) await this.render(this.container);
+          }
+        }
+      );
+    };
+
+    const showTaskContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const menu = new Menu();
+
+      // 1. Edit
+      menu.addItem((item) => {
+        item
+          .setTitle(t('tasks.menuEdit'))
+          .setIcon('pencil')
+          .onClick(() => {
+            this.editingTaskId = task.id;
+            if (this.container) void this.render(this.container);
+          });
+      });
+
+      // 2. Complete / Uncomplete
+      menu.addItem((item) => {
+        const isCompleted = Boolean(task.completed);
+        item
+          .setTitle(isCompleted ? t('tasks.menuUncomplete') : t('tasks.menuComplete'))
+          .setIcon(isCompleted ? 'square' : 'check-square')
+          .onClick(async () => {
+            await handleToggleCompletion(!isCompleted);
+          });
+      });
+
+      // 3. Promote / Convert
+      if (task.isIdea) {
+        menu.addItem((item) => {
+          item
+            .setTitle(t('tasks.menuPromote'))
+            .setIcon('zap')
+            .onClick(async () => {
+              await promoteIdeaToTaskInFile(this.app, task);
+              new Notice(t('tasks.promotedToTaskNotice', { text: task.text }));
+              if (this.container) await this.render(this.container);
+            });
+        });
+      } else {
+        menu.addItem((item) => {
+          item
+            .setTitle(t('tasks.menuConvertToIdea'))
+            .setIcon('archive')
+            .onClick(async () => {
+              const newText = task.text.includes('#idea') ? task.text : `${task.text} #idea`;
+              await updateTaskTextInFile(this.app, task, newText);
+              new Notice(t('tasks.savedInIceboxNotice'));
+              if (this.container) await this.render(this.container);
+            });
+        });
+      }
+
+      // 4. Open in note
+      menu.addItem((item) => {
+        item
+          .setTitle(t('tasks.menuOpenInNote'))
+          .setIcon('file-text')
+          .onClick(async () => {
+            await this.app.workspace.openLinkText(task.sourceFile, '', false);
+          });
+      });
+
+      menu.addSeparator();
+
+      // 5. Delete
+      menu.addItem((item) => {
+        item
+          .setTitle(t('tasks.menuDelete'))
+          .setIcon('trash-2')
+          .setWarning(true)
+          .onClick(async () => {
+            await handleDeleteTask();
+          });
+      });
+
+      menu.showAtMouseEvent(e);
+    };
+
+    itemCard.addEventListener('contextmenu', (e: MouseEvent) => {
+      showTaskContextMenu(e);
+    });
+
     // Checkbox or Icebox bullet
     const cbWrapper = itemCard.createDiv({ cls: 'study-flow-cb-wrapper' });
     let cb: HTMLInputElement | null = null;
@@ -437,10 +640,7 @@ export class TasksTab implements TabComponent {
       cb = cbWrapper.createEl('input', { type: 'checkbox' });
       cb.checked = task.completed;
       cb.addEventListener('change', async () => {
-        await toggleTaskCompletionInFile(this.app, task, cb!.checked);
-        task.completed = cb!.checked;
-        new Notice(cb!.checked ? t('tasks.markedCompletedNotice') : t('tasks.unmarkedNotice'));
-        if (this.container) await this.render(this.container);
+        await handleToggleCompletion(cb!.checked);
       });
     }
 
@@ -580,14 +780,21 @@ export class TasksTab implements TabComponent {
               ? formatDeadlineHuman(task.daysRemaining, task.dueDate)
               : task.dueDate;
           let badgeCls = 'study-flow-deadline-badge';
+          let dlIconName = 'calendar';
           if (task.daysRemaining !== undefined) {
-            if (task.daysRemaining < 0) badgeCls += ' is-overdue';
-            else if (task.daysRemaining === 0) badgeCls += ' is-today';
-            else if (task.daysRemaining <= 3) badgeCls += ' is-soon';
+            if (task.daysRemaining < 0) {
+              badgeCls += ' is-overdue';
+              dlIconName = 'alert-circle';
+            } else if (task.daysRemaining === 0) {
+              badgeCls += ' is-today';
+              dlIconName = 'clock';
+            } else if (task.daysRemaining <= 3) {
+              badgeCls += ' is-soon';
+            }
           }
           const dlBadge = badgesRow.createSpan({ cls: badgeCls });
           const dlIcon = dlBadge.createSpan({ cls: 'study-flow-badge-icon' });
-          setIcon(dlIcon, 'calendar');
+          setIcon(dlIcon, dlIconName);
           dlBadge.createSpan({ text: ` ${badgeText}` });
         }
 
@@ -655,7 +862,7 @@ export class TasksTab implements TabComponent {
       // Quick Pomodoro decrement (if at least 1 completed)
       if ((task.completedPomodoros || 0) > 0) {
         const minusPomoBtn = actionsToolbar.createEl('button', {
-          cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn',
+          cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn clickable-icon',
           attr: { 'aria-label': t('tasks.decrementPomodoroTooltip') },
         });
         const mIcon = minusPomoBtn.createSpan({ cls: 'study-flow-btn-icon' });
@@ -673,7 +880,7 @@ export class TasksTab implements TabComponent {
 
       // Quick Pomodoro increment
       const addPomoBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn',
+        cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn clickable-icon',
         attr: { 'aria-label': t('tasks.incrementPomodoroTooltip') },
       });
       const aIcon = addPomoBtn.createSpan({ cls: 'study-flow-btn-icon' });
@@ -690,7 +897,7 @@ export class TasksTab implements TabComponent {
 
       // Link to Pomodoro
       const linkPomodoroBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn',
+        cls: 'study-flow-icon-action-btn clickable-icon',
         attr: { 'aria-label': t('tasks.focusPomodoroTooltip') },
       });
       setIcon(linkPomodoroBtn, 'timer');
@@ -706,7 +913,7 @@ export class TasksTab implements TabComponent {
 
       // Add subtask quick button
       const addSubBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn',
+        cls: 'study-flow-icon-action-btn clickable-icon',
         attr: { 'aria-label': t('tasks.addSubtaskTooltip') },
       });
       setIcon(addSubBtn, 'list-plus');
@@ -727,7 +934,7 @@ export class TasksTab implements TabComponent {
 
     if (task.isIdea) {
       const promoteBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-promote-btn',
+        cls: 'study-flow-promote-btn clickable-icon',
         attr: { 'aria-label': t('tasks.promoteTooltip') },
       });
       const pIcon = promoteBtn.createSpan({ cls: 'study-flow-btn-icon' });
@@ -743,7 +950,7 @@ export class TasksTab implements TabComponent {
 
     // Edit inline button
     const editBtn = actionsToolbar.createEl('button', {
-      cls: 'study-flow-icon-action-btn',
+      cls: 'study-flow-icon-action-btn clickable-icon',
       attr: { 'aria-label': t('tasks.editTooltip') },
     });
     setIcon(editBtn, 'pencil');
@@ -755,15 +962,24 @@ export class TasksTab implements TabComponent {
 
     // Delete button
     const delBtn = actionsToolbar.createEl('button', {
-      cls: 'study-flow-icon-action-btn study-flow-delete-btn',
+      cls: 'study-flow-icon-action-btn study-flow-delete-btn clickable-icon',
       attr: { 'aria-label': t('tasks.deleteTooltip') },
     });
     setIcon(delBtn, 'trash-2');
     delBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      await deleteTaskFromFile(this.app, task);
-      new Notice(t('tasks.entryDeletedNotice'));
-      if (this.container) await this.render(this.container);
+      await handleDeleteTask();
+    });
+
+    // Context Menu Trigger Button ("...")
+    const moreBtn = actionsToolbar.createEl('button', {
+      cls: 'study-flow-icon-action-btn clickable-icon study-flow-task-more-btn',
+      attr: { 'aria-label': t('tasks.menuMoreActions') },
+    });
+    setIcon(moreBtn, 'more-vertical');
+    moreBtn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      showTaskContextMenu(e);
     });
   }
 

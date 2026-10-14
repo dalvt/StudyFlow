@@ -52,7 +52,7 @@ export class HabitsTab implements TabComponent {
     });
 
     const freqSelect = addSection.createEl('select', {
-      cls: 'study-flow-tasks-sort-select study-flow-habit-freq-select',
+      cls: 'study-flow-tasks-sort-select study-flow-habit-freq-select dropdown',
       attr: { 'aria-label': t('habits.frequencyLabel') },
     });
     freqSelect.createEl('option', { value: 'daily', text: t('habits.freqDailyOption') });
@@ -61,19 +61,18 @@ export class HabitsTab implements TabComponent {
 
     const targetInput = addSection.createEl('input', {
       type: 'number',
-      cls: 'study-flow-task-input study-flow-habit-target-input',
+      cls: 'study-flow-task-input study-flow-habit-target-input is-hidden',
       attr: {
         min: '1',
         max: '7',
         placeholder: '3',
-        style: 'display: none; width: 60px;',
         'aria-label': t('habits.timesPerWeekPlaceholder'),
       },
       value: '3',
     });
 
     freqSelect.addEventListener('change', () => {
-      targetInput.style.display = freqSelect.value === 'weekly' ? 'inline-block' : 'none';
+      targetInput.toggleClass('is-hidden', freqSelect.value !== 'weekly');
     });
 
     const addBtn = addSection.createEl('button', {

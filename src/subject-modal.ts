@@ -28,6 +28,7 @@ export class SubjectEditModal extends Modal {
   private tag: string = '';
   private color: string = '#4f46e5';
   private weeklyGoalHours: number = 5;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -49,6 +50,7 @@ export class SubjectEditModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-subject-modal');
@@ -168,12 +170,16 @@ export class SubjectEditModal extends Modal {
   onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }
 
 export class SubjectSelectModal extends Modal {
   private plugin: StudyFlowPlugin;
   private onSelect: (subject: Subject | null) => Promise<void> | void;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -186,6 +192,7 @@ export class SubjectSelectModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-subject-select-modal');
@@ -270,5 +277,8 @@ export class SubjectSelectModal extends Modal {
   onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }

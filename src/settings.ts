@@ -569,8 +569,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setName(name)
       .setDesc(desc);
 
-    const errorEl = setting.descEl.createDiv({ cls: 'study-flow-setting-error' });
-    errorEl.style.display = 'none';
+    const errorEl = setting.descEl.createDiv({ cls: 'study-flow-setting-error is-hidden' });
 
     setting.addText((text) => {
       text
@@ -579,12 +578,12 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           const res = validateSettingNumber(raw, minVal, maxVal, name);
           if (!res.valid) {
             errorEl.setText(res.error || t('settings.validationInvalid'));
-            errorEl.style.display = 'block';
+            errorEl.removeClass('is-hidden');
             text.inputEl.addClass('study-flow-input-invalid');
             return;
           }
 
-          errorEl.style.display = 'none';
+          errorEl.addClass('is-hidden');
           text.inputEl.removeClass('study-flow-input-invalid');
           if (res.value !== undefined) {
             await onSave(res.value);

@@ -18,6 +18,7 @@ export const en = {
   'common.reset': 'Reset',
   'common.pause': 'Pause',
   'common.start': 'Start',
+  'common.undo': 'Undo',
 
   // Priority
   'priority.none': 'Normal',
@@ -133,6 +134,8 @@ export const en = {
   'pomodoro.modeLongBreak': 'Long break',
   'pomodoro.modeBreak': 'Break',
   'pomodoro.footerStats': 'Session {streak}/{interval} • {completed} today',
+  'pomodoro.sessionCompletedAnnounce': 'Work session completed. Time for a break.',
+  'pomodoro.breakCompletedAnnounce': 'Break completed. Ready to focus.',
 
   // Pomodoro Task Check Modal
   'pomodoroCheck.title': 'Did you complete the task?',
@@ -208,6 +211,18 @@ export const en = {
   'tasks.promoteBtn': ' To Task',
   'tasks.editTooltip': 'Edit task',
   'tasks.deleteTooltip': 'Delete entry',
+  'tasks.menuMoreActions': 'More options',
+  'tasks.menuEdit': 'Edit task',
+  'tasks.menuComplete': 'Complete task',
+  'tasks.menuUncomplete': 'Mark as pending',
+  'tasks.menuPromote': 'Promote to task',
+  'tasks.menuConvertToIdea': 'Convert to idea',
+  'tasks.menuOpenInNote': 'Open in note',
+  'tasks.menuDelete': 'Delete task',
+  'tasks.taskCompletedWithUndo': 'Task completed',
+  'tasks.taskDeletedWithUndo': 'Task deleted',
+  'tasks.taskRestoredNotice': 'Task restored',
+  'tasks.filterMenuLabel': 'Filter views',
   'tasks.fileNotFound': 'File not found: {file}',
   'tasks.ambiguityNotice': 'Ambiguity updating task: multiple identical lines found.',
   'tasks.taskNotFoundNotice': 'Specified task not found in file.',

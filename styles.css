@@ -63,27 +63,52 @@
    Reduced Motion Accessibility (prefers-reduced-motion: reduce)
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .study-flow-container *,
+  .study-flow-container *::before,
+  .study-flow-container *::after,
+  .study-flow-modal *,
+  .study-flow-modal *::before,
+  .study-flow-modal *::after {
+    animation-duration: 0.001s;
+    animation-iteration-count: 1;
+    transition-duration: 0.001s;
+    scroll-behavior: auto;
   }
 }
 
 /* ==========================================================================
    Visible Focus for Keyboard Navigation & Accessibility
    ========================================================================== */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--sf-accent) !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 0 2px var(--sf-border-focus) !important;
+.study-flow-container button:focus-visible,
+.study-flow-container input:focus-visible,
+.study-flow-container select:focus-visible,
+.study-flow-container textarea:focus-visible,
+.study-flow-container [tabindex]:focus-visible,
+.study-flow-modal button:focus-visible,
+.study-flow-modal input:focus-visible,
+.study-flow-modal select:focus-visible,
+.study-flow-modal textarea:focus-visible,
+.study-flow-modal [tabindex]:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* Utility classes */
+.is-hidden {
+  display: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* =========================================
@@ -373,7 +398,7 @@ textarea:focus-visible,
 }
 
 /* In narrow panels/sidebars (< 560px), stack icon and label */
-@media (max-width: 560px) {
+@container (max-width: 560px) {
   .study-flow-segmented-nav {
     padding: 3px;
     gap: 3px;
@@ -387,13 +412,6 @@ textarea:focus-visible,
   .study-flow-nav-pill svg {
     width: 14px;
     height: 14px;
-  }
-}
-
-@media (max-width: 400px) {
-  .study-flow-nav-pill {
-    padding: 5px 1px;
-    font-size: 9.5px;
   }
 }
 
@@ -582,44 +600,15 @@ textarea:focus-visible,
   color: var(--interactive-accent);
 }
 
-/* Dial Aura & Glow */
+/* Native Clean Pomodoro Dial */
 .study-flow-dial-wrapper {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 6px auto;
-  width: 210px;
-  height: 210px;
-}
-
-.study-flow-dial-aura {
-  position: absolute;
-  width: 170px;
-  height: 170px;
-  border-radius: 50%;
-  filter: blur(36px);
-  opacity: 0.18;
-  pointer-events: none;
-  transition: background-color 0.4s ease, opacity 0.4s ease;
-}
-
-.study-flow-dial-aura.is-work {
-  background: var(--sf-danger-subtle);
-}
-
-.study-flow-dial-aura.is-break {
-  background: var(--sf-success-subtle);
-}
-
-.study-flow-dial-aura.is-pulsing {
-  animation: study-flow-aura-pulse 3s infinite ease-in-out;
-}
-
-@keyframes study-flow-aura-pulse {
-  0% { transform: scale(0.92); opacity: 0.18; }
-  50% { transform: scale(1.08); opacity: 0.32; }
-  100% { transform: scale(0.92); opacity: 0.18; }
+  width: 200px;
+  height: 200px;
 }
 
 .study-flow-dial-container {
@@ -635,37 +624,28 @@ textarea:focus-visible,
   width: 100%;
   height: 100%;
   transform: rotate(-90deg);
-  filter: drop-shadow(0 4px 12px color-mix(in srgb, var(--text-normal) 8%, transparent));
 }
 
 .study-flow-dial-bg {
   fill: none;
-  stroke: var(--background-modifier-border-hover, color-mix(in srgb, var(--text-on-accent) 10%, transparent));
-  stroke-width: 9;
-  opacity: 0.7;
-}
-
-.study-flow-dial-tick {
   stroke: var(--background-modifier-border);
-  stroke-width: 1.5;
-  opacity: 0.75;
+  stroke-width: 8;
+  opacity: 0.6;
 }
 
 .study-flow-dial-progress {
   fill: none;
-  stroke-width: 9;
+  stroke-width: 8;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: var(--sf-danger);
-  
+  stroke: var(--color-red, var(--text-error, #e53935));
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: var(--sf-success);
-  
+  stroke: var(--color-green, var(--text-success, #43a047));
 }
 
 .study-flow-dial-center {
@@ -678,27 +658,29 @@ textarea:focus-visible,
   text-align: center;
 }
 
+.study-flow-mode-pill,
 .study-flow-luxury-pill {
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
+  font-size: var(--font-ui-smaller, 10px);
+  font-weight: 600;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 9999px;
+  padding: 2px 8px;
+  border-radius: var(--radius-round, 9999px);
   display: inline-block;
-  backdrop-filter: blur(8px);
 }
 
+.study-flow-mode-pill.is-work,
 .study-flow-luxury-pill.is-work {
-  background-color: color-mix(in srgb, var(--sf-danger) 15%, transparent);
-  color: var(--sf-danger);
-  border: 1px solid color-mix(in srgb, var(--sf-danger) 30%, transparent);
+  background-color: color-mix(in srgb, var(--color-red, var(--text-error)) 15%, transparent);
+  color: var(--color-red, var(--text-error));
+  border: 1px solid color-mix(in srgb, var(--color-red, var(--text-error)) 30%, transparent);
 }
 
+.study-flow-mode-pill.is-break,
 .study-flow-luxury-pill.is-break {
-  background-color: color-mix(in srgb, var(--sf-success) 15%, transparent);
-  color: var(--sf-success);
-  border: 1px solid color-mix(in srgb, var(--sf-success) 30%, transparent);
+  background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
+  color: var(--color-green, var(--text-success));
+  border: 1px solid color-mix(in srgb, var(--color-green, var(--text-success)) 30%, transparent);
 }
 
 /* Modern Clean Sans-Serif Numbers (No Dotted-Zero Eyes) */
@@ -1668,7 +1650,7 @@ textarea:focus-visible,
   gap: 14px;
 }
 
-@media (max-width: 700px) {
+@container (max-width: 700px) {
   .study-flow-analytics-subgrid {
     grid-template-columns: 1fr;
   }
@@ -2653,9 +2635,9 @@ body.is-study-flow-zen .workspace-split {
   height: 14px;
 }
 
-.study-flow-task-search-input {
+.study-flow-search-input-wrap .study-flow-task-search-input {
   width: 100%;
-  padding: 7px 28px 7px 36px !important;
+  padding: 7px 28px 7px 36px;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -3444,71 +3426,90 @@ body.is-study-flow-zen .workspace-split {
   container-type: inline-size;
 }
 
+/* Hide brand header when docked in sidebar */
+.study-flow-container.is-in-sidebar .study-flow-brand-header {
+  display: none;
+}
+
+/* Tasks Filter Menu Button default state (hidden in wide container) */
+.study-flow-tasks-filter-menu-btn {
+  display: none;
+}
+
+/* Narrow Container (<400px): icon-only tabs with tooltips and native filter dropdown */
 @container (max-width: 400px) {
   .study-flow-nav-pill .study-flow-nav-pill-label {
-    display: none !important;
+    display: none;
   }
   .study-flow-nav-pill {
-    padding: 8px 4px !important;
-    justify-content: center !important;
-    min-height: 44px !important;
-    min-width: 44px !important;
+    padding: 8px 4px;
+    justify-content: center;
   }
   .study-flow-segmented-btn .study-flow-segmented-label {
-    display: none !important;
+    display: none;
   }
-  .study-flow-nav-pill,
-  .study-flow-icon-action-btn,
-  .study-flow-header-icon-btn,
-  .study-flow-preset-chip,
-  .study-flow-segmented-btn,
-  .study-flow-stepper-btn,
-  .study-flow-btn,
-  .mod-cta {
-    min-height: 44px !important;
-    min-width: 44px !important;
+  .study-flow-tasks-nav {
+    display: none;
+  }
+  .study-flow-tasks-filter-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-s);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    cursor: pointer;
+    font-size: var(--font-ui-small);
   }
 }
 
-@media (max-width: 400px) {
-  .study-flow-nav-pill .study-flow-nav-pill-label {
-    display: none !important;
-  }
-  .study-flow-nav-pill {
-    padding: 8px 4px !important;
-    justify-content: center !important;
-    min-height: 44px !important;
-    min-width: 44px !important;
-  }
-  .study-flow-segmented-btn .study-flow-segmented-label {
-    display: none !important;
-  }
-  .study-flow-nav-pill,
-  .study-flow-icon-action-btn,
-  .study-flow-header-icon-btn,
-  .study-flow-preset-chip,
-  .study-flow-segmented-btn,
-  .study-flow-stepper-btn,
-  .study-flow-btn,
-  .mod-cta {
-    min-height: 44px !important;
-    min-width: 44px !important;
-  }
+/* Mobile Touch Controls (min 44px) */
+.is-mobile .study-flow-container button,
+.is-mobile .study-flow-container .clickable-icon,
+.is-mobile .study-flow-container .study-flow-nav-pill,
+.is-mobile .study-flow-container .study-flow-icon-action-btn,
+.is-mobile .study-flow-container .study-flow-header-icon-btn,
+.is-mobile .study-flow-container .study-flow-preset-chip,
+.is-mobile .study-flow-container .study-flow-segmented-btn,
+.is-mobile .study-flow-container .study-flow-stepper-btn,
+.is-mobile .study-flow-container .study-flow-btn,
+.study-flow-container.is-mobile button,
+.study-flow-container.is-mobile .clickable-icon,
+.study-flow-container.is-mobile .study-flow-nav-pill,
+.study-flow-container.is-mobile .study-flow-icon-action-btn,
+.study-flow-container.is-mobile .study-flow-header-icon-btn,
+.study-flow-container.is-mobile .study-flow-preset-chip,
+.study-flow-container.is-mobile .study-flow-segmented-btn,
+.study-flow-container.is-mobile .study-flow-stepper-btn,
+.study-flow-container.is-mobile .study-flow-btn,
+.study-flow-container.is-mobile .mod-cta {
+  min-height: 44px;
+  min-width: 44px;
 }
 
-.is-phone .study-flow-nav-pill .study-flow-nav-pill-label {
-  display: none !important;
+/* Notice with Undo Button */
+.study-flow-notice-undo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
-.is-phone .study-flow-nav-pill,
-.is-phone .study-flow-icon-action-btn,
-.is-phone .study-flow-header-icon-btn,
-.is-phone .study-flow-preset-chip,
-.is-phone .study-flow-segmented-btn,
-.is-phone .study-flow-stepper-btn,
-.is-phone .study-flow-btn,
-.is-phone .mod-cta {
-  min-height: 44px !important;
-  min-width: 44px !important;
+
+.study-flow-notice-undo-msg {
+  flex: 1;
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
+}
+
+.study-flow-notice-undo-btn {
+  padding: 4px 10px;
+  font-size: var(--font-ui-smaller);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 /* Active Subject & Pomodoro Selection */
@@ -3817,7 +3818,8 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-habit-target-input {
-  width: 50px !important;
+  width: 50px;
+  max-width: 50px;
   padding: 4px 6px;
   font-size: var(--font-ui-smaller, 11px);
   text-align: center;

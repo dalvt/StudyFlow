@@ -12,6 +12,7 @@ export class PomodoroModal extends Modal {
   private pendingTasks: PendingTaskItem[] = [];
   private lastTaskText: string | null = null;
   private lastSubjectId: string | null = null;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -19,6 +20,7 @@ export class PomodoroModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-mini-timer-modal');
@@ -177,7 +179,7 @@ export class PomodoroModal extends Modal {
     const controls = contentEl.createDiv({ cls: 'study-flow-mini-timer-controls' });
 
     const resetBtn = controls.createEl('button', {
-      cls: 'study-flow-btn-icon',
+      cls: 'study-flow-btn-icon clickable-icon',
       attr: { 'aria-label': t('common.reset') },
     });
     setIcon(resetBtn, 'rotate-ccw');
@@ -187,16 +189,17 @@ export class PomodoroModal extends Modal {
 
     const isRunning = status.state === 'running';
     const playBtn = controls.createEl('button', {
-      cls: `mod-cta study-flow-play-btn ${isRunning ? 'is-running' : ''}`,
+      cls: `mod-cta study-flow-play-btn ${isRunning ? 'is-running' : ''} clickable-icon`,
       attr: { 'aria-label': isRunning ? t('common.pause') : t('common.start') },
     });
     setIcon(playBtn, isRunning ? 'pause' : 'play');
     playBtn.addEventListener('click', () => {
       this.plugin.pomodoro.toggleStartPause();
     });
+    setTimeout(() => playBtn.focus(), 20);
 
     const skipBtn = controls.createEl('button', {
-      cls: 'study-flow-btn-icon',
+      cls: 'study-flow-btn-icon clickable-icon',
       attr: { 'aria-label': t('pomodoro.skipCycle') },
     });
     setIcon(skipBtn, 'skip-forward');
@@ -282,5 +285,8 @@ export class PomodoroModal extends Modal {
       this.unsubscribe = null;
     }
     this.contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }

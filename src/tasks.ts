@@ -180,6 +180,7 @@ export class QuickCaptureModal extends Modal {
   private selectedPriority: TaskPriority = 'none';
   private selectedEstimate: number = 0;
   private selectedDeadline: string = '';
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app);
@@ -187,6 +188,7 @@ export class QuickCaptureModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal', 'study-flow-quick-capture');
@@ -213,13 +215,13 @@ export class QuickCaptureModal extends Modal {
         drop.onChange((val) => {
           this.itemType = val as 'task' | 'idea';
           if (prioritySetting) {
-            prioritySetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+            prioritySetting.settingEl.toggleClass('is-hidden', this.itemType === 'idea');
           }
           if (estimateSetting) {
-            estimateSetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+            estimateSetting.settingEl.toggleClass('is-hidden', this.itemType === 'idea');
           }
           if (deadlineSetting) {
-            deadlineSetting.settingEl.style.display = this.itemType === 'idea' ? 'none' : '';
+            deadlineSetting.settingEl.toggleClass('is-hidden', this.itemType === 'idea');
           }
         });
       });
@@ -320,6 +322,9 @@ export class QuickCaptureModal extends Modal {
   onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 
   private async submitTask(): Promise<void> {

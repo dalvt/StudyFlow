@@ -21,6 +21,7 @@ export class PomodoroTab implements TabComponent {
   private isAdjustingPomodoroTimes: boolean = false;
   private isSelectingTaskForPomodoro: boolean = false;
   private pendingInboxTasks: PendingTaskItem[] = [];
+  private lastAnnouncedMode: 'work' | 'break' | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     this.app = app;
@@ -177,10 +178,11 @@ export class PomodoroTab implements TabComponent {
     // Active Task Linking Section
     await this.renderActiveTaskBanner(card, status);
 
-    // Luxury Dial Wrapper
+    // Native Dial Wrapper
     const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
-    dialWrapper.createDiv({
-      cls: `study-flow-dial-aura ${status.mode === 'work' ? 'is-work' : 'is-break'} ${status.state === 'running' ? 'is-pulsing' : ''}`,
+    const liveAnnouncer = dialWrapper.createDiv({
+      cls: 'sr-only study-flow-sr-announcer',
+      attr: { 'aria-live': 'polite', 'aria-atomic': 'true' },
     });
 
     const dialContainer = dialWrapper.createDiv({ cls: 'study-flow-dial-container' });
@@ -189,35 +191,6 @@ export class PomodoroTab implements TabComponent {
       cls: 'study-flow-dial-svg',
       attr: { viewBox: '0 0 190 190' },
     });
-
-    // Defs for gradients
-    const defs = svgEl.createSvg('defs');
-    const gradWork = defs.createSvg('linearGradient', {
-      attr: { id: 'view-pomodoro-grad-work', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
-    });
-    gradWork.createSvg('stop', { attr: { offset: '0%', 'stop-color': '#ff4d4f' } });
-    gradWork.createSvg('stop', { attr: { offset: '100%', 'stop-color': '#fa8c16' } });
-
-    const gradBreak = defs.createSvg('linearGradient', {
-      attr: { id: 'view-pomodoro-grad-break', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
-    });
-    gradBreak.createSvg('stop', { attr: { offset: '0%', 'stop-color': '#10b981' } });
-    gradBreak.createSvg('stop', { attr: { offset: '100%', 'stop-color': '#06b6d4' } });
-
-    // 12 Chronograph ticks
-    const ticksGroup = svgEl.createSvg('g', { cls: 'study-flow-ticks-group' });
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * 2 * Math.PI;
-      const x1 = 95 + (CIRCLE_RADIUS - 6) * Math.cos(angle);
-      const y1 = 95 + (CIRCLE_RADIUS - 6) * Math.sin(angle);
-      const x2 = 95 + (CIRCLE_RADIUS + 6) * Math.cos(angle);
-      const y2 = 95 + (CIRCLE_RADIUS + 6) * Math.sin(angle);
-
-      ticksGroup.createSvg('line', {
-        cls: 'study-flow-dial-tick',
-        attr: { x1: String(x1), y1: String(y1), x2: String(x2), y2: String(y2) },
-      });
-    }
 
     // Track circle
     svgEl.createSvg('circle', {
@@ -245,7 +218,7 @@ export class PomodoroTab implements TabComponent {
 
     centerInfo.createDiv({
       text: pillText,
-      cls: `study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      cls: `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
     });
 
     centerInfo.createDiv({
@@ -272,7 +245,7 @@ export class PomodoroTab implements TabComponent {
     const controlDeck = card.createDiv({ cls: 'study-flow-control-deck' });
 
     const resetBtn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
       attr: { 'aria-label': t('pomodoro.reset') },
     });
     setIcon(resetBtn, 'rotate-ccw');
@@ -282,7 +255,7 @@ export class PomodoroTab implements TabComponent {
 
     const isRunning = status.state === 'running';
     const heroBtn = controlDeck.createEl('button', {
-      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'} clickable-icon`,
       attr: { 'aria-label': isRunning ? t('pomodoro.pause') : t('pomodoro.start') },
     });
     const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
@@ -292,7 +265,7 @@ export class PomodoroTab implements TabComponent {
     });
 
     const skipBtn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
       attr: { 'aria-label': t('pomodoro.skip') },
     });
     setIcon(skipBtn, 'skip-forward');
@@ -301,7 +274,7 @@ export class PomodoroTab implements TabComponent {
     });
 
     const add5Btn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
       attr: { 'aria-label': t('pomodoro.add5mTooltip') },
     });
     const plusIcon = add5Btn.createSpan();
@@ -527,13 +500,20 @@ export class PomodoroTab implements TabComponent {
           ? t('pomodoro.pillFocus')
           : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak'))
       );
-      pillEl.className = `study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      pillEl.className = `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
     }
 
-    const auraEl = this.container.querySelector('.study-flow-dial-aura');
-    if (auraEl) {
-      auraEl.className = `study-flow-dial-aura ${status.mode === 'work' ? 'is-work' : 'is-break'} ${status.state === 'running' ? 'is-pulsing' : ''}`;
+    if (this.lastAnnouncedMode !== null && this.lastAnnouncedMode !== status.mode) {
+      const announcer = this.container.querySelector('.study-flow-sr-announcer');
+      if (announcer) {
+        announcer.setText(
+          status.mode === 'break'
+            ? t('pomodoro.sessionCompletedAnnounce')
+            : t('pomodoro.breakCompletedAnnounce')
+        );
+      }
     }
+    this.lastAnnouncedMode = status.mode;
 
     const statsEl = this.container.querySelector('.study-flow-dial-stats-sub');
     if (statsEl) {

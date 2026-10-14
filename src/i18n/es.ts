@@ -20,6 +20,7 @@ export const es: TranslationDict = {
   'common.reset': 'Reiniciar',
   'common.pause': 'Pausar',
   'common.start': 'Iniciar',
+  'common.undo': 'Deshacer',
 
   // Priority
   'priority.none': 'Normal',
@@ -135,6 +136,8 @@ export const es: TranslationDict = {
   'pomodoro.modeLongBreak': 'Descanso largo',
   'pomodoro.modeBreak': 'Descanso',
   'pomodoro.footerStats': 'Sesión {streak}/{interval} • {completed} hoy',
+  'pomodoro.sessionCompletedAnnounce': 'Sesión de trabajo finalizada. Momento de descansar.',
+  'pomodoro.breakCompletedAnnounce': 'Descanso finalizado. Momento de concentrarse.',
 
   // Pomodoro Task Check Modal
   'pomodoroCheck.title': '¿Completaste la tarea?',
@@ -210,6 +213,18 @@ export const es: TranslationDict = {
   'tasks.promoteBtn': ' A Tarea',
   'tasks.editTooltip': 'Editar tarea',
   'tasks.deleteTooltip': 'Eliminar entrada',
+  'tasks.menuMoreActions': 'Más opciones',
+  'tasks.menuEdit': 'Editar tarea',
+  'tasks.menuComplete': 'Completar tarea',
+  'tasks.menuUncomplete': 'Marcar como pendiente',
+  'tasks.menuPromote': 'Promover a tarea',
+  'tasks.menuConvertToIdea': 'Convertir en idea',
+  'tasks.menuOpenInNote': 'Abrir en la nota',
+  'tasks.menuDelete': 'Eliminar tarea',
+  'tasks.taskCompletedWithUndo': 'Tarea completada',
+  'tasks.taskDeletedWithUndo': 'Tarea eliminada',
+  'tasks.taskRestoredNotice': 'Tarea restaurada',
+  'tasks.filterMenuLabel': 'Filtrar vistas',
   'tasks.fileNotFound': 'No se encontró el archivo: {file}',
   'tasks.ambiguityNotice': 'Ambigüedad al actualizar tarea: existen múltiples líneas idénticas.',
   'tasks.taskNotFoundNotice': 'No se encontró la tarea especificada en el archivo.',

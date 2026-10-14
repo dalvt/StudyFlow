@@ -23,6 +23,7 @@ export class TaskCreateModal extends Modal {
   private selectedDeadline: string = '';
   private pomodoroEstimate: number = 0;
   private selectedPriority: TaskPriority = 'none';
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -39,6 +40,7 @@ export class TaskCreateModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-cloud-modal');
@@ -93,7 +95,7 @@ export class TaskCreateModal extends Modal {
     // Cell 1: Materia
     const subjectField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
     subjectField.createEl('span', { text: t('tasks.subjectLabel'), cls: 'study-flow-cloud-label' });
-    const subjectSelect = subjectField.createEl('select', { cls: 'study-flow-cloud-control' });
+    const subjectSelect = subjectField.createEl('select', { cls: 'study-flow-cloud-control dropdown' });
     subjectSelect.createEl('option', { value: '', text: t('tasks.subjectNoneOption') });
 
     this.knownSubjects.forEach((subj) => {
@@ -105,14 +107,13 @@ export class TaskCreateModal extends Modal {
     const customSubjectInput = subjectField.createEl('input', {
       type: 'text',
       placeholder: t('tasks.customSubjectPlaceholder'),
-      cls: 'study-flow-cloud-control study-flow-cloud-custom-input',
+      cls: 'study-flow-cloud-control study-flow-cloud-custom-input is-hidden',
     });
-    customSubjectInput.style.display = 'none';
 
     subjectSelect.addEventListener('change', () => {
       if (subjectSelect.value === '__custom__') {
-        subjectSelect.style.display = 'none';
-        customSubjectInput.style.display = 'block';
+        subjectSelect.addClass('is-hidden');
+        customSubjectInput.removeClass('is-hidden');
         customSubjectInput.focus();
       } else {
         this.selectedSubject = subjectSelect.value;
@@ -125,8 +126,8 @@ export class TaskCreateModal extends Modal {
 
     customSubjectInput.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !customSubjectInput.value) {
-        customSubjectInput.style.display = 'none';
-        subjectSelect.style.display = 'block';
+        customSubjectInput.addClass('is-hidden');
+        subjectSelect.removeClass('is-hidden');
         subjectSelect.value = '';
         this.selectedSubject = '';
       }
@@ -248,25 +249,17 @@ export class TaskCreateModal extends Modal {
     // Sync Type Switch
     const syncItemType = (type: 'task' | 'idea') => {
       this.itemType = type;
-      if (type === 'idea') {
-        taskBtn.removeClass('is-active');
-        ideaBtn.addClass('is-active');
-        deadlineField.style.display = 'none';
-        estimateField.style.display = 'none';
-        priorityField.style.display = 'none';
-        metaGrid.addClass('is-idea-mode');
-        titleInput.placeholder = t('tasks.cloudIdeaPlaceholder');
-        submitTextSpan.setText(t('tasks.saveInIceboxBtn'));
-      } else {
-        ideaBtn.removeClass('is-active');
-        taskBtn.addClass('is-active');
-        deadlineField.style.display = '';
-        estimateField.style.display = '';
-        priorityField.style.display = '';
-        metaGrid.removeClass('is-idea-mode');
-        titleInput.placeholder = t('tasks.cloudTitlePlaceholder');
-        submitTextSpan.setText(t('tasks.addTaskBtn'));
-      }
+      const isIdea = type === 'idea';
+      taskBtn.toggleClass('is-active', !isIdea);
+      ideaBtn.toggleClass('is-active', isIdea);
+      deadlineField.toggleClass('is-hidden', isIdea);
+      estimateField.toggleClass('is-hidden', isIdea);
+      priorityField.toggleClass('is-hidden', isIdea);
+      metaGrid.toggleClass('is-idea-mode', isIdea);
+      titleInput.placeholder = isIdea
+        ? t('tasks.cloudIdeaPlaceholder')
+        : t('tasks.cloudTitlePlaceholder');
+      submitTextSpan.setText(isIdea ? t('tasks.saveInIceboxBtn') : t('tasks.addTaskBtn'));
     };
 
     taskBtn.addEventListener('click', () => syncItemType('task'));
@@ -296,6 +289,9 @@ export class TaskCreateModal extends Modal {
   onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 
   private async saveAndClose(): Promise<void> {

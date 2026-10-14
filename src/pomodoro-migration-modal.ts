@@ -8,6 +8,7 @@ import {
 export class PomodoroLogMigrationModal extends Modal {
   private previews: FilePomodoroMigrationPreview[];
   private onComplete?: (migratedCount: number) => void;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -20,6 +21,7 @@ export class PomodoroLogMigrationModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal');
@@ -115,6 +117,10 @@ export class PomodoroLogMigrationModal extends Modal {
   }
 
   onClose(): void {
-    this.contentEl.empty();
+    const { contentEl } = this;
+    contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }

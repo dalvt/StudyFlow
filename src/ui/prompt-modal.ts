@@ -5,6 +5,7 @@ export class PromptModal extends Modal {
   private titleText: string;
   private placeholder: string;
   private onSubmit: (value: string) => void | Promise<void>;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(
     app: App,
@@ -19,6 +20,7 @@ export class PromptModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-prompt-modal');
@@ -53,5 +55,13 @@ export class PromptModal extends Modal {
         handleConfirm();
       }
     });
+  }
+
+  onClose(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }

@@ -446,13 +446,12 @@ export class CalendarTab implements TabComponent {
         titleInput.value = '';
         noteInput.value = '';
       }
-      formWrapper.style.display = this.isAddingTimeBlock ? 'block' : 'none';
+      formWrapper.toggleClass('is-hidden', !this.isAddingTimeBlock);
     });
 
     // Inline Add Block Form
     const formWrapper = timeBlocksCol.createDiv({
-      cls: 'study-flow-block-create-form',
-      attr: { style: this.isAddingTimeBlock ? 'display: block;' : 'display: none;' },
+      cls: `study-flow-block-create-form ${this.isAddingTimeBlock ? '' : 'is-hidden'}`,
     });
     const formRow1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
     const startInput = formRow1.createEl('input', {
@@ -518,7 +517,7 @@ export class CalendarTab implements TabComponent {
       this.isAddingTimeBlock = false;
       this.editingBlockId = null;
       saveBlockBtn.setText(t('common.save'));
-      formWrapper.style.display = 'none';
+      formWrapper.addClass('is-hidden');
     });
 
     // Time Blocks List
@@ -605,7 +604,7 @@ export class CalendarTab implements TabComponent {
           titleInput.value = block.title;
           noteInput.value = block.linkedNote || '';
           saveBlockBtn.setText(t('common.update'));
-          formWrapper.style.display = 'block';
+          formWrapper.removeClass('is-hidden');
           titleInput.focus();
         });
 
@@ -640,13 +639,12 @@ export class CalendarTab implements TabComponent {
     addDlBtn.createSpan({ text: t('calendar.newDeadline') });
     addDlBtn.addEventListener('click', () => {
       this.isAddingDeadline = !this.isAddingDeadline;
-      dlFormWrapper.style.display = this.isAddingDeadline ? 'block' : 'none';
+      dlFormWrapper.toggleClass('is-hidden', !this.isAddingDeadline);
     });
 
     // Inline Add Deadline Form
     const dlFormWrapper = deadlinesCol.createDiv({
-      cls: 'study-flow-block-create-form',
-      attr: { style: this.isAddingDeadline ? 'display: block;' : 'display: none;' },
+      cls: `study-flow-block-create-form ${this.isAddingDeadline ? '' : 'is-hidden'}`,
     });
     const dlRow1 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
     const dlTitleInput = dlRow1.createEl('input', {
@@ -662,7 +660,7 @@ export class CalendarTab implements TabComponent {
 
     const dlRow2 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
     const prioritySelect = dlRow2.createEl('select', {
-      cls: 'study-flow-select-input',
+      cls: 'study-flow-select-input dropdown',
       attr: { 'aria-label': t('calendar.deadlinePriorityAria') },
     });
     const priorities: Array<{ val: TaskPriority; label: string }> = [
@@ -719,7 +717,7 @@ export class CalendarTab implements TabComponent {
 
     cancelDlBtn.addEventListener('click', () => {
       this.isAddingDeadline = false;
-      dlFormWrapper.style.display = 'none';
+      dlFormWrapper.addClass('is-hidden');
     });
 
     // List of day deadlines
@@ -996,13 +994,12 @@ export class CalendarTab implements TabComponent {
     newDlBtn.createSpan({ text: t('calendar.newDeadline') });
     newDlBtn.addEventListener('click', () => {
       this.isAddingDeadline = !this.isAddingDeadline;
-      formWrapper.style.display = this.isAddingDeadline ? 'block' : 'none';
+      formWrapper.toggleClass('is-hidden', !this.isAddingDeadline);
     });
 
     // Inline form for master hub
     const formWrapper = hubWrapper.createDiv({
-      cls: 'study-flow-block-create-form',
-      attr: { style: this.isAddingDeadline ? 'display: block;' : 'display: none;' },
+      cls: `study-flow-block-create-form ${this.isAddingDeadline ? '' : 'is-hidden'}`,
     });
     const r1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
     const titleIn = r1.createEl('input', {
@@ -1023,7 +1020,7 @@ export class CalendarTab implements TabComponent {
 
     const r2 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
     const prioIn = r2.createEl('select', {
-      cls: 'study-flow-select-input',
+      cls: 'study-flow-select-input dropdown',
       attr: { 'aria-label': t('tasks.priorityName') },
     });
     [
@@ -1076,7 +1073,7 @@ export class CalendarTab implements TabComponent {
 
     cancelHubDl.addEventListener('click', () => {
       this.isAddingDeadline = false;
-      formWrapper.style.display = 'none';
+      formWrapper.addClass('is-hidden');
     });
 
     // Urgency Groups

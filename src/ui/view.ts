@@ -1,4 +1,4 @@
-import { ItemView, setIcon, WorkspaceLeaf } from 'obsidian';
+import { ItemView, Platform, setIcon, setTooltip, WorkspaceLeaf } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
 import { PomodoroTab } from './pomodoro-tab';
@@ -129,7 +129,10 @@ export class StudyFlowView extends ItemView {
   }
 
   private buildShell(): void {
-    const rootWrapper = this.containerEl.createDiv({ cls: 'study-flow-container' });
+    const isMainTab = this.leaf.getRoot() === this.app.workspace.rootSplit;
+    const rootWrapper = this.containerEl.createDiv({
+      cls: `study-flow-container ${!isMainTab ? 'is-in-sidebar' : ''} ${Platform.isMobile ? 'is-mobile' : ''}`,
+    });
 
     // Top Brand Header
     const brandRow = rootWrapper.createDiv({ cls: 'study-flow-brand-header' });
@@ -142,11 +145,11 @@ export class StudyFlowView extends ItemView {
 
     // Header Action Buttons
     const headerActions = brandRow.createDiv({ cls: 'study-flow-header-actions' });
-    const isMainTab = this.leaf.getRoot() === this.app.workspace.rootSplit;
 
     if (!isMainTab) {
       const expandBtn = headerActions.createEl('button', {
-        cls: 'study-flow-expand-tab-btn',
+        cls: 'study-flow-expand-tab-btn clickable-icon',
+        attr: { 'aria-label': t('view.fullTab') },
       });
       const expIcon = expandBtn.createSpan();
       setIcon(expIcon, 'maximize-2');
@@ -156,7 +159,7 @@ export class StudyFlowView extends ItemView {
       });
     } else {
       const dockBtn = headerActions.createEl('button', {
-        cls: 'study-flow-header-icon-btn',
+        cls: 'study-flow-header-icon-btn clickable-icon',
         attr: { 'aria-label': t('view.moveToSidebar') },
       });
       setIcon(dockBtn, 'panel-right');
@@ -166,7 +169,7 @@ export class StudyFlowView extends ItemView {
     }
 
     const refreshBtn = headerActions.createEl('button', {
-      cls: 'study-flow-header-icon-btn',
+      cls: 'study-flow-header-icon-btn clickable-icon',
       attr: { 'aria-label': t('view.reloadView') },
     });
     setIcon(refreshBtn, 'rotate-cw');
@@ -177,8 +180,14 @@ export class StudyFlowView extends ItemView {
       }
     });
 
-    // Navigation Tab Bar with 5 tabs
-    const navBar = rootWrapper.createDiv({ cls: 'study-flow-segmented-nav' });
+    // Navigation Tab Bar with 5 tabs (role="tablist")
+    const navBar = rootWrapper.createDiv({
+      cls: 'study-flow-segmented-nav',
+      attr: {
+        role: 'tablist',
+        'aria-label': 'Study Flow Navigation',
+      },
+    });
 
     const tabsConfig: Array<{ id: ActiveTab; label: string; icon: string }> = [
       { id: 'pomodoro', label: t('tabs.pomodoro'), icon: 'timer' },
@@ -189,10 +198,19 @@ export class StudyFlowView extends ItemView {
     ];
 
     tabsConfig.forEach((tab) => {
+      const isSelected = this.activeTab === tab.id;
       const btn = navBar.createEl('button', {
-        cls: `study-flow-nav-pill ${this.activeTab === tab.id ? 'is-active' : ''}`,
-        attr: { 'aria-label': tab.label },
+        cls: `study-flow-nav-pill clickable-icon ${isSelected ? 'is-active' : ''}`,
+        attr: {
+          role: 'tab',
+          id: `study-flow-tab-${tab.id}`,
+          'aria-controls': `study-flow-panel-${tab.id}`,
+          'aria-selected': isSelected ? 'true' : 'false',
+          tabindex: isSelected ? '0' : '-1',
+          'aria-label': tab.label,
+        },
       });
+      setTooltip(btn, tab.label);
       const iconSpan = btn.createSpan({ cls: 'study-flow-nav-pill-icon' });
       setIcon(iconSpan, tab.icon);
       btn.createSpan({ text: tab.label, cls: 'study-flow-nav-pill-label' });
@@ -204,14 +222,48 @@ export class StudyFlowView extends ItemView {
       this.navButtons.set(tab.id, btn);
     });
 
+    // Arrow keys & Home/End navigation on tablist
+    navBar.addEventListener('keydown', async (e: KeyboardEvent) => {
+      const tabIds = tabsConfig.map((t) => t.id);
+      const currentIndex = tabIds.indexOf(this.activeTab);
+      let targetIndex = -1;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        targetIndex = (currentIndex + 1) % tabIds.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        targetIndex = (currentIndex - 1 + tabIds.length) % tabIds.length;
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        targetIndex = 0;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        targetIndex = tabIds.length - 1;
+      }
+
+      if (targetIndex !== -1) {
+        const nextTab = tabIds[targetIndex];
+        await this.switchTab(nextTab);
+        const targetBtn = this.navButtons.get(nextTab);
+        targetBtn?.focus();
+      }
+    });
+
     // Persistent Content Container Body
     const contentBody = rootWrapper.createDiv({ cls: 'study-flow-tab-body' });
 
-    // Create a container for each tab to preserve DOM state across tab switches
+    // Create a container for each tab (role="tabpanel")
     tabsConfig.forEach((tab) => {
+      const isSelected = this.activeTab === tab.id;
       const tabContainer = contentBody.createDiv({
-        cls: `study-flow-tab-content study-flow-tab-${tab.id}`,
-        attr: { style: 'display: none;' },
+        cls: `study-flow-tab-content study-flow-tab-${tab.id} ${isSelected ? '' : 'is-hidden'}`,
+        attr: {
+          role: 'tabpanel',
+          id: `study-flow-panel-${tab.id}`,
+          'aria-labelledby': `study-flow-tab-${tab.id}`,
+          tabindex: '0',
+        },
       });
       this.tabContainers.set(tab.id, tabContainer);
       this.tabRendered.set(tab.id, false);
@@ -223,23 +275,19 @@ export class StudyFlowView extends ItemView {
 
     // Update nav pills
     this.navButtons.forEach((btn, id) => {
-      if (id === tab) {
-        btn.addClass('is-active');
-      } else {
-        btn.removeClass('is-active');
-      }
+      const isSelected = id === tab;
+      btn.toggleClass('is-active', isSelected);
+      btn.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+      btn.tabIndex = isSelected ? 0 : -1;
     });
 
     // Toggle container visibility without destroying DOM state
     for (const [id, container] of this.tabContainers.entries()) {
-      if (id === tab) {
-        container.style.display = '';
-        if (!this.tabRendered.get(id)) {
-          await this.tabComponents[id].render(container);
-          this.tabRendered.set(id, true);
-        }
-      } else {
-        container.style.display = 'none';
+      const isSelected = id === tab;
+      container.toggleClass('is-hidden', !isSelected);
+      if (isSelected && !this.tabRendered.get(id)) {
+        await this.tabComponents[id].render(container);
+        this.tabRendered.set(id, true);
       }
     }
   }
