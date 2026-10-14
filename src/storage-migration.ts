@@ -1,8 +1,8 @@
 import { App, Notice, normalizePath, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import type { FocusSessionRecord } from './analytics';
-import { syncBlocksToMarkdown } from './markdown-utils';
-import { getDailyNotePath, getOrCreateFile } from './utils';
+import { syncBlocksToMarkdown } from './markdown-utils.ts';
+import { getDailyNotePath, getOrCreateFile } from './utils.ts';
 import { t } from './i18n/index.ts';
 import {
   SCHEMA_VERSION,
@@ -11,9 +11,15 @@ import {
   prepareMigrationData,
   parseSessionsFromJsonl,
   formatSessionsToJsonl,
-} from './migration-utils';
+} from './migration-utils.ts';
+import {
+  parsePomodoroLogLine,
+  formatPomodoroLogLine,
+  migratePomodoroLogsInContent,
+  type PomodoroLogMigrationChange,
+} from './conventions.ts';
 
-export * from './migration-utils';
+export * from './migration-utils.ts';
 
 /**
  * Reads all sessions directly from the JSONL file in the vault.
@@ -131,8 +137,8 @@ export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<bool
   return true;
 }
 
-import { extractTagsFromText } from './analytics';
-import type { StudyFlowSettings } from './settings';
+import { extractTagsFromText } from './analytics.ts';
+import type { StudyFlowSettings } from './settings.ts';
 
 /**
  * Scans daily notes for past pomodoro logs and imports them into StudyFlow/Sessions.jsonl.
@@ -157,13 +163,14 @@ export async function syncHistoricalSessionsFromVault(
 
     try {
       const content = await app.vault.read(file);
-      // Matches: - [x] Pomodoro completado a las HH:mm (— *task text*)?
-      const pomodoroRegex = /^[-*]\s+\[x\]\s+Pomodoro completado(?:\s+a las\s+(\d{2}:\d{2}))?(?:\s*—\s*\*?(.*?)\*?)?$/gim;
-      let match: RegExpExecArray | null;
+      const lines = content.split(/\r?\n/);
 
-      while ((match = pomodoroRegex.exec(content)) !== null) {
-        const timeStr = match[1] || '12:00';
-        const taskText = (match[2] || '').trim();
+      for (const line of lines) {
+        const parsed = parsePomodoroLogLine(line);
+        if (!parsed) continue;
+
+        const timeStr = parsed.time || '12:00';
+        const taskText = (parsed.taskText || '').trim();
         const duration = settings.pomodoroWorkDuration || 25;
         const key = `${fileDate}_${taskText}_${duration}`;
 
@@ -199,4 +206,65 @@ export async function syncHistoricalSessionsFromVault(
   }
 
   return addedCount;
+}
+
+export {
+  migratePomodoroLogsInContent,
+  type PomodoroLogMigrationChange,
+};
+
+export interface FilePomodoroMigrationPreview {
+  file: TFile;
+  path: string;
+  changes: import('./conventions.ts').PomodoroLogMigrationChange[];
+}
+
+/**
+ * Scans markdown files in the vault looking for files with old Pomodoro logs to migrate.
+ */
+export async function scanVaultForPomodoroLogMigrations(
+  app: App
+): Promise<FilePomodoroMigrationPreview[]> {
+  const files = app.vault.getMarkdownFiles();
+  const previews: FilePomodoroMigrationPreview[] = [];
+
+  for (const file of files) {
+    try {
+      const content = await app.vault.read(file);
+      if (/pomodoro\s+(?:completado|completed)/i.test(content)) {
+        const { changes } = migratePomodoroLogsInContent(content);
+        if (changes.length > 0) {
+          previews.push({
+            file,
+            path: file.path,
+            changes,
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`Error reading ${file.path} for Pomodoro log migration`, e);
+    }
+  }
+
+  return previews;
+}
+
+/**
+ * Applies the Pomodoro log migration using app.vault.process for each affected file.
+ */
+export async function applyPomodoroLogMigrations(
+  app: App,
+  previews: FilePomodoroMigrationPreview[]
+): Promise<number> {
+  let totalChanges = 0;
+
+  for (const item of previews) {
+    await app.vault.process(item.file, (content) => {
+      const { newContent, changes } = migratePomodoroLogsInContent(content);
+      totalChanges += changes.length;
+      return newContent;
+    });
+  }
+
+  return totalChanges;
 }

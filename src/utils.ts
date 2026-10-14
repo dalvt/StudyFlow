@@ -1,4 +1,4 @@
-import { App, normalizePath, TFile } from 'obsidian';
+import { App, normalizePath, TFile, moment } from 'obsidian';
 import type { StudyFlowSettings } from './settings';
 import { formatDailyNoteFileName } from './markdown-utils';
 
@@ -59,19 +59,11 @@ export function getDailyNotePath(
   settings: StudyFlowSettings,
   targetDateOrOffset: number | string | Date = 0
 ): string {
-  const momentFn = (
-    window as unknown as {
-      moment?: (d?: unknown) => {
-        add: (n: number, u: string) => { format: (f: string) => string };
-        format: (f: string) => string;
-      };
-    }
-  ).moment;
   let fileName: string;
 
-  if (typeof momentFn === 'function') {
+  if (typeof moment === 'function') {
     if (typeof targetDateOrOffset === 'number') {
-      const m = momentFn();
+      const m = (moment as any)();
       const formatted =
         targetDateOrOffset !== 0
           ? m.add(targetDateOrOffset, 'days').format(settings.dailyNoteDateFormat)
@@ -89,7 +81,7 @@ export function getDailyNotePath(
       } else {
         targetDate = targetDateOrOffset;
       }
-      const formatted = momentFn(targetDate).format(settings.dailyNoteDateFormat);
+      const formatted = (moment as any)(targetDate).format(settings.dailyNoteDateFormat);
       fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
     }
   } else {

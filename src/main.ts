@@ -4,7 +4,7 @@ import { NextDayPlannerModal } from './planner';
 import { PomodoroManager } from './pomodoro';
 import { PomodoroModal } from './pomodoro-modal';
 import { AnalyticsModal } from './analytics-modal';
-import { DEFAULT_SETTINGS, StudyFlowSettings, StudyFlowSettingTab } from './settings';
+import { cloneDefaultSettings, StudyFlowSettings, StudyFlowSettingTab } from './settings';
 import { QuickCaptureModal, TasksManagerModal } from './tasks';
 import { ActiveTab, StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
@@ -12,12 +12,13 @@ import { migratePluginFilesToDedicatedFolder } from './utils';
 import { TaskIndex } from './task-index';
 import { runStartupMigration, loadFocusSessionsFromFile } from './storage-migration';
 import type { FocusSessionRecord } from './analytics';
-import { t, setLanguage, setObsidianLanguageResolver } from './i18n/index.ts';
+import { t, setLanguage, setObsidianLanguageResolver, getEffectiveLanguage } from './i18n/index.ts';
+import { getDefaultConventions } from './conventions.ts';
 import { exportStudyFlowIcsFile } from './ics-export';
 import { handleStudyFlowProtocol } from './protocol-handler';
 
 export default class StudyFlowPlugin extends Plugin {
-  settings: StudyFlowSettings = DEFAULT_SETTINGS;
+  settings: StudyFlowSettings = cloneDefaultSettings();
   pomodoro!: PomodoroManager;
   taskIndex!: TaskIndex;
   zen: ZenModeManager = new ZenModeManager(this);
@@ -35,7 +36,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     // Initialize reactive TaskIndex
     this.taskIndex = new TaskIndex(this);
-    await this.taskIndex.init();
+    this.taskIndex.init();
 
     // Register Sidebar Hub View
     this.registerView(
@@ -202,13 +203,29 @@ export default class StudyFlowPlugin extends Plugin {
         void (async () => {
           try {
             const { initSpacedRepetitionForFile } = await import('./spaced-repetition.ts');
-            await initSpacedRepetitionForFile(this.app, activeFile);
+            await initSpacedRepetitionForFile(this.app, activeFile, undefined, this);
             new Notice(t('spaced.initializedNotice', { title: activeFile.basename }));
           } catch (err) {
             console.error('Study Flow: Error iniciando repaso espaciado', err);
           }
         })();
         return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'migrate-pomodoro-logs',
+      name: t('commands.migratePomodoroLogs'),
+      callback: async () => {
+        try {
+          const { scanVaultForPomodoroLogMigrations } = await import('./storage-migration.ts');
+          const { PomodoroLogMigrationModal } = await import('./pomodoro-migration-modal.ts');
+          const previews = await scanVaultForPomodoroLogMigrations(this.app);
+          new PomodoroLogMigrationModal(this.app, previews).open();
+        } catch (err) {
+          console.error('Study Flow: Error escaneando registros de Pomodoro para migración', err);
+          new Notice(t('migration.errorNotice'));
+        }
       },
     });
 
@@ -308,15 +325,55 @@ export default class StudyFlowPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    if (!Array.isArray(this.settings.subjects)) {
+    const rawData = await this.loadData();
+    const isFirstInstall = !rawData || Object.keys(rawData).length === 0;
+    const effectiveLang = getEffectiveLanguage();
+    const defaults = cloneDefaultSettings(isFirstInstall ? effectiveLang : undefined);
+    const loadedData = rawData || {};
+    this.settings = Object.assign({}, defaults, loadedData);
+
+    const userLang = loadedData.language === 'en' ? 'en' : (loadedData.language === 'es' ? 'es' : effectiveLang);
+    const langConventions = getDefaultConventions(userLang);
+
+    if (!this.settings.timeBlocksSectionHeader) {
+      this.settings.timeBlocksSectionHeader = langConventions.timeBlocksSectionHeader;
+    }
+    if (!this.settings.spacedRepetitionTag) {
+      this.settings.spacedRepetitionTag = langConventions.spacedRepetitionTag;
+    }
+    if (!this.settings.spacedRepetitionNextKey) {
+      this.settings.spacedRepetitionNextKey = langConventions.spacedRepetitionNextKey;
+    }
+    if (!this.settings.spacedRepetitionIntervalKey) {
+      this.settings.spacedRepetitionIntervalKey = langConventions.spacedRepetitionIntervalKey;
+    }
+    if (!this.settings.spacedRepetitionReviewedKey) {
+      this.settings.spacedRepetitionReviewedKey = langConventions.spacedRepetitionReviewedKey;
+    }
+
+    if (Array.isArray(loadedData.taskIncludedFolders)) {
+      this.settings.taskIncludedFolders = [...loadedData.taskIncludedFolders];
+    } else {
+      this.settings.taskIncludedFolders = [...defaults.taskIncludedFolders];
+    }
+
+    if (Array.isArray(loadedData.taskExcludedFolders)) {
+      this.settings.taskExcludedFolders = [...loadedData.taskExcludedFolders];
+    } else {
+      this.settings.taskExcludedFolders = [...defaults.taskExcludedFolders];
+    }
+
+    if (Array.isArray(loadedData.subjects)) {
+      this.settings.subjects = loadedData.subjects.map((sub: unknown) => ({ ...(sub as object) } as import('./settings-utils').Subject));
+    } else {
       this.settings.subjects = [];
     }
+
     if (!this.settings.weeklyReviewsFolder) {
-      this.settings.weeklyReviewsFolder = DEFAULT_SETTINGS.weeklyReviewsFolder;
+      this.settings.weeklyReviewsFolder = defaults.weeklyReviewsFolder;
     }
     if (!this.settings.weeklyReviewTemplate) {
-      this.settings.weeklyReviewTemplate = DEFAULT_SETTINGS.weeklyReviewTemplate;
+      this.settings.weeklyReviewTemplate = defaults.weeklyReviewTemplate;
     }
   }
 

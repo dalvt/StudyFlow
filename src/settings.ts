@@ -3,9 +3,10 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import type { FocusSessionRecord } from './analytics';
 
-import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, validateSettingNumber } from './settings-utils';
+import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, cloneDefaultSettings, validateSettingNumber } from './settings-utils';
 export * from './settings-utils';
-import { t, setLanguage } from './i18n/index.ts';
+import { t, setLanguage, getEffectiveLanguage } from './i18n/index.ts';
+import { getDefaultWeeklyReviewTemplate } from './conventions.ts';
 import { SubjectEditModal } from './subject-modal.ts';
 
 export class StudyFlowSettingTab extends PluginSettingTab {
@@ -177,6 +178,19 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.iceboxSectionHeader)
           .onChange(async (value) => {
             this.plugin.settings.iceboxSectionHeader = value.trim() || '## Icebox';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.timeBlocksHeaderName'))
+      .setDesc(t('settings.timeBlocksHeaderDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('## Bloques de Tiempo')
+          .setValue(this.plugin.settings.timeBlocksSectionHeader)
+          .onChange(async (value) => {
+            this.plugin.settings.timeBlocksSectionHeader = value.trim() || '## Bloques de Tiempo';
             await this.plugin.saveSettings();
           })
       );
@@ -430,12 +444,85 @@ export class StudyFlowSettingTab extends PluginSettingTab {
         .setButtonText(t('settings.resetTemplateBtn'))
         .setTooltip(t('settings.resetTemplateTooltip'))
         .onClick(async () => {
-          this.plugin.settings.weeklyReviewTemplate = DEFAULT_WEEKLY_REVIEW_TEMPLATE;
+          const effectiveLang = this.plugin.settings.language === 'en' ? 'en' : (this.plugin.settings.language === 'es' ? 'es' : getEffectiveLanguage());
+          this.plugin.settings.weeklyReviewTemplate = getDefaultWeeklyReviewTemplate(effectiveLang);
           await this.plugin.saveSettings();
           this.display();
           new Notice(t('settings.templateResetNotice'));
         })
     );
+
+    // Spaced Repetition Section
+    new Setting(containerEl).setName(t('settings.headingSpacedRepetition')).setHeading();
+
+    new Setting(containerEl)
+      .setName(t('settings.spacedTagName'))
+      .setDesc(t('settings.spacedTagDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('#repasar')
+          .setValue(this.plugin.settings.spacedRepetitionTag)
+          .onChange(async (value) => {
+            this.plugin.settings.spacedRepetitionTag = value.trim() || '#repasar';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.spacedNextKeyName'))
+      .setDesc(t('settings.spacedNextKeyDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('repasar_siguiente')
+          .setValue(this.plugin.settings.spacedRepetitionNextKey)
+          .onChange(async (value) => {
+            this.plugin.settings.spacedRepetitionNextKey = value.trim() || 'repasar_siguiente';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.spacedIntervalKeyName'))
+      .setDesc(t('settings.spacedIntervalKeyDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('repasar_intervalo')
+          .setValue(this.plugin.settings.spacedRepetitionIntervalKey)
+          .onChange(async (value) => {
+            this.plugin.settings.spacedRepetitionIntervalKey = value.trim() || 'repasar_intervalo';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName(t('settings.spacedReviewedKeyName'))
+      .setDesc(t('settings.spacedReviewedKeyDesc'))
+      .addText((text) =>
+        text
+          .setPlaceholder('repasar_revisado')
+          .setValue(this.plugin.settings.spacedRepetitionReviewedKey)
+          .onChange(async (value) => {
+            this.plugin.settings.spacedRepetitionReviewedKey = value.trim() || 'repasar_revisado';
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // Maintenance & Migration Section
+    new Setting(containerEl).setName(t('settings.headingMaintenance')).setHeading();
+
+    new Setting(containerEl)
+      .setName(t('settings.migratePomodoroLogsName'))
+      .setDesc(t('settings.migratePomodoroLogsDesc'))
+      .addButton((btn) =>
+        btn
+          .setButtonText(t('settings.migratePomodoroLogsBtn'))
+          .onClick(async () => {
+            const { scanVaultForPomodoroLogMigrations } = await import('./storage-migration.ts');
+            const { PomodoroLogMigrationModal } = await import('./pomodoro-migration-modal.ts');
+            const previews = await scanVaultForPomodoroLogMigrations(this.app);
+            new PomodoroLogMigrationModal(this.app, previews).open();
+          })
+      );
 
     new Setting(containerEl)
       .setName(t('settings.syncHistoryName'))
@@ -444,7 +531,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
         btn
           .setButtonText(t('settings.syncNowBtn'))
           .onClick(async () => {
-            const { syncHistoricalSessionsFromVault } = await import('./storage-migration');
+            const { syncHistoricalSessionsFromVault } = await import('./storage-migration.ts');
             const count = await syncHistoricalSessionsFromVault(this.app, this.plugin.settings, this.plugin);
             new Notice(t('settings.syncHistoryNotice', { count }));
           })
@@ -458,7 +545,8 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setWarning()
           .setButtonText(t('settings.resetValuesBtn'))
           .onClick(async () => {
-            this.plugin.settings = Object.assign({}, DEFAULT_SETTINGS);
+            const effectiveLang = this.plugin.settings.language === 'en' ? 'en' : (this.plugin.settings.language === 'es' ? 'es' : getEffectiveLanguage());
+            this.plugin.settings = cloneDefaultSettings(effectiveLang);
             setLanguage(this.plugin.settings.language);
             await this.plugin.saveSettings();
             this.plugin.pomodoro.onSettingsUpdated();

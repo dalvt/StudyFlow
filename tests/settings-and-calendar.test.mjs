@@ -69,6 +69,31 @@ test('DEFAULT_SETTINGS contains all required settings and defaults', () => {
   assert.ok(DEFAULT_SETTINGS.weeklyReviewTemplate.includes('Revisión Semanal'));
 });
 
+test('cloneDefaultSettings produces independent deep copies without shared references', async () => {
+  const { cloneDefaultSettings } = await import('../src/settings-utils.ts');
+  const clone1 = cloneDefaultSettings();
+  const clone2 = cloneDefaultSettings();
+
+  assert.deepEqual(clone1, DEFAULT_SETTINGS);
+  assert.notEqual(clone1, DEFAULT_SETTINGS);
+  assert.notEqual(clone1.taskIncludedFolders, DEFAULT_SETTINGS.taskIncludedFolders);
+  assert.notEqual(clone1.taskExcludedFolders, DEFAULT_SETTINGS.taskExcludedFolders);
+  assert.notEqual(clone1.subjects, DEFAULT_SETTINGS.subjects);
+
+  // Mutations on clone1 must not affect clone2 or DEFAULT_SETTINGS
+  clone1.taskExcludedFolders.push('ExtraExcluded');
+  clone1.taskIncludedFolders.push('ExtraIncluded');
+  clone1.subjects.push({ id: 's1', name: 'Math', tag: '#math', color: '#000', weeklyGoalHours: 5 });
+
+  assert.equal(DEFAULT_SETTINGS.taskExcludedFolders.includes('ExtraExcluded'), false);
+  assert.equal(DEFAULT_SETTINGS.taskIncludedFolders.length, 0);
+  assert.equal(DEFAULT_SETTINGS.subjects.length, 0);
+
+  assert.equal(clone2.taskExcludedFolders.includes('ExtraExcluded'), false);
+  assert.equal(clone2.taskIncludedFolders.length, 0);
+  assert.equal(clone2.subjects.length, 0);
+});
+
 test('getCalendarMonthMatrix supports both Monday and Sunday week starts', () => {
   const ref = new Date('2026-10-13T12:00:00');
   // October 2026: 31 days. Oct 1 is Thursday.

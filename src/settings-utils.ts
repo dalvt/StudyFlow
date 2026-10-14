@@ -38,6 +38,11 @@ export interface StudyFlowSettings {
   autoZenMode: boolean;
   tasksSectionHeader: string;
   iceboxSectionHeader: string;
+  timeBlocksSectionHeader: string;
+  spacedRepetitionTag: string;
+  spacedRepetitionNextKey: string;
+  spacedRepetitionIntervalKey: string;
+  spacedRepetitionReviewedKey: string;
   taskIncludedFolders: string[];
   taskExcludedFolders: string[];
   weekStartDay: 'monday' | 'sunday';
@@ -52,8 +57,20 @@ export interface StudyFlowSettings {
 }
 
 import { t } from './i18n/index.ts';
-import { DEFAULT_WEEKLY_REVIEW_TEMPLATE } from './weekly-review.ts';
-export { DEFAULT_WEEKLY_REVIEW_TEMPLATE };
+import {
+  DEFAULT_TASKS_HEADER_ES,
+  DEFAULT_ICEBOX_HEADER_ES,
+  DEFAULT_TIME_BLOCKS_HEADER_ES,
+  DEFAULT_SPACED_TAG_ES,
+  DEFAULT_SPACED_NEXT_KEY_ES,
+  DEFAULT_SPACED_INTERVAL_KEY_ES,
+  DEFAULT_SPACED_REVIEWED_KEY_ES,
+  DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
+  getDefaultConventions,
+  type SupportedConventionLanguage,
+} from './conventions.ts';
+
+export const DEFAULT_WEEKLY_REVIEW_TEMPLATE = DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES;
 
 export const DEFAULT_SETTINGS: StudyFlowSettings = {
   schemaVersion: 2,
@@ -72,16 +89,30 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   enableChimeSound: true,
   chimeVolume: 0.7,
   autoZenMode: false,
-  tasksSectionHeader: '## Tareas',
-  iceboxSectionHeader: '## Icebox',
+  tasksSectionHeader: DEFAULT_TASKS_HEADER_ES,
+  iceboxSectionHeader: DEFAULT_ICEBOX_HEADER_ES,
+  timeBlocksSectionHeader: DEFAULT_TIME_BLOCKS_HEADER_ES,
+  spacedRepetitionTag: DEFAULT_SPACED_TAG_ES,
+  spacedRepetitionNextKey: DEFAULT_SPACED_NEXT_KEY_ES,
+  spacedRepetitionIntervalKey: DEFAULT_SPACED_INTERVAL_KEY_ES,
+  spacedRepetitionReviewedKey: DEFAULT_SPACED_REVIEWED_KEY_ES,
   taskIncludedFolders: [],
   taskExcludedFolders: ['Templates', 'templates'],
   weekStartDay: 'monday',
   language: 'auto',
   subjects: [],
   weeklyReviewsFolder: 'StudyFlow/Reviews',
-  weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE,
+  weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
 };
+
+export function cloneDefaultSettings(lang?: SupportedConventionLanguage): StudyFlowSettings {
+  const base: StudyFlowSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  if (lang) {
+    const conv = getDefaultConventions(lang);
+    Object.assign(base, conv);
+  }
+  return base;
+}
 
 export interface SettingValidationResult {
   valid: boolean;

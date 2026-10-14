@@ -57,7 +57,7 @@ export class TasksTab implements TabComponent {
     }
 
     try {
-      this.spacedNotesQueue = await getSpacedRepetitionQueue(this.app);
+      this.spacedNotesQueue = await getSpacedRepetitionQueue(this.app, undefined, this.plugin);
     } catch (e) {
       this.spacedNotesQueue = [];
     }
@@ -469,7 +469,7 @@ export class TasksTab implements TabComponent {
       hardBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         try {
-          await reviewSpacedNote(this.app, item.file, 'dificil');
+          await reviewSpacedNote(this.app, item.file, 'dificil', undefined, this.plugin);
           new Notice(t('spaced.reviewedHardNotice', { title: item.title }));
           if (this.container) await this.render(this.container);
         } catch (err) {
@@ -484,7 +484,7 @@ export class TasksTab implements TabComponent {
       easyBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         try {
-          const res = await reviewSpacedNote(this.app, item.file, 'facil');
+          const res = await reviewSpacedNote(this.app, item.file, 'facil', undefined, this.plugin);
           new Notice(t('spaced.reviewedEasyNotice', { title: item.title, next: res.nextReviewDate }));
           if (this.container) await this.render(this.container);
         } catch (err) {

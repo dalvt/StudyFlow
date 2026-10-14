@@ -3878,5 +3878,67 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
 }
 
+/* Pomodoro Log Migration Modal */
+.study-flow-migration-empty {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: var(--sf-space-m) 0;
+}
+
+.study-flow-migration-preview-list {
+  max-height: 380px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--sf-space-s);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-m);
+  margin: var(--sf-space-m) 0;
+}
+
+.study-flow-migration-file-group {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: var(--sf-space-s) var(--sf-space-m);
+}
+
+.study-flow-migration-file-title {
+  font-weight: 600;
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  margin-bottom: var(--sf-space-xs);
+}
+
+.study-flow-migration-changes-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-space-xs);
+}
+
+.study-flow-migration-diff-row {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--background-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.study-flow-migration-diff-old {
+  color: var(--text-error);
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+.study-flow-migration-diff-new {
+  color: var(--text-success);
+  font-weight: 600;
+}
+
 
 

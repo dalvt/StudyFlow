@@ -1,13 +1,14 @@
-import { App, TFile } from 'obsidian';
+import { App, Notice, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   compareTasksByPriority,
   computeDeadlinesFromTasks,
-  DeadlineItem,
+  type DeadlineItem,
   extractAllTasksFromContent,
   isPathIndexed,
-  TaskRecord,
-} from './markdown-utils';
+  type TaskRecord,
+} from './markdown-utils.ts';
+import { t } from './i18n/index.ts';
 
 export { isPathIndexed };
 
@@ -21,6 +22,7 @@ export class TaskIndex {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
+  private isProcessing: boolean = false;
 
   constructor(plugin: StudyFlowPlugin) {
     this.plugin = plugin;
@@ -29,42 +31,68 @@ export class TaskIndex {
 
   /**
    * Initializes the task index, registers vault and metadataCache event listeners,
-   * and performs initial vault scanning.
+   * and performs initial vault scanning once workspace layout is ready.
    */
-  async init(): Promise<void> {
+  init(): void {
     if (this.initialized) return;
     this.initialized = true;
 
     this.registerVaultEvents();
 
-    this.plugin.registerEvent(
-      this.app.metadataCache.on('resolved', async () => {
-        await this.scanVault();
-      })
-    );
-
-    // Initial scan on already loaded files
-    await this.scanVault();
+    this.app.workspace.onLayoutReady(async () => {
+      await this.scanVault({ isInitial: true });
+    });
   }
 
   /**
-   * Scans all markdown files in vault matching inclusion/exclusion settings.
+   * Scans all markdown files in vault matching inclusion/exclusion settings,
+   * yielding every 50 files and removing files that no longer match settings.
    */
-  async scanVault(): Promise<void> {
+  async scanVault(options?: { isInitial?: boolean }): Promise<void> {
+    const startTime = Date.now();
     const files = this.app.vault.getMarkdownFiles();
     const { taskIncludedFolders, taskExcludedFolders, tasksSectionHeader, iceboxSectionHeader, habitsFilePath } =
       this.plugin.settings;
     const excludedFiles = habitsFilePath ? [habitsFilePath] : [];
 
-    for (const file of files) {
+    const validPaths = new Set<string>();
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       if (!isPathIndexed(file.path, taskIncludedFolders, taskExcludedFolders, excludedFiles)) {
+        if (this.tasksByFile.has(file.path)) {
+          this.tasksByFile.delete(file.path);
+        }
         continue;
       }
+
+      validPaths.add(file.path);
       await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
+
+      // Yield event loop every 50 files
+      if ((i + 1) % 50 === 0 && i + 1 < files.length) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    // Clean up any files that were in the index but are no longer valid or no longer in vault
+    for (const indexedPath of Array.from(this.tasksByFile.keys())) {
+      if (!validPaths.has(indexedPath)) {
+        this.tasksByFile.delete(indexedPath);
+      }
     }
 
     this.invalidateCaches();
     this.emitChange();
+
+    if (options?.isInitial) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 2000) {
+        const count = this.getAllTasks().length;
+        const seconds = (elapsed / 1000).toFixed(1);
+        new Notice(t('tasks.indexingVaultNotice', { count, seconds }));
+      }
+    }
   }
 
   /**
@@ -157,6 +185,10 @@ export class TaskIndex {
       return;
     }
 
+    if (this.dirtyFiles.has(filePath)) {
+      return;
+    }
+
     this.dirtyFiles.add(filePath);
     this.triggerDebouncedProcessing();
   }
@@ -198,22 +230,29 @@ export class TaskIndex {
   }
 
   private async processDirtyFiles(): Promise<void> {
-    if (this.dirtyFiles.size === 0) return;
-    const pathsToProcess = Array.from(this.dirtyFiles);
-    this.dirtyFiles.clear();
+    if (this.dirtyFiles.size === 0 || this.isProcessing) return;
+    this.isProcessing = true;
+    try {
+      while (this.dirtyFiles.size > 0) {
+        const pathsToProcess = Array.from(this.dirtyFiles);
+        this.dirtyFiles.clear();
 
-    const { tasksSectionHeader, iceboxSectionHeader } = this.plugin.settings;
-    for (const path of pathsToProcess) {
-      const file = this.app.vault.getAbstractFileByPath(path);
-      if (file instanceof TFile) {
-        await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
-      } else {
-        this.tasksByFile.delete(path);
+        const { tasksSectionHeader, iceboxSectionHeader } = this.plugin.settings;
+        for (const path of pathsToProcess) {
+          const file = this.app.vault.getAbstractFileByPath(path);
+          if (file instanceof TFile) {
+            await this.indexFile(file, { tasksSectionHeader, iceboxSectionHeader });
+          } else {
+            this.tasksByFile.delete(path);
+          }
+        }
       }
-    }
 
-    this.invalidateCaches();
-    this.emitChange();
+      this.invalidateCaches();
+      this.emitChange();
+    } finally {
+      this.isProcessing = false;
+    }
   }
 
   /**
@@ -311,6 +350,7 @@ export class TaskIndex {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    this.isProcessing = false;
     this.listeners.clear();
     this.dirtyFiles.clear();
     this.tasksByFile.clear();

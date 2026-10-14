@@ -201,10 +201,14 @@ export async function exportStudyFlowIcsFile(
       continue;
     }
     const content = await app.vault.read(file);
-    if (content.includes('## Bloques de Tiempo')) {
-      const match = file.basename.match(/\d{4}-\d{2}-\d{2}/);
-      const dateStr = match ? match[0] : file.basename;
-      const fileBlocks = parseTimeBlocksFromMarkdown(content, dateStr);
+    const match = file.basename.match(/\d{4}-\d{2}-\d{2}/);
+    const dateStr = match ? match[0] : file.basename;
+    const fileBlocks = parseTimeBlocksFromMarkdown(
+      content,
+      dateStr,
+      plugin.settings.timeBlocksSectionHeader
+    );
+    if (fileBlocks.length > 0) {
       blocks.push(...fileBlocks);
     }
   }

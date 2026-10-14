@@ -936,7 +936,7 @@ export class CalendarTab implements TabComponent {
       await this.app.vault.process(targetFile, (content) => {
         let updated = content;
         for (const task of selected) {
-          updated = appendTaskToMarkdownSection(updated, sectionHeader, task.text);
+          updated = appendTaskToMarkdownSection(updated, task.text, sectionHeader);
         }
         return updated;
       });

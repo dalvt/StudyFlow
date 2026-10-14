@@ -1,4 +1,4 @@
-import { Notice, setTooltip } from 'obsidian';
+import { App, Menu, Modal, Notice, setTooltip } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import { playPomodoroChime } from './audio';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils';
@@ -7,6 +7,45 @@ import { extractTagsFromText, FocusSessionRecord } from './analytics';
 import { appendFocusSessionToFile } from './storage-migration';
 import { PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
 import { t } from './i18n/index.ts';
+import { formatPomodoroLogLine } from './conventions.ts';
+
+export class PomodoroConfirmResetModal extends Modal {
+  private onConfirm: () => void;
+
+  constructor(app: App, onConfirm: () => void) {
+    super(app);
+    this.onConfirm = onConfirm;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('study-flow-modal');
+
+    contentEl.createEl('h3', { text: t('pomodoro.confirmResetTitle') });
+    contentEl.createEl('p', { text: t('pomodoro.confirmResetMessage') });
+
+    const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
+    const cancelBtn = footer.createEl('button', {
+      text: t('common.cancel'),
+      cls: 'study-flow-btn-secondary',
+    });
+    cancelBtn.addEventListener('click', () => this.close());
+
+    const confirmBtn = footer.createEl('button', {
+      text: t('pomodoro.confirmResetBtn'),
+      cls: 'mod-warning',
+    });
+    confirmBtn.addEventListener('click', () => {
+      this.close();
+      this.onConfirm();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
 import type { Subject } from './settings-utils';
 import { SubjectSelectModal } from './subject-modal';
 import { normalizeTag } from './subject-analytics';
@@ -76,11 +115,76 @@ export class PomodoroManager {
 
     this.plugin.registerDomEvent(this.statusBarEl, 'contextmenu', (evt: MouseEvent) => {
       evt.preventDefault();
-      this.reset();
-      new Notice(t('pomodoro.timerResetNotice'));
+      this.showStatusBarContextMenu(evt);
     });
 
     this.updateDisplay();
+  }
+
+  public getElapsedSeconds(): number {
+    if (this.state === 'idle') return 0;
+    const currentRemaining = this.state === 'running'
+      ? Math.max(0, Math.ceil((this.endTime - Date.now()) / 1000))
+      : this.remainingSeconds;
+    return Math.max(0, this.totalDurationSeconds - currentRemaining);
+  }
+
+  public promptReset(): void {
+    if ((this.state === 'running' || this.state === 'paused') && this.getElapsedSeconds() > 60) {
+      new PomodoroConfirmResetModal(this.plugin.app, async () => {
+        await this.reset();
+        new Notice(t('pomodoro.timerResetNotice'));
+      }).open();
+    } else {
+      void (async () => {
+        await this.reset();
+        new Notice(t('pomodoro.timerResetNotice'));
+      })();
+    }
+  }
+
+  public showStatusBarContextMenu(evt: MouseEvent): void {
+    const menu = new Menu();
+
+    menu.addItem((item) => {
+      item
+        .setTitle(t('pomodoro.menuReset'))
+        .setIcon('rotate-ccw')
+        .onClick(() => {
+          this.promptReset();
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle(t('pomodoro.menuSkipPhase'))
+        .setIcon('fast-forward')
+        .onClick(() => {
+          void this.skipCycle();
+        });
+    });
+
+    menu.addSeparator();
+
+    const presets = [
+      { label: t('pomodoro.preset25m'), mins: 25, mode: 'work' as const },
+      { label: t('pomodoro.preset50m'), mins: 50, mode: 'work' as const },
+      { label: t('pomodoro.preset5m'), mins: 5, mode: 'break' as const },
+      { label: t('pomodoro.preset15m'), mins: 15, mode: 'break' as const },
+    ];
+
+    for (const p of presets) {
+      menu.addItem((item) => {
+        item
+          .setTitle(p.label)
+          .setIcon('timer')
+          .onClick(() => {
+            void this.setCustomMinutes(p.mins, p.mode);
+          });
+      });
+    }
+
+    menu.showAtMouseEvent(evt);
   }
 
   public subscribe(listener: PomodoroListener): () => void {
@@ -182,6 +286,11 @@ export class PomodoroManager {
     });
   }
 
+  private getLocalStorageKey(): string {
+    const vaultName = this.plugin.app.vault?.getName?.() || 'default';
+    return `study-flow-pomodoro:${vaultName}`;
+  }
+
   private async savePomodoroState(): Promise<void> {
     try {
       const persisted: PersistedPomodoroState = {
@@ -194,15 +303,37 @@ export class PomodoroManager {
         activeTask: this.activeTask,
         activeSubject: this.activeSubject,
       };
-      this.plugin.settings.persistedPomodoro = persisted;
-      await this.plugin.saveSettings();
+      const key = this.getLocalStorageKey();
+      if (typeof this.plugin.app.saveLocalStorage === 'function') {
+        this.plugin.app.saveLocalStorage(key, persisted);
+      }
     } catch (err) {
       console.error('Study Flow Assistant: Error persistiendo estado pomodoro', err);
     }
   }
 
   public async restoreState(): Promise<void> {
-    const persisted = this.plugin.settings.persistedPomodoro;
+    const key = this.getLocalStorageKey();
+    let persisted: PersistedPomodoroState | null = null;
+
+    if (typeof this.plugin.app.loadLocalStorage === 'function') {
+      persisted = this.plugin.app.loadLocalStorage(key);
+    }
+
+    // Migration from data.json if not yet in localStorage
+    if (!persisted && this.plugin.settings.persistedPomodoro) {
+      persisted = this.plugin.settings.persistedPomodoro;
+      if (typeof this.plugin.app.saveLocalStorage === 'function') {
+        this.plugin.app.saveLocalStorage(key, persisted);
+      }
+      this.plugin.settings.persistedPomodoro = null;
+      await this.plugin.saveSettings();
+    } else if (this.plugin.settings.persistedPomodoro) {
+      // Clear legacy state from settings/data.json
+      this.plugin.settings.persistedPomodoro = null;
+      await this.plugin.saveSettings();
+    }
+
     if (!persisted) {
       this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
       this.remainingSeconds = this.totalDurationSeconds;
@@ -652,8 +783,10 @@ export class PomodoroManager {
       const now = new Date();
       const hh = String(now.getHours()).padStart(2, '0');
       const mm = String(now.getMinutes()).padStart(2, '0');
-      const taskSuffix = this.activeTask ? ` — *${this.activeTask.text}*` : '';
-      const logLine = `- [x] Pomodoro completado a las ${hh}:${mm}${taskSuffix}`;
+      const timeStr = `${hh}:${mm}`;
+      const taskText = this.activeTask?.text;
+      const subjectName = this.activeSubject?.name || this.activeSubject?.tag;
+      const logLine = formatPomodoroLogLine(timeStr, taskText, subjectName);
 
       const dailyPath = getDailyNotePath(this.plugin.settings, 0);
       const file = await getOrCreateFile(this.plugin.app, dailyPath, `# ${getLocalDateString(now)}\n\n`);

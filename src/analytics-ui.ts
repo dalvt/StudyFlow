@@ -16,7 +16,7 @@ import { t } from './i18n/index.ts';
  */
 async function loadAllCurrentTasks(app: App, plugin: StudyFlowPlugin): Promise<TaskRecord[]> {
   if (plugin.taskIndex) {
-    return plugin.taskIndex.getAllTasks().filter((t) => !t.text.includes('Pomodoro completado a las'));
+    return plugin.taskIndex.getAllTasks();
   }
 
   const allTasks: TaskRecord[] = [];
@@ -49,8 +49,6 @@ async function loadAllCurrentTasks(app: App, plugin: StudyFlowPlugin): Promise<T
       const content = await app.vault.read(dailyFile);
       const dailyTasks = extractAllTasksFromContent(content, dailyFile.path);
       for (const t of dailyTasks) {
-        // Skip pomodoro completion lines
-        if (t.text.includes('Pomodoro completado a las')) continue;
         const key = `${t.sourceFile}:${t.text}`;
         if (!processedKeys.has(key)) {
           processedKeys.add(key);

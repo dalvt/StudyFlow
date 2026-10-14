@@ -1,3 +1,5 @@
+import { isTimeBlocksSection } from './conventions.ts';
+
 export interface CalendarDayCell {
   dateStr: string; // YYYY-MM-DD
   dayNumber: number;
@@ -311,12 +313,12 @@ export function parseTimeBlockLine(
  */
 export function parseTimeBlocksFromMarkdown(
   content: string,
-  dateStr: string = ''
+  dateStr: string = '',
+  customHeader?: string
 ): CalendarTimeBlock[] {
   if (!content) return [];
   const lines = content.split(/\r?\n/);
-  const header = '## Bloques de Tiempo';
-  const headerIndex = lines.findIndex((l) => l.trim().toLowerCase() === header.toLowerCase());
+  const headerIndex = lines.findIndex((l) => isTimeBlocksSection(l, customHeader));
   if (headerIndex === -1) return [];
 
   const blocks: CalendarTimeBlock[] = [];

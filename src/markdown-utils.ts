@@ -1,4 +1,11 @@
 import { t } from './i18n/index.ts';
+import {
+  isPomodoroLogLine,
+  isTasksSection,
+  isIceboxSectionHeader,
+  isTimeBlocksSection,
+  normalizeHeaderTitle,
+} from './conventions.ts';
 
 /**
  * Extracts hashtags (#materia) and wikilinks ([[Nota]]) from text.
@@ -845,6 +852,10 @@ export function extractAllTasksFromContent(
       if (/<!--\s*streak:\s*\d+/i.test(line)) {
         continue;
       }
+      // Pomodoro log lines (e.g. old checkbox format) are not todo tasks
+      if (isPomodoroLogLine(line)) {
+        continue;
+      }
       const statusChar = match[1];
       const taskText = match[2].trim();
       const completed = statusChar.toLowerCase() === 'x';
@@ -892,7 +903,7 @@ export function extractAllTasksFromContent(
     // Passive bullet under Icebox / Ideas section (- bullet)
     const bulletMatch = line.match(/^\s*-\s+(?!\[[ xX]\])(.*)$/);
     if (bulletMatch && isIceboxSection(currentSection, options?.iceboxSectionHeader)) {
-      if (/<!--\s*streak:\s*\d+/i.test(line)) {
+      if (/<!--\s*streak:\s*\d+/i.test(line) || isPomodoroLogLine(line)) {
         continue;
       }
       const itemText = bulletMatch[1].trim();
@@ -1823,13 +1834,14 @@ export function syncBlocksToMarkdown(
     title: string;
     completed?: boolean;
     linkedNote?: string;
-  }>
+  }>,
+  customHeader?: string
 ): string {
   const lines = content.split(/\r?\n/);
   const blockLines = blocks.map((b) => formatTimeBlockLine(b));
 
-  const header = '## Bloques de Tiempo';
-  const headerIndex = lines.findIndex((l) => l.trim().toLowerCase() === header.toLowerCase());
+  const header = customHeader || '## Bloques de Tiempo';
+  const headerIndex = lines.findIndex((l) => isTimeBlocksSection(l, customHeader));
 
   if (headerIndex === -1) {
     return `${content.trimEnd()}\n\n${header}\n${blockLines.join('\n')}\n`;
@@ -1903,7 +1915,7 @@ export function appendClosingNoteToDailyContent(
   let lastMatchingIndex = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
-    if (line.includes('Pomodoro completado') && (cleanTask.length === 0 || line.includes(cleanTask))) {
+    if (isPomodoroLogLine(line) && (cleanTask.length === 0 || line.includes(cleanTask))) {
       lastMatchingIndex = i;
       break;
     }
