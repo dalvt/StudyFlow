@@ -95,7 +95,9 @@
 }
 
 /* Utility classes */
-.is-hidden {
+.is-hidden,
+.study-flow-tab-content.is-hidden,
+.study-flow-today-tab.is-hidden {
   display: none;
 }
 
@@ -4447,7 +4449,7 @@ body.is-study-flow-zen .workspace-split {
 /* ==========================================================================
    Today Tab ("¿Qué hago ahora?") Layout & Compact Sidebar Styling
    ========================================================================== */
-.study-flow-today-tab {
+.study-flow-today-tab:not(.is-hidden) {
   display: flex;
   flex-direction: column;
   gap: 12px;
