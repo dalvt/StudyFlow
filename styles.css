@@ -3998,6 +3998,58 @@ body.is-study-flow-zen .workspace-split {
   background: var(--background-secondary);
 }
 
+.study-flow-link-habit-btn {
+  background: var(--background-secondary);
+}
+
+.study-flow-link-habit-btn:hover {
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.study-flow-active-habit-banner {
+  border-left: 3px solid #ea580c;
+}
+
+.study-flow-active-habit-banner .study-flow-task-target-icon svg {
+  color: #ea580c;
+}
+
+.study-flow-habit-modal-icon {
+  background: color-mix(in srgb, #ea580c 15%, transparent);
+  color: #ea580c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study-flow-habit-modal-icon svg {
+  width: 14px;
+  height: 14px;
+  color: #ea580c;
+}
+
+.study-flow-habit-streak-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ea580c;
+  background-color: color-mix(in srgb, #ea580c 15%, transparent);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+  margin-left: auto;
+}
+
+.study-flow-habit-done-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sf-success, #10b981);
+  margin-left: 6px;
+}
+
 /* Weekly Subject Progress (Analytics) */
 .study-flow-subjects-card {
   margin-top: 16px;

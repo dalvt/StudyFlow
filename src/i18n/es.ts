@@ -101,6 +101,10 @@ export const es: TranslationDict = {
   'pomodoro.unlink': 'Desvincular',
   'pomodoro.linkTask': 'Vincular tarea a este Pomodoro',
   'pomodoro.linkTaskDots': 'Vincular tarea...',
+  'pomodoro.linkHabit': 'Elegir hábito',
+  'pomodoro.linkHabitDots': 'Elegir hábito...',
+  'pomodoro.habitLabel': 'Hábito: ',
+  'pomodoro.noHabitOption': 'Sin hábito (Quitar)',
   'pomodoro.selectInboxTask': 'Selecciona una tarea de tu Inbox:',
   'pomodoro.selectTaskPrompt': '— Selecciona una tarea —',
   'pomodoro.quickTaskPlaceholder': 'Escribe una tarea para enfocar...',
@@ -337,6 +341,9 @@ export const es: TranslationDict = {
   'habits.modalNewPlaceholder': 'Nuevo hábito diario (ej. 15 min ejercicio)...',
   'habits.modalEmptyTitle': 'No tienes hábitos registrados',
   'habits.modalEmptyDesc': 'Crea tu primer hábito arriba para construir tu racha.',
+  'habits.selectModalTitle': '¿En qué hábito te vas a enfocar?',
+  'habits.selectModalDesc': 'Selecciona un hábito para tu sesión de enfoque Pomodoro.',
+  'habits.selectModalEmpty': 'No se encontraron hábitos en Habits.md.',
 
   // Calendar Tab & Operations
   'calendar.prev': 'Anterior',

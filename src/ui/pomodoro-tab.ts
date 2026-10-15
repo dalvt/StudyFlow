@@ -10,6 +10,7 @@ import {
   appendTaskToMarkdownSection,
 } from '../utils';
 import { SubjectSelectModal } from '../subject-modal';
+import { HabitSelectModal } from '../habit-select-modal';
 import { t } from '../i18n/index.ts';
 
 const CIRCLE_RADIUS = 76;
@@ -312,20 +313,28 @@ export class PomodoroTab implements TabComponent {
     const taskSection = container.createDiv({ cls: 'study-flow-active-task-container' });
 
     if (status.activeTask) {
-      const banner = taskSection.createDiv({ cls: 'study-flow-active-task-banner' });
+      const isHabit = Boolean(status.activeTask.id && status.activeTask.id.startsWith('habit-'));
+      const banner = taskSection.createDiv({
+        cls: `study-flow-active-task-banner ${isHabit ? 'study-flow-active-habit-banner' : ''}`,
+      });
       const targetIcon = banner.createSpan({ cls: 'study-flow-task-target-icon' });
-      setIcon(targetIcon, 'target');
+      setIcon(targetIcon, isHabit ? 'flame' : 'target');
 
       const textWrap = banner.createDiv({ cls: 'study-flow-task-banner-text' });
-      textWrap.createSpan({ text: t('pomodoro.focusedOn'), cls: 'study-flow-task-banner-label' });
+      textWrap.createSpan({
+        text: isHabit ? t('pomodoro.habitLabel') : t('pomodoro.focusedOn'),
+        cls: 'study-flow-task-banner-label',
+      });
       textWrap.createSpan({ text: getCleanTaskDisplayTitle(status.activeTask.text), cls: 'study-flow-task-banner-name' });
 
-      const { estimated, completed } = parseTaskPomodoroEstimate(status.activeTask.text);
-      if (estimated || (completed && completed > 0)) {
-        const estText = (completed && completed > 0 && estimated)
-          ? ` • 🍅 ${completed}/${estimated}`
-          : (estimated ? ` • 🍅 ${estimated} est.` : ` • 🍅 ${completed}`);
-        textWrap.createSpan({ text: estText, cls: 'study-flow-active-task-pomo-hint' });
+      if (!isHabit) {
+        const { estimated, completed } = parseTaskPomodoroEstimate(status.activeTask.text);
+        if (estimated || (completed && completed > 0)) {
+          const estText = (completed && completed > 0 && estimated)
+            ? ` • 🍅 ${completed}/${estimated}`
+            : (estimated ? ` • 🍅 ${estimated} est.` : ` • 🍅 ${completed}`);
+          textWrap.createSpan({ text: estText, cls: 'study-flow-active-task-pomo-hint' });
+        }
       }
 
       const completeBtn = banner.createEl('button', {
@@ -406,6 +415,25 @@ export class PomodoroTab implements TabComponent {
           this.isSelectingTaskForPomodoro = true;
           this.loadPendingInboxTasks();
           if (this.container) await this.render(this.container);
+        });
+
+        const linkHabitBtn = btnRow.createEl('button', { cls: 'study-flow-link-task-btn study-flow-link-habit-btn' });
+        const hIcon = linkHabitBtn.createSpan();
+        setIcon(hIcon, 'flame');
+        linkHabitBtn.createSpan({ text: t('pomodoro.linkHabit') });
+        linkHabitBtn.addEventListener('click', () => {
+          new HabitSelectModal(this.app, this.plugin, async (chosen) => {
+            if (chosen) {
+              await this.plugin.pomodoro.setActiveTask({
+                id: `habit-${chosen.id}`,
+                text: chosen.name,
+                sourceFile: this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md',
+              });
+            } else {
+              this.plugin.pomodoro.setActiveTask(null);
+            }
+            if (this.container) await this.render(this.container);
+          }).open();
         });
 
         if (!status.activeSubject) {

@@ -12,6 +12,7 @@ import { formatPomodoroLogLine } from './conventions.ts';
 import type { Subject, PomodoroPreset } from './settings-utils';
 import { SubjectSelectModal } from './subject-modal';
 import { normalizeTag } from './subject-analytics';
+import { toggleHabitStatus } from './habits';
 import {
   countCompletedSessionsToday,
   shouldTriggerLongBreak,
@@ -266,6 +267,19 @@ export class PomodoroManager {
       const activeTask = this.activeTask;
       const srcFile = activeTask.sourceFile || getDailyNotePath(this.plugin.settings, getLocalDateString(new Date()));
 
+      if (activeTask.id && activeTask.id.startsWith('habit-')) {
+        const habitId = activeTask.id.replace(/^habit-/, '');
+        const habitsPath = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
+        const updatedHabits = await toggleHabitStatus(this.plugin.app, habitsPath, habitId, true);
+        const targetHabit = updatedHabits.find((h) => h.id === habitId);
+        const streakCount = targetHabit ? targetHabit.streak : 1;
+        new Notice(t('habits.habitFulfilledNotice', { streak: streakCount }));
+        this.activeTask = null;
+        await this.savePomodoroState();
+        this.notifyListeners();
+        return;
+      }
+
       if (activeTask.id && (activeTask.id.startsWith('block-') || activeTask.text.includes('['))) {
         const blockId = activeTask.id.replace(/^block-/, '');
         const dateMatch = srcFile.match(/(\d{4}-\d{2}-\d{2})/);
@@ -397,13 +411,15 @@ export class PomodoroManager {
         }
         const restoredTask = this.activeTask;
         if (restoredTask) {
-          try {
-            const res = await incrementTaskPomodoroInFile(this.plugin.app, restoredTask);
-            if (res) {
-              restoredTask.text = res.updatedText;
+          if (!restoredTask.id?.startsWith('habit-')) {
+            try {
+              const res = await incrementTaskPomodoroInFile(this.plugin.app, restoredTask);
+              if (res) {
+                restoredTask.text = res.updatedText;
+              }
+            } catch (e) {
+              console.error('Error incrementing pomodoro count on task during restore:', e);
             }
-          } catch (e) {
-            console.error('Error incrementing pomodoro count on task during restore:', e);
           }
           if (this.plugin.settings.enableSessionClosingReview) {
             new PomodoroClosingReviewModal(this.plugin.app, this.plugin, restoredTask, sessionRecord).open();
@@ -915,13 +931,15 @@ export class PomodoroManager {
 
       const activeTaskRef = this.activeTask;
       if (activeTaskRef) {
-        try {
-          const res = await incrementTaskPomodoroInFile(this.plugin.app, activeTaskRef);
-          if (res) {
-            activeTaskRef.text = res.updatedText;
+        if (!activeTaskRef.id?.startsWith('habit-')) {
+          try {
+            const res = await incrementTaskPomodoroInFile(this.plugin.app, activeTaskRef);
+            if (res) {
+              activeTaskRef.text = res.updatedText;
+            }
+          } catch (e) {
+            console.error('Error incrementing pomodoro count on task:', e);
           }
-        } catch (e) {
-          console.error('Error incrementing pomodoro count on task:', e);
         }
       }
 

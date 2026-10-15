@@ -42,11 +42,17 @@ export class PomodoroClosingReviewModal extends Modal {
 
     // If active task exists, show task banner and completion toggle
     if (this.task) {
-      const taskBanner = contentEl.createDiv({ cls: 'study-flow-active-task-banner' });
+      const isHabit = Boolean(this.task.id && this.task.id.startsWith('habit-'));
+      const taskBanner = contentEl.createDiv({
+        cls: `study-flow-active-task-banner ${isHabit ? 'study-flow-active-habit-banner' : ''}`,
+      });
       const targetIcon = taskBanner.createSpan({ cls: 'study-flow-task-target-icon' });
-      setIcon(targetIcon, 'target');
+      setIcon(targetIcon, isHabit ? 'flame' : 'target');
       const textWrap = taskBanner.createDiv({ cls: 'study-flow-task-banner-text' });
-      textWrap.createSpan({ text: t('pomodoroCheck.taskLabel'), cls: 'study-flow-task-banner-label' });
+      textWrap.createSpan({
+        text: isHabit ? t('pomodoro.habitLabel') : t('pomodoroCheck.taskLabel'),
+        cls: 'study-flow-task-banner-label',
+      });
       textWrap.createSpan({ text: this.task.text, cls: 'study-flow-task-banner-name' });
 
       new Setting(contentEl)

@@ -232,3 +232,25 @@ Notas adicionales antes de la lista.
   assert.ok(updated.includes('# Mis Hábitos Diarios'));
   assert.ok(updated.includes('> Recuerda tomar agua.'));
 });
+
+test('Pomodoro habit integration: completing habit via syncHabitsToMarkdown marks checkbox and advances streak', () => {
+  const content = `# Mis Hábitos
+- [ ] 📚 Lectura 20 min <!-- streak: 2 | last: 2026-10-13 -->
+`;
+  const today = '2026-10-14';
+  const parsed = parseHabitLine('- [ ] 📚 Lectura 20 min <!-- streak: 2 | last: 2026-10-13 -->', today);
+  assert.ok(parsed);
+  assert.strictEqual(parsed.completedToday, false);
+
+  // Simulate completeActiveTask for habit
+  parsed.completedToday = true;
+  parsed.lastCompletedDate = today;
+  parsed.history = ['2026-10-12', '2026-10-13', today];
+  parsed.streak = calculateHabitStreak(parsed, new Date('2026-10-14T12:00:00'));
+
+  assert.strictEqual(parsed.streak, 3);
+  const updatedMarkdown = syncHabitsToMarkdown(content, [parsed]);
+  assert.ok(updatedMarkdown.includes('- [x] 📚 Lectura 20 min'));
+  assert.ok(updatedMarkdown.includes('streak: 3'));
+  assert.ok(updatedMarkdown.includes('last: 2026-10-14'));
+});

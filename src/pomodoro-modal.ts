@@ -3,6 +3,7 @@ import type StudyFlowPlugin from './main';
 import { PomodoroStatus } from './pomodoro';
 import type { PendingTaskItem } from './utils';
 import { SubjectSelectModal } from './subject-modal';
+import { HabitSelectModal } from './habit-select-modal';
 import { t } from './i18n/index.ts';
 
 export class PomodoroModal extends Modal {
@@ -76,8 +77,12 @@ export class PomodoroModal extends Modal {
     // 4. Active Task / Link Task Section
     const taskContainer = contentEl.createDiv({ cls: 'study-flow-mini-timer-task' });
     if (status.activeTask) {
+      const isHabit = Boolean(status.activeTask.id && status.activeTask.id.startsWith('habit-'));
       const taskIcon = taskContainer.createSpan({ cls: 'study-flow-task-target-icon' });
-      setIcon(taskIcon, 'target');
+      setIcon(taskIcon, isHabit ? 'flame' : 'target');
+      if (isHabit) {
+        taskIcon.addClass('study-flow-habit-modal-icon');
+      }
       taskContainer.createSpan({ text: ` ${status.activeTask.text}` });
 
       const completeBtn = taskContainer.createEl('button', {
@@ -159,6 +164,25 @@ export class PomodoroModal extends Modal {
       linkBtn.addEventListener('click', () => {
         this.isSelectingTask = true;
         this.renderUI();
+      });
+
+      const linkHabitBtn = btnRow.createEl('button', {
+        text: t('pomodoro.linkHabitDots'),
+        cls: 'study-flow-link-task-btn study-flow-link-habit-btn',
+      });
+      linkHabitBtn.addEventListener('click', () => {
+        new HabitSelectModal(this.app, this.plugin, async (chosen) => {
+          if (chosen) {
+            await this.plugin.pomodoro.setActiveTask({
+              id: `habit-${chosen.id}`,
+              text: chosen.name,
+              sourceFile: this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md',
+            });
+          } else {
+            this.plugin.pomodoro.setActiveTask(null);
+          }
+          this.renderUI();
+        }).open();
       });
 
       if ((this.plugin.settings.subjects?.length || 0) > 0) {

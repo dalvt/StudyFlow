@@ -99,6 +99,10 @@ export const en = {
   'pomodoro.unlink': 'Unlink',
   'pomodoro.linkTask': 'Link task to this Pomodoro',
   'pomodoro.linkTaskDots': 'Link task...',
+  'pomodoro.linkHabit': 'Choose habit',
+  'pomodoro.linkHabitDots': 'Choose habit...',
+  'pomodoro.habitLabel': 'Habit: ',
+  'pomodoro.noHabitOption': 'No habit (Clear)',
   'pomodoro.selectInboxTask': 'Select a task from your Inbox:',
   'pomodoro.selectTaskPrompt': '— Select a task —',
   'pomodoro.quickTaskPlaceholder': 'Type a task to focus on...',
@@ -335,6 +339,9 @@ export const en = {
   'habits.modalNewPlaceholder': 'New daily habit (e.g. 15 min exercise)...',
   'habits.modalEmptyTitle': 'You have no habits recorded',
   'habits.modalEmptyDesc': 'Create your first habit above to build your streak.',
+  'habits.selectModalTitle': 'Which habit will you focus on?',
+  'habits.selectModalDesc': 'Select a habit for your Pomodoro focus session.',
+  'habits.selectModalEmpty': 'No habits found in Habits.md.',
 
   // Calendar Tab & Operations
   'calendar.prev': 'Previous',
