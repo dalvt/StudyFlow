@@ -3,6 +3,7 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroSound, playPomodoroChime } from './audio';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils';
 import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, TaskRecord } from './tasks';
+import { toggleTimeBlockCompletion } from './calendar';
 import { extractTagsFromText, FocusSessionRecord } from './analytics';
 import { appendFocusSessionToFile } from './storage-migration';
 import { PomodoroClosingReviewModal, PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
@@ -262,19 +263,29 @@ export class PomodoroManager {
   public async completeActiveTask(): Promise<void> {
     if (!this.activeTask) return;
     try {
-      const { priority } = parseTaskPriority(this.activeTask.text);
+      const activeTask = this.activeTask;
+      const srcFile = activeTask.sourceFile || getDailyNotePath(this.plugin.settings, getLocalDateString(new Date()));
+
+      if (activeTask.id && (activeTask.id.startsWith('block-') || activeTask.text.includes('['))) {
+        const blockId = activeTask.id.replace(/^block-/, '');
+        const dateMatch = srcFile.match(/(\d{4}-\d{2}-\d{2})/);
+        const dateStr = dateMatch ? dateMatch[1] : getLocalDateString(new Date());
+        await toggleTimeBlockCompletion(this.plugin, dateStr, blockId, true);
+      }
+
+      const { priority } = parseTaskPriority(activeTask.text);
       const taskRecord: TaskRecord = {
-        id: this.activeTask.id,
-        originalLine: `- [ ] ${this.activeTask.text}`,
-        text: this.activeTask.text,
-        sourceFile: this.activeTask.sourceFile,
+        id: activeTask.id,
+        originalLine: `- [ ] ${activeTask.text}`,
+        text: activeTask.text,
+        sourceFile: srcFile,
         completed: false,
         statusChar: ' ',
         priority,
       };
 
       await toggleTaskCompletionInFile(this.plugin.app, taskRecord, true);
-      new Notice(t('pomodoro.taskCompletedNotice', { task: this.activeTask.text }));
+      new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
       this.activeTask = null;
       await this.savePomodoroState();
       this.notifyListeners();

@@ -10,7 +10,7 @@ import {
   type SpacedRepetitionNoteItem,
 } from '../spaced-repetition.ts';
 import type { PomodoroStatus } from '../pomodoro.ts';
-import { extractTagsFromText, getLocalDateString, formatDeadlineHuman } from '../utils.ts';
+import { extractTagsFromText, getLocalDateString, formatDeadlineHuman, getDailyNotePath } from '../utils.ts';
 import { t } from '../i18n/index.ts';
 
 import {
@@ -160,7 +160,7 @@ export class TodayTab implements TabComponent {
       emptyRow.createSpan({ text: t('today.noScheduledBlocks'), cls: 'study-flow-empty-text' });
       const openCalBtn = emptyRow.createEl('button', {
         text: t('today.openCalendarBtn'),
-        cls: 'study-flow-btn-secondary clickable-icon',
+        cls: 'study-flow-btn-secondary',
       });
       openCalBtn.addEventListener('click', () => this.onSwitchTab('calendar'));
       return;
@@ -213,10 +213,11 @@ export class TodayTab implements TabComponent {
       if (matchedSubject) {
         await this.plugin.pomodoro.setActiveSubject(matchedSubject);
       }
+      const dailyPath = getDailyNotePath(this.plugin.settings, todayDate);
       await this.plugin.pomodoro.setActiveTask({
         id: `block-${block.id}`,
         text: block.title,
-        sourceFile: '',
+        sourceFile: dailyPath,
       });
       const status = this.plugin.pomodoro.getStatus();
       if (status.state === 'idle' || status.state === 'paused') {
@@ -256,7 +257,8 @@ export class TodayTab implements TabComponent {
     });
     setIcon(this.miniTimerPlayBtn, status.state === 'running' ? 'pause' : 'play');
 
-    this.miniTimerPlayBtn.addEventListener('click', async () => {
+    this.miniTimerPlayBtn.addEventListener('click', async (e: MouseEvent) => {
+      e.stopPropagation();
       const current = this.plugin.pomodoro.getStatus();
       if (current.state === 'running') {
         await this.plugin.pomodoro.pause();

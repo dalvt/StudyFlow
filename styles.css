@@ -342,10 +342,10 @@
   height: 14px;
 }
 
-/* Responsive 5-Column Navigation */
+/* Responsive 6-Column Navigation */
 .study-flow-segmented-nav {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 10px;
@@ -4701,6 +4701,357 @@ body.is-study-flow-zen .workspace-split {
   display: inline-flex;
   opacity: 0.6;
 }
+
+.study-flow-today-task-row.is-done {
+  opacity: 0.6;
+}
+
+.study-flow-today-item-title.is-strikethrough {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.study-flow-task-checkbox {
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: var(--interactive-accent);
+}
+
+.study-flow-clickable-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.study-flow-clickable-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Link-style and Secondary Buttons */
+.study-flow-link-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--interactive-accent);
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.study-flow-link-btn:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--interactive-accent-hover);
+}
+
+.study-flow-btn-secondary {
+  background-color: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  padding: 6px 14px;
+  border-radius: var(--radius-m);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.study-flow-btn-secondary:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.study-flow-btn-subtle {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-btn-subtle:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+
+/* Prompt Modal */
+.study-flow-prompt-modal {
+  padding: 20px 24px;
+  max-width: 440px;
+}
+
+.study-flow-prompt-title {
+  margin: 0 0 14px 0;
+  font-size: var(--font-ui-large);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-prompt-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  margin-bottom: 18px;
+  box-sizing: border-box;
+}
+
+.study-flow-prompt-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.study-flow-prompt-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Subject Select Modal */
+.study-flow-subject-select-modal {
+  max-width: 420px;
+}
+
+.study-flow-modal-subtitle {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
+.study-flow-subject-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.study-flow-subject-select-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-subject-select-item:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-subject-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study-flow-subject-color-dot.is-none,
+.study-flow-subject-color-dot.is-add {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.study-flow-subject-color-dot svg {
+  width: 10px;
+  height: 10px;
+}
+
+.study-flow-subject-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.study-flow-subject-item-name {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.study-flow-subject-item-tag {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.study-flow-subject-item-goal {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+/* Mini Timer Modal (Pop-up Timer) */
+.study-flow-mini-timer-modal {
+  padding: 20px;
+  max-width: 360px;
+  text-align: center;
+}
+
+.study-flow-mini-timer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.study-flow-mini-timer-title {
+  font-weight: 700;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.study-flow-mini-timer-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-s);
+}
+
+.study-flow-mini-timer-badge.is-work {
+  background-color: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+  color: var(--interactive-accent);
+}
+
+.study-flow-mini-timer-badge.is-break {
+  background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
+  color: var(--color-green, var(--text-success));
+}
+
+.study-flow-mini-timer-digits {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  margin: 10px 0 14px 0;
+}
+
+.study-flow-mini-timer-progress-bar {
+  height: 6px;
+  width: 100%;
+  border-radius: 3px;
+  background-color: var(--background-modifier-border);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.study-flow-mini-timer-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.study-flow-mini-timer-progress-fill.is-work {
+  background-color: var(--interactive-accent);
+}
+
+.study-flow-mini-timer-progress-fill.is-break {
+  background-color: var(--color-green, var(--text-success));
+}
+
+.study-flow-mini-timer-task {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  margin-bottom: 16px;
+}
+
+.study-flow-mini-timer-task .study-flow-task-target-icon svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+.study-flow-mini-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-border);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study-flow-mini-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.study-flow-mini-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.study-flow-mini-picker select {
+  flex: 1;
+  font-size: var(--font-ui-smaller);
+}
+
+.study-flow-link-buttons-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.study-flow-mini-timer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.study-flow-mini-timer-controls .study-flow-play-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.study-flow-mini-timer-controls .study-flow-play-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.study-flow-mini-timer-footer {
+  font-size: var(--font-ui-smaller);
+  margin-top: 8px;
+}
+
 
 
 
