@@ -207,7 +207,7 @@ export class PomodoroTab implements TabComponent {
 
     // Progress circle
     svgEl.createSvg('circle', {
-      cls: `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      cls: ['study-flow-dial-progress', status.mode === 'work' ? 'is-work' : 'is-break'],
       attr: {
         cx: '95',
         cy: '95',
