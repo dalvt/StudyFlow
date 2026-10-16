@@ -442,6 +442,11 @@
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+.study-flow-pomodoro-luxury-card > * {
+  position: relative;
+  z-index: 1;
+}
+
 .study-flow-pomodoro-luxury-card::before {
   content: "";
   position: absolute;
@@ -745,15 +750,13 @@
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: var(--color-red, var(--text-error, #ff5e57));
-  stroke: url(#sf-dial-work-gradient) var(--color-red, var(--text-error, #ff5e57));
-  filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--color-red, #ef4444) 45%, transparent));
+  stroke: var(--sf-danger, var(--color-red, #ef4444));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sf-danger, #ef4444) 45%, transparent));
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: var(--color-green, var(--text-success, #10b981));
-  stroke: url(#sf-dial-break-gradient) var(--color-green, var(--text-success, #10b981));
-  filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--color-green, #10b981) 45%, transparent));
+  stroke: var(--sf-success, var(--color-green, #10b981));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sf-success, #10b981) 45%, transparent));
 }
 
 .study-flow-dial-progress.is-running {

@@ -101,151 +101,126 @@ export class PomodoroTab implements TabComponent {
   }
 
   async render(container: HTMLElement): Promise<void> {
-    this.container = container;
-    container.empty();
+    try {
+      this.container = container;
+      container.empty();
 
-    const status = this.plugin.pomodoro.getStatus();
-    const isRunning = status.state === 'running';
-    const card = container.createDiv({
-      cls: `study-flow-card study-flow-pomodoro-luxury-card ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`,
-    });
-
-    // Presets bar
-    const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
-    const presets: PomodoroPreset[] = this.plugin.settings.pomodoroPresets || [];
-
-    for (const p of presets) {
-      const isPresetActive =
-        !status.isCountUp &&
-        this.plugin.settings.pomodoroWorkDuration === p.workMinutes &&
-        this.plugin.settings.pomodoroBreakDuration === p.breakMinutes;
-
-      const chipWrapper = presetsRow.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
-      const chip = chipWrapper.createEl('button', {
-        text: p.name,
-        cls: `study-flow-preset-chip ${isPresetActive ? 'is-active' : ''}`,
-        attr: { 'aria-label': `${p.name} (${p.workMinutes}m / ${p.breakMinutes}m)` },
+      const status = this.plugin.pomodoro.getStatus();
+      const isRunning = status.state === 'running';
+      const card = container.createDiv({
+        cls: `study-flow-card study-flow-pomodoro-luxury-card ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`,
       });
-      chip.addEventListener('click', async () => {
-        await this.plugin.pomodoro.applyPreset(p);
+
+      // Presets bar
+      const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
+      const presets: PomodoroPreset[] = this.plugin.settings.pomodoroPresets || [];
+
+      for (const p of presets) {
+        const isPresetActive =
+          !status.isCountUp &&
+          this.plugin.settings.pomodoroWorkDuration === p.workMinutes &&
+          this.plugin.settings.pomodoroBreakDuration === p.breakMinutes;
+
+        const chipWrapper = presetsRow.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
+        const chip = chipWrapper.createEl('button', {
+          text: p.name,
+          cls: `study-flow-preset-chip ${isPresetActive ? 'is-active' : ''}`,
+          attr: { 'aria-label': `${p.name} (${p.workMinutes}m / ${p.breakMinutes}m)` },
+        });
+        chip.addEventListener('click', async () => {
+          await this.plugin.pomodoro.applyPreset(p);
+          if (this.container) await this.render(this.container);
+        });
+
+        if (p.isCustom) {
+          const delBtn = chipWrapper.createEl('button', {
+            cls: 'study-flow-preset-del-btn clickable-icon',
+            attr: { 'aria-label': t('pomodoro.deletePresetTooltip') },
+          });
+          setIcon(delBtn, 'x');
+          delBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await this.plugin.pomodoro.deleteCustomPreset(p.id);
+            new Notice(t('pomodoro.presetDeletedNotice'));
+            if (this.container) await this.render(this.container);
+          });
+        }
+      }
+
+      // Add preset button
+      const addPresetBtn = presetsRow.createEl('button', {
+        cls: 'study-flow-preset-chip study-flow-add-preset-chip',
+        text: t('pomodoro.addPresetBtn'),
+        attr: { 'aria-label': t('pomodoro.addPreset') },
+      });
+      addPresetBtn.addEventListener('click', () => {
+        new PomodoroCreatePresetModal(this.app, this.plugin, () => {
+          if (this.container) void this.render(this.container);
+        }).open();
+      });
+
+      // Count-up mode chip (Modo sin límite)
+      const countUpBtn = presetsRow.createEl('button', {
+        cls: `study-flow-preset-chip study-flow-countup-chip ${status.isCountUp ? 'is-active' : ''}`,
+        text: t('pomodoro.presetCountUp'),
+        attr: { 'aria-label': t('pomodoro.presetCountUpTooltip') },
+      });
+      countUpBtn.addEventListener('click', async () => {
+        if (!status.isCountUp) {
+          await this.plugin.pomodoro.startCountUp();
+        } else {
+          await this.plugin.pomodoro.finishCountUpSession();
+        }
         if (this.container) await this.render(this.container);
       });
 
-      if (p.isCustom) {
-        const delBtn = chipWrapper.createEl('button', {
-          cls: 'study-flow-preset-del-btn clickable-icon',
-          attr: { 'aria-label': t('pomodoro.deletePresetTooltip') },
-        });
-        setIcon(delBtn, 'x');
-        delBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await this.plugin.pomodoro.deleteCustomPreset(p.id);
-          new Notice(t('pomodoro.presetDeletedNotice'));
-          if (this.container) await this.render(this.container);
-        });
-      }
-    }
-
-    // Add preset button
-    const addPresetBtn = presetsRow.createEl('button', {
-      cls: 'study-flow-preset-chip study-flow-add-preset-chip',
-      text: t('pomodoro.addPresetBtn'),
-      attr: { 'aria-label': t('pomodoro.addPreset') },
-    });
-    addPresetBtn.addEventListener('click', () => {
-      new PomodoroCreatePresetModal(this.app, this.plugin, () => {
+      // Zen toggle chip
+      const zenBtn = presetsRow.createEl('button', {
+        cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
+        attr: { 'aria-label': t('pomodoro.toggleZenTooltip') },
+      });
+      const zenIcon = zenBtn.createSpan();
+      setIcon(zenIcon, 'eye-off');
+      zenBtn.createSpan({ text: this.plugin.zen.isZen() ? t('pomodoro.zenActive') : t('pomodoro.zen') });
+      zenBtn.addEventListener('click', () => {
+        this.plugin.zen.toggleZen();
         if (this.container) void this.render(this.container);
-      }).open();
-    });
+      });
 
-    // Count-up mode chip (Modo sin límite)
-    const countUpBtn = presetsRow.createEl('button', {
-      cls: `study-flow-preset-chip study-flow-countup-chip ${status.isCountUp ? 'is-active' : ''}`,
-      text: t('pomodoro.presetCountUp'),
-      attr: { 'aria-label': t('pomodoro.presetCountUpTooltip') },
-    });
-    countUpBtn.addEventListener('click', async () => {
-      if (!status.isCountUp) {
-        await this.plugin.pomodoro.startCountUp();
-      } else {
-        await this.plugin.pomodoro.finishCountUpSession();
-      }
-      if (this.container) await this.render(this.container);
-    });
+      // Active Task Linking Section
+      await this.renderActiveTaskBanner(card, status);
 
-    // Zen toggle chip
-    const zenBtn = presetsRow.createEl('button', {
-      cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
-      attr: { 'aria-label': t('pomodoro.toggleZenTooltip') },
-    });
-    const zenIcon = zenBtn.createSpan();
-    setIcon(zenIcon, 'eye-off');
-    zenBtn.createSpan({ text: this.plugin.zen.isZen() ? t('pomodoro.zenActive') : t('pomodoro.zen') });
-    zenBtn.addEventListener('click', () => {
-      this.plugin.zen.toggleZen();
-      if (this.container) void this.render(this.container);
-    });
+      // Native Dial Wrapper
+      const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
+      const liveAnnouncer = dialWrapper.createDiv({
+        cls: 'sr-only study-flow-sr-announcer',
+        attr: { 'aria-live': 'polite', 'aria-atomic': 'true' },
+      });
 
-    // Active Task Linking Section
-    await this.renderActiveTaskBanner(card, status);
+      const dialContainer = dialWrapper.createDiv({ cls: 'study-flow-dial-container' });
 
-    // Native Dial Wrapper
-    const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
-    const liveAnnouncer = dialWrapper.createDiv({
-      cls: 'sr-only study-flow-sr-announcer',
-      attr: { 'aria-live': 'polite', 'aria-atomic': 'true' },
-    });
+      const svgEl = dialContainer.createSvg('svg', {
+        cls: 'study-flow-dial-svg',
+        attr: { viewBox: '0 0 190 190' },
+      });
 
-    const dialContainer = dialWrapper.createDiv({ cls: 'study-flow-dial-container' });
+      // Track circle
+      svgEl.createSvg('circle', {
+        cls: 'study-flow-dial-bg',
+        attr: { cx: '95', cy: '95', r: String(CIRCLE_RADIUS) },
+      });
 
-    const svgEl = dialContainer.createSvg('svg', {
-      cls: 'study-flow-dial-svg',
-      attr: { viewBox: '0 0 190 190' },
-    });
-
-    // SVG Defs with color gradients
-    const defsEl = svgEl.createSvg('defs');
-    const workGrad = defsEl.createSvg('linearGradient', {
-      attr: { id: 'sf-dial-work-gradient', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
-    });
-    workGrad.createSvg('stop', { attr: { offset: '0%', 'stop-color': 'var(--color-red, #ff5e57)' } });
-    workGrad.createSvg('stop', { attr: { offset: '100%', 'stop-color': 'var(--sf-danger, #e53935)' } });
-
-    const breakGrad = defsEl.createSvg('linearGradient', {
-      attr: { id: 'sf-dial-break-gradient', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
-    });
-    breakGrad.createSvg('stop', { attr: { offset: '0%', 'stop-color': 'var(--color-green, #10b981)' } });
-    breakGrad.createSvg('stop', { attr: { offset: '100%', 'stop-color': 'var(--sf-success, #059669)' } });
-
-    // Outer subtle tick/accent ring
-    svgEl.createSvg('circle', {
-      cls: 'study-flow-dial-outer-accent',
-      attr: { cx: '95', cy: '95', r: '87' },
-    });
-
-    // Track circle
-    svgEl.createSvg('circle', {
-      cls: 'study-flow-dial-bg',
-      attr: { cx: '95', cy: '95', r: String(CIRCLE_RADIUS) },
-    });
-
-    // Inner subtle accent ring
-    svgEl.createSvg('circle', {
-      cls: 'study-flow-dial-inner-accent',
-      attr: { cx: '95', cy: '95', r: '65' },
-    });
-
-    // Progress circle
-    const progressCls = `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`;
-    svgEl.createSvg('circle', {
-      cls: progressCls,
-      attr: {
-        cx: '95',
-        cy: '95',
-        r: String(CIRCLE_RADIUS),
-        'stroke-dasharray': String(CIRCUMFERENCE),
-      },
-    });
+      // Progress circle
+      const progressCls = `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`;
+      svgEl.createSvg('circle', {
+        cls: progressCls,
+        attr: {
+          cx: '95',
+          cy: '95',
+          r: String(CIRCLE_RADIUS),
+          'stroke-dasharray': String(CIRCUMFERENCE),
+        },
+      });
 
     // Dial center text
     const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
@@ -348,7 +323,11 @@ export class PomodoroTab implements TabComponent {
       });
     }
 
-    this.updateProgressRing(status);
+      this.updateProgressRing(status);
+    } catch (err) {
+      console.error('[Study Flow Pomodoro] Error rendering pomodoro tab:', err);
+      new Notice(`Pomodoro Render Error: ${(err as Error).message}`);
+    }
   }
 
   private async renderActiveTaskBanner(container: HTMLElement, status: any): Promise<void> {
