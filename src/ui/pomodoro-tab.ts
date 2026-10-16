@@ -211,9 +211,7 @@ export class PomodoroTab implements TabComponent {
       });
 
       // Progress circle
-      const progressCls = `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`;
-      svgEl.createSvg('circle', {
-        cls: progressCls,
+      const progressCircle = svgEl.createSvg('circle', {
         attr: {
           cx: '95',
           cy: '95',
@@ -221,6 +219,10 @@ export class PomodoroTab implements TabComponent {
           'stroke-dasharray': String(CIRCUMFERENCE),
         },
       });
+      progressCircle.setAttribute(
+        'class',
+        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`
+      );
 
     // Dial center text
     const centerInfo = dialContainer.createDiv({ cls: 'study-flow-dial-center' });
@@ -636,7 +638,7 @@ export class PomodoroTab implements TabComponent {
       const isRunning = status.state === 'running';
       progressCircle.setAttribute(
         'class',
-        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`
+        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`
       );
     }
   }

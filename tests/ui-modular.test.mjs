@@ -150,4 +150,18 @@ test('Modals and satellite reduction: verifies obsolete modals and pruned module
   assert.ok(pomoSrc.includes('class PomodoroModal'));
 });
 
+test('Pomodoro SVG dial: creates progress circle with setAttribute to prevent DOMTokenList space and empty token crashes', async () => {
+  const fs = await import('node:fs');
+  const pomoTabSrc = fs.readFileSync('src/ui/pomodoro-tab.ts', 'utf8');
+
+  assert.ok(
+    !pomoTabSrc.includes('cls: progressCls'),
+    'Must not pass space-separated progressCls to createSvg'
+  );
+  assert.ok(
+    pomoTabSrc.includes("progressCircle.setAttribute(\n        'class'"),
+    'Must use setAttribute for class on SVG progress circle'
+  );
+});
+
 
