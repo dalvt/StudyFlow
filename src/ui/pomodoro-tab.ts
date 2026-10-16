@@ -112,7 +112,8 @@ export class PomodoroTab implements TabComponent {
       });
 
       // Presets bar
-      const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
+      const presetsBar = card.createDiv({ cls: 'study-flow-presets-bar' });
+      const presetsGroup = presetsBar.createDiv({ cls: 'study-flow-presets-group' });
       const presets: PomodoroPreset[] = this.plugin.settings.pomodoroPresets || [];
 
       for (const p of presets) {
@@ -121,7 +122,7 @@ export class PomodoroTab implements TabComponent {
           this.plugin.settings.pomodoroWorkDuration === p.workMinutes &&
           this.plugin.settings.pomodoroBreakDuration === p.breakMinutes;
 
-        const chipWrapper = presetsRow.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
+        const chipWrapper = presetsGroup.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
         const chip = chipWrapper.createEl('button', {
           text: p.name,
           cls: `study-flow-preset-chip ${isPresetActive ? 'is-active' : ''}`,
@@ -148,7 +149,7 @@ export class PomodoroTab implements TabComponent {
       }
 
       // Add preset button
-      const addPresetBtn = presetsRow.createEl('button', {
+      const addPresetBtn = presetsGroup.createEl('button', {
         cls: 'study-flow-preset-chip study-flow-add-preset-chip',
         text: t('pomodoro.addPresetBtn'),
         attr: { 'aria-label': t('pomodoro.addPreset') },
@@ -159,8 +160,11 @@ export class PomodoroTab implements TabComponent {
         }).open();
       });
 
+      // Utilities group (Count-up & Zen)
+      const utilitiesGroup = presetsBar.createDiv({ cls: 'study-flow-utilities-group' });
+
       // Count-up mode chip (Modo sin límite)
-      const countUpBtn = presetsRow.createEl('button', {
+      const countUpBtn = utilitiesGroup.createEl('button', {
         cls: `study-flow-preset-chip study-flow-countup-chip ${status.isCountUp ? 'is-active' : ''}`,
         text: t('pomodoro.presetCountUp'),
         attr: { 'aria-label': t('pomodoro.presetCountUpTooltip') },
@@ -175,7 +179,7 @@ export class PomodoroTab implements TabComponent {
       });
 
       // Zen toggle chip
-      const zenBtn = presetsRow.createEl('button', {
+      const zenBtn = utilitiesGroup.createEl('button', {
         cls: `study-flow-preset-chip study-flow-zen-toggle-chip ${this.plugin.zen.isZen() ? 'is-active' : ''}`,
         attr: { 'aria-label': t('pomodoro.toggleZenTooltip') },
       });
@@ -219,9 +223,10 @@ export class PomodoroTab implements TabComponent {
           'stroke-dasharray': String(CIRCUMFERENCE),
         },
       });
+      const activeModeCls = status.isCountUp ? 'is-countup' : (status.mode === 'work' ? 'is-work' : 'is-break');
       progressCircle.setAttribute(
         'class',
-        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`
+        `study-flow-dial-progress ${activeModeCls}${isRunning ? ' is-running' : ''}`
       );
 
     // Dial center text
@@ -235,7 +240,7 @@ export class PomodoroTab implements TabComponent {
 
     centerInfo.createDiv({
       text: pillText,
-      cls: `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      cls: `study-flow-mode-pill study-flow-luxury-pill ${activeModeCls}`,
     });
 
     const timeHeroEl = centerInfo.createDiv({
@@ -283,7 +288,7 @@ export class PomodoroTab implements TabComponent {
     }
 
     const heroBtn = controlDeck.createEl('button', {
-      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
+      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${activeModeCls}`,
       attr: { 'aria-label': isRunning ? t('pomodoro.pause') : t('pomodoro.start') },
     });
     const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
@@ -574,6 +579,7 @@ export class PomodoroTab implements TabComponent {
       timeEl.classList.toggle('is-running', isRunning);
     }
 
+    const activeModeCls = status.isCountUp ? 'is-countup' : (status.mode === 'work' ? 'is-work' : 'is-break');
     const pillEl = this.container.querySelector('.study-flow-luxury-pill');
     if (pillEl) {
       pillEl.setText(
@@ -583,7 +589,7 @@ export class PomodoroTab implements TabComponent {
               ? t('pomodoro.pillFocus')
               : (status.isLongBreak ? t('pomodoro.pillLongBreak') : t('pomodoro.pillBreak')))
       );
-      pillEl.className = `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      pillEl.className = `study-flow-mode-pill study-flow-luxury-pill ${activeModeCls}`;
     }
 
     if (this.lastAnnouncedMode !== null && this.lastAnnouncedMode !== status.mode) {
@@ -619,7 +625,7 @@ export class PomodoroTab implements TabComponent {
     // Hero button
     const heroBtn = this.container.querySelector('.study-flow-hero-play-btn');
     if (heroBtn) {
-      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
+      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${activeModeCls}`;
       heroBtn.setAttribute('aria-label', isRunning ? t('pomodoro.pause') : t('pomodoro.start'));
       heroBtn.empty();
       const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
@@ -629,16 +635,17 @@ export class PomodoroTab implements TabComponent {
     this.updateProgressRing(status);
   }
 
-  private updateProgressRing(status: { progressPercent: number; mode: string; state?: string }): void {
+  private updateProgressRing(status: { progressPercent: number; mode: string; state?: string; isCountUp?: boolean }): void {
     if (!this.container) return;
     const progressCircle = this.container.querySelector('.study-flow-dial-progress') as SVGCircleElement | null;
     if (progressCircle) {
       const offset = CIRCUMFERENCE * (1 - status.progressPercent / 100);
       progressCircle.setAttribute('stroke-dashoffset', String(offset));
       const isRunning = status.state === 'running';
+      const activeModeCls = status.isCountUp ? 'is-countup' : (status.mode === 'work' ? 'is-work' : 'is-break');
       progressCircle.setAttribute(
         'class',
-        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`
+        `study-flow-dial-progress ${activeModeCls}${isRunning ? ' is-running' : ''}`
       );
     }
   }
