@@ -16,17 +16,18 @@ import { t } from '../i18n/index.ts';
 const CIRCLE_RADIUS = 76;
 const CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
 
-export class PomodoroCreatePresetModal extends Modal {
+export class PomodoroAdjustModal extends Modal {
   private plugin: StudyFlowPlugin;
   private onSaved: () => void;
-  private name: string = '';
-  private workMinutes: number = 45;
-  private breakMinutes: number = 15;
+  private workMinutes: number;
+  private breakMinutes: number;
 
   constructor(app: App, plugin: StudyFlowPlugin, onSaved: () => void) {
     super(app);
     this.plugin = plugin;
     this.onSaved = onSaved;
+    this.workMinutes = plugin.settings.pomodoroWorkDuration || 25;
+    this.breakMinutes = plugin.settings.pomodoroBreakDuration || 5;
   }
 
   onOpen(): void {
@@ -34,49 +35,75 @@ export class PomodoroCreatePresetModal extends Modal {
     contentEl.empty();
     contentEl.addClass('study-flow-modal');
 
-    contentEl.createEl('h2', { text: t('pomodoro.createPresetTitle') });
+    contentEl.createEl('h2', { text: t('pomodoro.customTimesTitle') });
+
+    // Quick selection presets inside modal
+    const quickBar = contentEl.createDiv({ cls: 'study-flow-presets-group' });
+    quickBar.style.marginBottom = '16px';
+    const quickPresets = [
+      { name: '25 / 5', work: 25, break: 5 },
+      { name: '50 / 10', work: 50, break: 10 },
+      { name: '90 / 20', work: 90, break: 20 },
+    ];
+
+    let workInput: HTMLInputElement;
+    let breakInput: HTMLInputElement;
+
+    for (const q of quickPresets) {
+      const chip = quickBar.createEl('button', {
+        text: q.name,
+        cls: 'study-flow-preset-chip',
+      });
+      chip.addEventListener('click', () => {
+        this.workMinutes = q.work;
+        this.breakMinutes = q.break;
+        if (workInput) workInput.value = String(q.work);
+        if (breakInput) breakInput.value = String(q.break);
+      });
+    }
 
     new Setting(contentEl)
-      .setName(t('pomodoro.presetName'))
+      .setName(t('pomodoro.focusMinutes'))
       .addText((text) => {
-        text
-          .setPlaceholder(t('pomodoro.presetNamePlaceholder'))
-          .onChange((val) => {
-            this.name = val;
-          });
+        workInput = text.inputEl;
+        text.inputEl.type = 'number';
+        text.setValue(String(this.workMinutes));
+        text.onChange((val) => {
+          const num = parseInt(val, 10);
+          if (!isNaN(num) && num > 0) this.workMinutes = num;
+        });
       });
 
     new Setting(contentEl)
-      .setName(t('pomodoro.presetWork'))
+      .setName(t('pomodoro.breakMinutes'))
       .addText((text) => {
-        text
-          .setValue(String(this.workMinutes))
-          .onChange((val) => {
-            const num = parseInt(val, 10);
-            if (!isNaN(num) && num > 0) this.workMinutes = num;
-          });
+        breakInput = text.inputEl;
+        text.inputEl.type = 'number';
+        text.setValue(String(this.breakMinutes));
+        text.onChange((val) => {
+          const num = parseInt(val, 10);
+          if (!isNaN(num) && num > 0) this.breakMinutes = num;
+        });
       });
 
+    let saveAsDefault = true;
     new Setting(contentEl)
-      .setName(t('pomodoro.presetBreak'))
-      .addText((text) => {
-        text
-          .setValue(String(this.breakMinutes))
-          .onChange((val) => {
-            const num = parseInt(val, 10);
-            if (!isNaN(num) && num > 0) this.breakMinutes = num;
-          });
+      .setName(t('pomodoro.saveAsDefault'))
+      .addToggle((toggle) => {
+        toggle.setValue(true);
+        toggle.onChange((val) => {
+          saveAsDefault = val;
+        });
       });
 
     const footer = contentEl.createDiv({ cls: 'study-flow-modal-footer' });
     const cancelBtn = footer.createEl('button', { text: t('common.cancel'), cls: 'study-flow-btn-secondary' });
     cancelBtn.addEventListener('click', () => this.close());
 
-    const saveBtn = footer.createEl('button', { text: t('common.save'), cls: 'mod-cta' });
+    const saveBtn = footer.createEl('button', { text: t('pomodoro.applyTimes'), cls: 'mod-cta' });
     saveBtn.addEventListener('click', async () => {
-      const presetName = this.name.trim() || `${this.workMinutes}/${this.breakMinutes}`;
-      await this.plugin.pomodoro.addCustomPreset(presetName, this.workMinutes, this.breakMinutes);
-      new Notice(t('pomodoro.presetAddedNotice', { name: presetName }));
+      await this.plugin.pomodoro.setCustomWorkAndBreak(this.workMinutes, this.breakMinutes, saveAsDefault);
+      new Notice(t('pomodoro.timesConfiguredNotice', { work: String(this.workMinutes), break: String(this.breakMinutes) }));
       this.close();
       this.onSaved();
     });
@@ -86,6 +113,7 @@ export class PomodoroCreatePresetModal extends Modal {
     this.contentEl.empty();
   }
 }
+export const PomodoroCreatePresetModal = PomodoroAdjustModal;
 
 export class PomodoroTab implements TabComponent {
   private app: App;
@@ -111,57 +139,28 @@ export class PomodoroTab implements TabComponent {
         cls: `study-flow-card study-flow-pomodoro-luxury-card ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`,
       });
 
-      // Presets bar
-      const presetsBar = card.createDiv({ cls: 'study-flow-presets-bar' });
-      const presetsGroup = presetsBar.createDiv({ cls: 'study-flow-presets-group' });
-      const presets: PomodoroPreset[] = this.plugin.settings.pomodoroPresets || [];
+      // Top bar: Adjust pomodoro button on the left, utilities (Count-up & Zen) on the right
+      const topBar = card.createDiv({ cls: 'study-flow-presets-bar' });
 
-      for (const p of presets) {
-        const isPresetActive =
-          !status.isCountUp &&
-          this.plugin.settings.pomodoroWorkDuration === p.workMinutes &&
-          this.plugin.settings.pomodoroBreakDuration === p.breakMinutes;
+      // Single button to adjust the Pomodoro timer
+      const workDur = this.plugin.settings.pomodoroWorkDuration || 25;
+      const breakDur = this.plugin.settings.pomodoroBreakDuration || 5;
 
-        const chipWrapper = presetsGroup.createDiv({ cls: 'study-flow-preset-chip-wrapper' });
-        const chip = chipWrapper.createEl('button', {
-          text: p.name,
-          cls: `study-flow-preset-chip ${isPresetActive ? 'is-active' : ''}`,
-          attr: { 'aria-label': `${p.name} (${p.workMinutes}m / ${p.breakMinutes}m)` },
-        });
-        chip.addEventListener('click', async () => {
-          await this.plugin.pomodoro.applyPreset(p);
-          if (this.container) await this.render(this.container);
-        });
-
-        if (p.isCustom) {
-          const delBtn = chipWrapper.createEl('button', {
-            cls: 'study-flow-preset-del-btn clickable-icon',
-            attr: { 'aria-label': t('pomodoro.deletePresetTooltip') },
-          });
-          setIcon(delBtn, 'x');
-          delBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await this.plugin.pomodoro.deleteCustomPreset(p.id);
-            new Notice(t('pomodoro.presetDeletedNotice'));
-            if (this.container) await this.render(this.container);
-          });
-        }
-      }
-
-      // Add preset button
-      const addPresetBtn = presetsGroup.createEl('button', {
-        cls: 'study-flow-preset-chip study-flow-add-preset-chip',
-        text: t('pomodoro.addPresetBtn'),
-        attr: { 'aria-label': t('pomodoro.addPreset') },
+      const adjustBtn = topBar.createEl('button', {
+        cls: 'study-flow-preset-chip study-flow-adjust-btn',
+        attr: { 'aria-label': t('pomodoro.configureTimes') },
       });
-      addPresetBtn.addEventListener('click', () => {
-        new PomodoroCreatePresetModal(this.app, this.plugin, () => {
+      const adjIcon = adjustBtn.createSpan({ cls: 'study-flow-chip-icon' });
+      setIcon(adjIcon, 'sliders');
+      adjustBtn.createSpan({ text: `${t('pomodoro.adjust')} (${workDur}m / ${breakDur}m)` });
+      adjustBtn.addEventListener('click', () => {
+        new PomodoroAdjustModal(this.app, this.plugin, () => {
           if (this.container) void this.render(this.container);
         }).open();
       });
 
       // Utilities group (Count-up & Zen)
-      const utilitiesGroup = presetsBar.createDiv({ cls: 'study-flow-utilities-group' });
+      const utilitiesGroup = topBar.createDiv({ cls: 'study-flow-utilities-group' });
 
       // Count-up mode chip (Modo sin límite)
       const countUpBtn = utilitiesGroup.createEl('button', {
@@ -435,20 +434,26 @@ export class PomodoroTab implements TabComponent {
 
       if (!this.isSelectingTaskForPomodoro) {
         const btnRow = taskSection.createDiv({ cls: 'study-flow-link-buttons-row' });
-        const linkBtn = btnRow.createEl('button', { cls: 'study-flow-link-task-btn' });
-        const tIcon = linkBtn.createSpan();
+        const linkBtn = btnRow.createEl('button', {
+          cls: 'study-flow-link-task-btn study-flow-link-task-btn-task',
+          attr: { 'aria-label': t('pomodoro.linkTask') },
+        });
+        const tIcon = linkBtn.createSpan({ cls: 'study-flow-link-btn-icon' });
         setIcon(tIcon, 'target');
-        linkBtn.createSpan({ text: t('pomodoro.linkTask') });
+        linkBtn.createSpan({ text: t('pomodoro.linkTaskShort') });
         linkBtn.addEventListener('click', async () => {
           this.isSelectingTaskForPomodoro = true;
           this.loadPendingInboxTasks();
           if (this.container) await this.render(this.container);
         });
 
-        const linkHabitBtn = btnRow.createEl('button', { cls: 'study-flow-link-task-btn study-flow-link-habit-btn' });
-        const hIcon = linkHabitBtn.createSpan();
+        const linkHabitBtn = btnRow.createEl('button', {
+          cls: 'study-flow-link-task-btn study-flow-link-habit-btn',
+          attr: { 'aria-label': t('pomodoro.linkHabit') },
+        });
+        const hIcon = linkHabitBtn.createSpan({ cls: 'study-flow-link-btn-icon' });
         setIcon(hIcon, 'flame');
-        linkHabitBtn.createSpan({ text: t('pomodoro.linkHabit') });
+        linkHabitBtn.createSpan({ text: t('pomodoro.linkHabitShort') });
         linkHabitBtn.addEventListener('click', () => {
           new HabitSelectModal(this.app, this.plugin, async (chosen) => {
             if (chosen) {
@@ -465,10 +470,13 @@ export class PomodoroTab implements TabComponent {
         });
 
         if (!status.activeSubject) {
-          const linkSubBtn = btnRow.createEl('button', { cls: 'study-flow-link-task-btn study-flow-link-subject-btn' });
-          const subIcon = linkSubBtn.createSpan();
+          const linkSubBtn = btnRow.createEl('button', {
+            cls: 'study-flow-link-task-btn study-flow-link-subject-btn',
+            attr: { 'aria-label': t('subjects.chooseSubjectBtn') },
+          });
+          const subIcon = linkSubBtn.createSpan({ cls: 'study-flow-link-btn-icon' });
           setIcon(subIcon, 'book-open');
-          linkSubBtn.createSpan({ text: t('subjects.chooseSubjectBtn') });
+          linkSubBtn.createSpan({ text: t('subjects.chooseSubjectShort') });
           linkSubBtn.addEventListener('click', () => {
             new SubjectSelectModal(this.app, this.plugin, async (chosen) => {
               await this.plugin.pomodoro.setActiveSubject(chosen);

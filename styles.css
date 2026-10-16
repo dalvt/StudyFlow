@@ -538,6 +538,28 @@
   border: 1px solid var(--background-modifier-border);
 }
 
+.study-flow-adjust-btn {
+  background-color: color-mix(in srgb, var(--background-secondary) 80%, var(--background-primary));
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.study-flow-adjust-btn:hover {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.study-flow-adjust-btn .study-flow-chip-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.study-flow-adjust-btn .study-flow-chip-icon svg {
+  width: 13px;
+  height: 13px;
+  color: var(--interactive-accent);
+}
+
 .study-flow-preset-chip:hover {
   border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
   color: var(--text-normal);
@@ -604,8 +626,12 @@
 .study-flow-active-task-container {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 2px 0 6px 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+  margin: 6px auto 10px auto;
 }
 
 .study-flow-active-task-banner {
@@ -617,6 +643,8 @@
   background-color: var(--background-primary);
   border: 1px solid var(--interactive-accent);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--text-normal) 4%, transparent);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .study-flow-task-target-icon svg {
@@ -666,12 +694,28 @@
   height: 12px;
 }
 
+/* Pomodoro Context Link Capsule */
+.study-flow-link-buttons-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 5px;
+  margin: 4px auto;
+  background: color-mix(in srgb, var(--background-secondary) 85%, var(--background-primary));
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  border-radius: var(--radius-round, 9999px);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 6%, transparent);
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
 .study-flow-link-task-btn {
   width: auto;
-  flex: 0 1 auto;
-  padding: 6px 14px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius-round, 9999px);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller, 11px);
@@ -679,27 +723,66 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 6%, transparent);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: none;
+  user-select: none;
 }
 
 .study-flow-link-task-btn:hover {
-  border-color: var(--interactive-accent);
   color: var(--text-normal);
-  background-color: var(--background-modifier-hover);
+  background-color: var(--background-primary);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 80%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 8%, transparent);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 12%, transparent);
 }
 
 .study-flow-link-task-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
 }
 
+.study-flow-link-task-btn .study-flow-link-btn-icon,
 .study-flow-link-task-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.study-flow-link-task-btn:hover svg {
+  transform: scale(1.08);
+}
+
+.study-flow-link-task-btn-task:hover {
+  color: var(--interactive-accent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+}
+
+.study-flow-link-task-btn-task:hover svg {
+  color: var(--interactive-accent);
+}
+
+.study-flow-link-habit-btn:hover {
+  color: #ea580c;
+  border-color: color-mix(in srgb, #ea580c 40%, transparent);
+}
+
+.study-flow-link-habit-btn:hover svg {
+  color: #ea580c;
+}
+
+.study-flow-link-subject-btn:hover {
+  color: #8b5cf6;
+  border-color: color-mix(in srgb, #8b5cf6 40%, transparent);
+}
+
+.study-flow-link-subject-btn:hover svg {
+  color: #8b5cf6;
 }
 
 .study-flow-task-picker-box {
@@ -4188,26 +4271,6 @@ body.is-study-flow-zen .workspace-split {
   font-size: 11px;
 }
 
-.study-flow-link-buttons-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.study-flow-link-subject-btn {
-  background: var(--background-secondary);
-}
-
-.study-flow-link-habit-btn {
-  background: var(--background-secondary);
-}
-
-.study-flow-link-habit-btn:hover {
-  border-color: #ea580c;
-  color: #ea580c;
-}
-
 .study-flow-active-habit-banner {
   border-left: 3px solid #ea580c;
 }
@@ -5210,12 +5273,6 @@ body.is-study-flow-zen .workspace-split {
 .study-flow-mini-picker select {
   flex: 1;
   font-size: var(--font-ui-smaller);
-}
-
-.study-flow-link-buttons-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
 }
 
 .study-flow-mini-timer-controls {
