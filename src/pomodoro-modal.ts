@@ -213,6 +213,17 @@ export class PomodoroModal extends Modal {
       this.plugin.pomodoro.promptReset();
     });
 
+    if (!status.isCountUp) {
+      const prevBtn = controls.createEl('button', {
+        cls: 'study-flow-btn-icon clickable-icon',
+        attr: { 'aria-label': t('pomodoro.previousCycle') },
+      });
+      setIcon(prevBtn, 'skip-back');
+      prevBtn.addEventListener('click', () => {
+        void this.plugin.pomodoro.previousCycle();
+      });
+    }
+
     const isRunning = status.state === 'running';
     const playBtn = controls.createEl('button', {
       cls: `mod-cta study-flow-play-btn ${isRunning ? 'is-running' : ''} clickable-icon`,

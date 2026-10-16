@@ -161,6 +161,22 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: 'pomodoro-previous-cycle',
+      name: t('commands.pomodoroPreviousCycle'),
+      callback: () => {
+        void this.pomodoro.previousCycle();
+      },
+    });
+
+    this.addCommand({
+      id: 'pomodoro-skip-cycle',
+      name: t('commands.pomodoroSkipCycle'),
+      callback: () => {
+        void this.pomodoro.skipCycle();
+      },
+    });
+
+    this.addCommand({
       id: 'toggle-zen-mode',
       name: t('commands.toggleZen'),
       callback: () => {

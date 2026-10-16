@@ -29,6 +29,14 @@ test('parseProtocolAction: handles aliases cmd=play and do=pause', () => {
   assert.strictEqual(parseProtocolAction({ do: 'stop' }).action, 'pause');
 });
 
+test('parseProtocolAction: parses action=previous and aliases prev/back', () => {
+  assert.strictEqual(parseProtocolAction({ action: 'previous' }).action, 'previous');
+  assert.strictEqual(parseProtocolAction({ action: 'prev' }).action, 'previous');
+  assert.strictEqual(parseProtocolAction({ action: 'back' }).action, 'previous');
+  assert.strictEqual(parseProtocolAction({ previous: '' }).action, 'previous');
+  assert.strictEqual(parseProtocolAction({ prev: '' }).action, 'previous');
+});
+
 test('parseProtocolAction: handles unknown actions safely', () => {
   const res = parseProtocolAction({ action: 'nonexistent' });
   assert.strictEqual(res.action, 'unknown');

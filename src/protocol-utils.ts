@@ -3,6 +3,7 @@ export type ProtocolAction =
   | 'pause'
   | 'reset'
   | 'skip'
+  | 'previous'
   | 'complete-task'
   | 'capture'
   | 'open'
@@ -48,6 +49,7 @@ export function parseProtocolAction(params: Record<string, string>): ParsedProto
     else if ('pause' in params) rawAction = 'pause';
     else if ('reset' in params) rawAction = 'reset';
     else if ('skip' in params) rawAction = 'skip';
+    else if ('previous' in params || 'prev' in params || 'back' in params) rawAction = 'previous';
     else if ('complete-task' in params || 'complete' in params) rawAction = 'complete-task';
     else if ('open' in params) rawAction = 'open';
     else if ('capture' in params || 'text' in params) rawAction = 'capture';
@@ -62,6 +64,8 @@ export function parseProtocolAction(params: Record<string, string>): ParsedProto
     action = 'reset';
   } else if (rawAction === 'skip' || rawAction === 'next') {
     action = 'skip';
+  } else if (rawAction === 'previous' || rawAction === 'prev' || rawAction === 'back') {
+    action = 'previous';
   } else if (
     rawAction === 'complete-task' ||
     rawAction === 'complete_task' ||

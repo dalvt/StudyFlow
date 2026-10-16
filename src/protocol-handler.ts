@@ -93,6 +93,11 @@ export async function handleStudyFlowProtocol(
       new Notice(t('protocol.timerSkippedNotice'));
       break;
     }
+    case 'previous': {
+      await plugin.pomodoro.previousCycle();
+      new Notice(t('protocol.timerPreviousNotice'));
+      break;
+    }
     case 'complete-task': {
       const activeTask = plugin.pomodoro.getActiveTask();
       if (activeTask) {

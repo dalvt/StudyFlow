@@ -56,6 +56,8 @@ export const es: TranslationDict = {
   'commands.pomodoroToggle': 'Iniciar / pausar Pomodoro',
   'commands.pomodoroReset': 'Reiniciar Pomodoro',
   'commands.pomodoroSwitchMode': 'Alternar entre trabajo y descanso',
+  'commands.pomodoroPreviousCycle': 'Volver a la fase anterior',
+  'commands.pomodoroSkipCycle': 'Saltar a la fase siguiente',
   'commands.toggleZen': 'Alternar modo Zen',
 
   // View Shell
@@ -89,6 +91,8 @@ export const es: TranslationDict = {
   'pomodoro.reset': 'Reiniciar',
   'pomodoro.pause': 'Pausar',
   'pomodoro.start': 'Iniciar',
+  'pomodoro.previous': 'Anterior',
+  'pomodoro.previousCycle': 'Fase anterior',
   'pomodoro.skip': 'Saltar',
   'pomodoro.skipCycle': 'Saltar ciclo',
   'pomodoro.add5m': '+5m',
@@ -127,6 +131,7 @@ export const es: TranslationDict = {
   'pomodoro.taskCompleteError': 'Error al marcar la tarea como completada',
   'pomodoro.statusBarTooltip': 'Clic: Iniciar/Pausar | Clic derecho: Menú',
   'pomodoro.menuReset': 'Reiniciar',
+  'pomodoro.menuPreviousPhase': 'Fase anterior',
   'pomodoro.menuSkipPhase': 'Saltar fase',
   'pomodoro.preset25m': 'Preset: 25m Enfoque',
   'pomodoro.preset50m': 'Preset: 50m Enfoque',
@@ -685,6 +690,7 @@ export const es: TranslationDict = {
   'protocol.timerNotRunning': 'El temporizador Pomodoro no está en ejecución',
   'protocol.timerResetNotice': 'Temporizador reiniciado',
   'protocol.timerSkippedNotice': 'Fase de pomodoro saltada',
+  'protocol.timerPreviousNotice': 'Fase de pomodoro devuelta a la anterior',
   'protocol.taskCompletedNotice': 'Tarea completada: {task}',
   'protocol.noActiveTaskNotice': 'No hay ninguna tarea activa para completar',
   'protocol.tabOpenedNotice': 'Pestaña de Study Flow abierta: {tab}',

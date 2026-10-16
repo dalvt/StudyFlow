@@ -54,6 +54,8 @@ export const en = {
   'commands.pomodoroToggle': 'Start / pause Pomodoro',
   'commands.pomodoroReset': 'Reset Pomodoro',
   'commands.pomodoroSwitchMode': 'Switch between work and break',
+  'commands.pomodoroPreviousCycle': 'Return to previous phase',
+  'commands.pomodoroSkipCycle': 'Skip to next phase',
   'commands.toggleZen': 'Toggle Zen mode',
 
   // View Shell
@@ -87,6 +89,8 @@ export const en = {
   'pomodoro.reset': 'Reset',
   'pomodoro.pause': 'Pause',
   'pomodoro.start': 'Start',
+  'pomodoro.previous': 'Previous',
+  'pomodoro.previousCycle': 'Previous phase',
   'pomodoro.skip': 'Skip',
   'pomodoro.skipCycle': 'Skip cycle',
   'pomodoro.add5m': '+5m',
@@ -125,6 +129,7 @@ export const en = {
   'pomodoro.taskCompleteError': 'Error marking task as completed',
   'pomodoro.statusBarTooltip': 'Click: Start/Pause | Right click: Menu',
   'pomodoro.menuReset': 'Reset',
+  'pomodoro.menuPreviousPhase': 'Previous phase',
   'pomodoro.menuSkipPhase': 'Skip phase',
   'pomodoro.preset25m': 'Preset: 25m Focus',
   'pomodoro.preset50m': 'Preset: 50m Focus',
@@ -683,6 +688,7 @@ export const en = {
   'protocol.timerNotRunning': 'Pomodoro timer is not running',
   'protocol.timerResetNotice': 'Timer reset',
   'protocol.timerSkippedNotice': 'Pomodoro phase skipped',
+  'protocol.timerPreviousNotice': 'Pomodoro phase returned to previous',
   'protocol.taskCompletedNotice': 'Task completed: {task}',
   'protocol.noActiveTaskNotice': 'No active task to complete',
   'protocol.tabOpenedNotice': 'Study Flow tab opened: {tab}',

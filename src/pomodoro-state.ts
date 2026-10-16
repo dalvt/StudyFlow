@@ -371,3 +371,71 @@ export function formatStatusBarDisplay(
   const pauseSuffix = state === 'paused' ? ' ⏸' : '';
   return `${icon} ${formattedTime}${countUpIndicator}${pauseSuffix}${taskTag}`;
 }
+
+/**
+ * Calculates the previous cycle mode and duration when user steps backwards (←).
+ */
+export function getPreviousCycleState(
+  currentMode: PomodoroMode,
+  completedSessionsToday: number,
+  config: {
+    workDurationMin: number;
+    breakDurationMin: number;
+    longBreakDurationMin: number;
+    longBreakInterval: number;
+  }
+): {
+  mode: PomodoroMode;
+  isLongBreak: boolean;
+  totalDurationSeconds: number;
+} {
+  if (currentMode === 'break') {
+    return {
+      mode: 'work',
+      isLongBreak: false,
+      totalDurationSeconds: Math.max(1, config.workDurationMin) * 60,
+    };
+  } else {
+    const isLong = shouldTriggerLongBreak(completedSessionsToday, config.longBreakInterval);
+    const durationMin = isLong ? config.longBreakDurationMin : config.breakDurationMin;
+    return {
+      mode: 'break',
+      isLongBreak: isLong,
+      totalDurationSeconds: Math.max(1, durationMin) * 60,
+    };
+  }
+}
+
+/**
+ * Calculates the next cycle mode and duration when user skips forward (→).
+ */
+export function getNextCycleState(
+  currentMode: PomodoroMode,
+  completedSessionsToday: number,
+  config: {
+    workDurationMin: number;
+    breakDurationMin: number;
+    longBreakDurationMin: number;
+    longBreakInterval: number;
+  }
+): {
+  mode: PomodoroMode;
+  isLongBreak: boolean;
+  totalDurationSeconds: number;
+} {
+  if (currentMode === 'work') {
+    const isLong = shouldTriggerLongBreak(completedSessionsToday, config.longBreakInterval);
+    const durationMin = isLong ? config.longBreakDurationMin : config.breakDurationMin;
+    return {
+      mode: 'break',
+      isLongBreak: isLong,
+      totalDurationSeconds: Math.max(1, durationMin) * 60,
+    };
+  } else {
+    return {
+      mode: 'work',
+      isLongBreak: false,
+      totalDurationSeconds: Math.max(1, config.workDurationMin) * 60,
+    };
+  }
+}

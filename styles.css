@@ -432,10 +432,54 @@
    4. Luxury Pomodoro Dial & Control Deck
    ========================================= */
 .study-flow-pomodoro-luxury-card {
-  background: var(--background-secondary);
+  background: linear-gradient(180deg, var(--background-secondary) 0%, var(--background-primary) 100%);
   border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-l, 14px);
   position: relative;
   overflow: hidden;
+  padding: 16px 14px 20px;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 8%, transparent);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.study-flow-pomodoro-luxury-card::before {
+  content: "";
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--interactive-accent) 12%, transparent) 0%, transparent 70%);
+  opacity: 0.6;
+  transition: background 0.5s ease, opacity 0.5s ease;
+  z-index: 0;
+}
+
+.study-flow-pomodoro-luxury-card.is-work::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--sf-danger, #ef4444) 14%, transparent) 0%, transparent 70%);
+}
+
+.study-flow-pomodoro-luxury-card.is-break::before {
+  background: radial-gradient(circle, color-mix(in srgb, var(--sf-success, #10b981) 14%, transparent) 0%, transparent 70%);
+}
+
+.study-flow-pomodoro-luxury-card.is-running::before {
+  opacity: 0.95;
+  animation: study-flow-ambient-breathe 4s infinite ease-in-out;
+}
+
+@keyframes study-flow-ambient-breathe {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
 }
 
 .study-flow-presets-bar {
@@ -572,31 +616,39 @@
 }
 
 .study-flow-link-task-btn {
-  width: 100%;
-  padding: 8px 12px;
+  width: auto;
+  flex: 0 1 auto;
+  padding: 6px 14px;
   background-color: var(--background-primary);
-  border: 1px dashed var(--background-modifier-border);
-  border-radius: var(--radius-m);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-round, 9999px);
   color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
+  font-size: var(--font-ui-smaller, 11px);
   font-weight: 600;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 6%, transparent);
 }
 
 .study-flow-link-task-btn:hover {
   border-color: var(--interactive-accent);
-  color: var(--interactive-accent);
+  color: var(--text-normal);
   background-color: var(--background-modifier-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 12%, transparent);
+}
+
+.study-flow-link-task-btn:active {
+  transform: translateY(0);
 }
 
 .study-flow-link-task-btn svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .study-flow-task-picker-box {
@@ -642,9 +694,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 6px auto;
-  width: 200px;
-  height: 200px;
+  margin: 10px auto 6px auto;
+  width: 206px;
+  height: 206px;
 }
 
 .study-flow-dial-container {
@@ -662,26 +714,57 @@
   transform: rotate(-90deg);
 }
 
+.study-flow-dial-outer-accent {
+  fill: none;
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+  opacity: 0.3;
+}
+
 .study-flow-dial-bg {
   fill: none;
   stroke: var(--background-modifier-border);
   stroke-width: 8;
-  opacity: 0.6;
+  opacity: 0.45;
+}
+
+.study-flow-dial-inner-accent {
+  fill: none;
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.22;
 }
 
 .study-flow-dial-progress {
   fill: none;
-  stroke-width: 8;
+  stroke-width: 8.5;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: var(--color-red, var(--text-error, #e53935));
+  stroke: url(#sf-dial-work-gradient, var(--color-red, var(--text-error, #ff5e57)));
+  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--color-red, #ef4444) 40%, transparent));
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: var(--color-green, var(--text-success, #43a047));
+  stroke: url(#sf-dial-break-gradient, var(--color-green, var(--text-success, #10b981)));
+  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--color-green, #10b981) 40%, transparent));
+}
+
+.study-flow-dial-progress.is-running {
+  animation: study-flow-dial-pulse 3s infinite ease-in-out;
+}
+
+@keyframes study-flow-dial-pulse {
+  0%, 100% {
+    stroke-width: 8.5;
+  }
+  50% {
+    stroke-width: 9.5;
+  }
 }
 
 .study-flow-dial-center {
@@ -692,74 +775,87 @@
   justify-content: center;
   gap: 3px;
   text-align: center;
+  z-index: 1;
 }
 
 .study-flow-mode-pill,
 .study-flow-luxury-pill {
   font-size: var(--font-ui-smaller, 10px);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: var(--radius-round, 9999px);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: all 0.25s ease;
 }
 
 .study-flow-mode-pill.is-work,
 .study-flow-luxury-pill.is-work {
-  background-color: color-mix(in srgb, var(--color-red, var(--text-error)) 15%, transparent);
+  background-color: color-mix(in srgb, var(--color-red, var(--text-error)) 14%, transparent);
   color: var(--color-red, var(--text-error));
-  border: 1px solid color-mix(in srgb, var(--color-red, var(--text-error)) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-red, var(--text-error)) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-red, var(--text-error)) 15%, transparent);
 }
 
 .study-flow-mode-pill.is-break,
 .study-flow-luxury-pill.is-break {
-  background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
+  background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 14%, transparent);
   color: var(--color-green, var(--text-success));
-  border: 1px solid color-mix(in srgb, var(--color-green, var(--text-success)) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-green, var(--text-success)) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
 }
 
 /* Modern Clean Sans-Serif Numbers (No Dotted-Zero Eyes) */
 .study-flow-dial-time-hero {
   font-family: var(--font-interface), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  font-size: 2.85rem;
-  font-weight: 700;
+  font-size: 3rem;
+  font-weight: 750;
   color: var(--text-normal);
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.8px;
   margin: 4px 0;
   text-shadow: none;
+  transition: text-shadow 0.3s ease;
+}
+
+.study-flow-dial-time-hero.is-running {
+  text-shadow: 0 0 20px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
 /* Streak Micro Dots */
 .study-flow-streak-dots {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 2px 0;
+  gap: 7px;
+  margin: 3px 0;
 }
 
 .study-flow-streak-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   border: 1.5px solid var(--text-faint);
   background-color: transparent;
-  transition: all 0.25s ease;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .study-flow-streak-dot.is-filled {
   background-color: var(--sf-danger);
   border-color: var(--sf-danger);
-  box-shadow: var(--sf-shadow-xs);
-  transform: scale(1.15);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--sf-danger) 60%, transparent);
+  transform: scale(1.2);
 }
 
 .study-flow-dial-stats-sub {
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 /* Hero Control Deck */
@@ -768,12 +864,12 @@
   align-items: center;
   justify-content: center;
   gap: 14px;
-  margin-top: 4px;
+  margin-top: 10px;
 }
 
-.study-flow-deck-btn {
-  width: 40px;
-  height: 40px;
+.study-flow-control-deck .study-flow-deck-btn {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -783,34 +879,44 @@
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--text-normal) 5%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 8%, transparent);
 }
 
-.study-flow-deck-btn:hover {
+.study-flow-control-deck .study-flow-deck-btn:hover {
   border-color: var(--interactive-accent);
   color: var(--interactive-accent);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--background-modifier-box-shadow, #000) 15%, transparent);
 }
 
-.study-flow-deck-btn svg {
-  width: 17px;
-  height: 17px;
+.study-flow-control-deck .study-flow-deck-btn:active {
+  transform: translateY(0) scale(0.96);
 }
 
-.study-flow-deck-btn-label {
-  font-size: 10px;
+.study-flow-control-deck .study-flow-deck-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.study-flow-control-deck .study-flow-deck-btn-prev svg,
+.study-flow-control-deck .study-flow-deck-btn-next svg {
+  width: 20px;
+  height: 20px;
+}
+
+.study-flow-control-deck .study-flow-deck-btn-label {
+  font-size: 11px;
   font-weight: 700;
   margin-left: 2px;
 }
 
-.study-flow-deck-btn-finish {
+.study-flow-control-deck .study-flow-deck-btn-finish {
   background-color: color-mix(in srgb, var(--color-green, var(--text-success)) 15%, transparent);
   border-color: color-mix(in srgb, var(--color-green, var(--text-success)) 40%, transparent);
   color: var(--color-green, var(--text-success));
 }
 
-.study-flow-deck-btn-finish:hover {
+.study-flow-control-deck .study-flow-deck-btn-finish:hover {
   background-color: var(--color-green, var(--text-success));
   color: var(--text-on-accent);
 }
@@ -844,9 +950,9 @@
   width: 100%;
 }
 
-.study-flow-hero-play-btn {
-  width: 58px;
-  height: 58px;
+.study-flow-control-deck .study-flow-hero-play-btn {
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -854,41 +960,61 @@
   border: none;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: var(--sf-shadow-m);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
 }
 
-.study-flow-hero-play-btn.is-work {
-  background: var(--sf-danger);
-  color: var(--text-on-accent);
+.study-flow-control-deck .study-flow-hero-play-btn.is-work {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 50%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
 }
 
-.study-flow-hero-play-btn.is-break {
-  background: var(--sf-success);
-  color: var(--text-on-accent);
+.study-flow-control-deck .study-flow-hero-play-btn.is-break {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
 }
 
-.study-flow-hero-play-btn:hover {
+.study-flow-control-deck .study-flow-hero-play-btn:hover {
   transform: scale(1.08);
-  box-shadow: var(--sf-shadow-s);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.study-flow-hero-play-btn.is-break:hover {
-  box-shadow: var(--sf-shadow-s);
-}
-
-.study-flow-hero-play-btn.is-running {
-  animation: study-flow-hero-pulse 2s infinite ease-in-out;
+.study-flow-control-deck .study-flow-hero-play-btn.is-running {
+  animation: study-flow-hero-pulse 2.2s infinite ease-in-out;
 }
 
 @keyframes study-flow-hero-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.04); }
-  100% { transform: scale(1); }
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 6px 24px rgba(239, 68, 68, 0.6);
+  }
 }
 
-.study-flow-hero-icon svg {
-  width: 24px;
-  height: 24px;
+.study-flow-control-deck .study-flow-hero-play-btn.is-break.is-running {
+  animation: study-flow-hero-break-pulse 2.2s infinite ease-in-out;
+}
+
+@keyframes study-flow-hero-break-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 6px 24px rgba(16, 185, 129, 0.6);
+  }
+}
+
+.study-flow-control-deck .study-flow-hero-icon svg {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.5;
+  color: #ffffff;
 }
 
 /* =========================================

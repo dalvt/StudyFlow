@@ -8,7 +8,7 @@
     "build": "node esbuild.config.mjs production",
     "check-types": "tsc --noEmit",
     "test": "node --test 'tests/*.test.mjs'",
-    "deploy": "node -e 'const fs = require(\"fs\"); const paths = [\"../Obsidian Vault/.obsidian/plugins/study-flow-assistant\", \"../Obsidian Vault/System/.obsidian/plugins/study-flow-assistant\"]; paths.forEach(p => { fs.mkdirSync(p, { recursive: true }); [\"main.js\", \"manifest.json\", \"styles.css\"].forEach(f => fs.copyFileSync(f, p + \"/\" + f)); }); console.log(\"Deployed to all vaults!\");'"
+    "deploy": "node -e 'const fs = require(\"fs\"); const paths = [\"../Obsidian Vault/.obsidian/plugins/study-flow-assistant\", \"../Obsidian Vault/System/.obsidian/plugins/study-flow-assistant\", \"../Obsidian Vault/System/System/.obsidian/plugins/study-flow-assistant\"]; paths.forEach(p => { fs.mkdirSync(p, { recursive: true }); [\"main.js\", \"manifest.json\", \"styles.css\"].forEach(f => fs.copyFileSync(f, p + \"/\" + f)); }); console.log(\"Deployed to all vaults!\");'"
   },
   "keywords": [
     "obsidian",

@@ -9,6 +9,8 @@ import {
   restorePomodoroState,
   shouldSendSystemNotification,
   formatStatusBarDisplay,
+  getPreviousCycleState,
+  getNextCycleState,
 } from '../src/pomodoro-state.ts';
 
 test('countCompletedSessionsToday calculates completed sessions for today excluding interrupted ones', () => {
@@ -309,4 +311,66 @@ test('formatStatusBarDisplay formats status bar in "🍅 24:59" format without b
     formatStatusBarDisplay('work', '18:22', false, 'paused', 'Repasar anatomía'),
     '🍅 18:22 ⏸ [Repasar an...]'
   );
+});
+
+test('getPreviousCycleState: steps back from break to work mode', () => {
+  const config = {
+    workDurationMin: 25,
+    breakDurationMin: 5,
+    longBreakDurationMin: 15,
+    longBreakInterval: 4,
+  };
+
+  const prev = getPreviousCycleState('break', 2, config);
+  assert.equal(prev.mode, 'work');
+  assert.equal(prev.isLongBreak, false);
+  assert.equal(prev.totalDurationSeconds, 25 * 60);
+});
+
+test('getPreviousCycleState: steps back from work to break (short or long break depending on interval)', () => {
+  const config = {
+    workDurationMin: 25,
+    breakDurationMin: 5,
+    longBreakDurationMin: 15,
+    longBreakInterval: 4,
+  };
+
+  // 1 session completed today -> short break (5m)
+  const prevShort = getPreviousCycleState('work', 1, config);
+  assert.equal(prevShort.mode, 'break');
+  assert.equal(prevShort.isLongBreak, false);
+  assert.equal(prevShort.totalDurationSeconds, 5 * 60);
+
+  // 4 sessions completed today -> long break (15m)
+  const prevLong = getPreviousCycleState('work', 4, config);
+  assert.equal(prevLong.mode, 'break');
+  assert.equal(prevLong.isLongBreak, true);
+  assert.equal(prevLong.totalDurationSeconds, 15 * 60);
+});
+
+test('getNextCycleState: skips forward between work and break modes', () => {
+  const config = {
+    workDurationMin: 25,
+    breakDurationMin: 5,
+    longBreakDurationMin: 15,
+    longBreakInterval: 4,
+  };
+
+  // From break -> work
+  const nextFromBreak = getNextCycleState('break', 2, config);
+  assert.equal(nextFromBreak.mode, 'work');
+  assert.equal(nextFromBreak.isLongBreak, false);
+  assert.equal(nextFromBreak.totalDurationSeconds, 25 * 60);
+
+  // From work -> break (short break when not on interval multiple)
+  const nextShortBreak = getNextCycleState('work', 2, config);
+  assert.equal(nextShortBreak.mode, 'break');
+  assert.equal(nextShortBreak.isLongBreak, false);
+  assert.equal(nextShortBreak.totalDurationSeconds, 5 * 60);
+
+  // From work -> break (long break when on interval multiple)
+  const nextLongBreak = getNextCycleState('work', 4, config);
+  assert.equal(nextLongBreak.mode, 'break');
+  assert.equal(nextLongBreak.isLongBreak, true);
+  assert.equal(nextLongBreak.totalDurationSeconds, 15 * 60);
 });

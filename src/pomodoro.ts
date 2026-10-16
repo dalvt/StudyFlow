@@ -21,6 +21,8 @@ import {
   restorePomodoroState,
   shouldSendSystemNotification,
   formatStatusBarDisplay,
+  getPreviousCycleState,
+  getNextCycleState,
   PomodoroState,
   PomodoroMode,
   ActivePomodoroTask,
@@ -157,6 +159,15 @@ export class PomodoroManager {
         .setIcon('rotate-ccw')
         .onClick(() => {
           this.promptReset();
+        });
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle(t('pomodoro.menuPreviousPhase'))
+        .setIcon('rewind')
+        .onClick(() => {
+          void this.previousCycle();
         });
     });
 
@@ -763,21 +774,44 @@ export class PomodoroManager {
       this.intervalId = null;
     }
 
-    if (this.mode === 'work') {
-      const completedToday = this.getCompletedSessionsToday();
-      const isLong = shouldTriggerLongBreak(completedToday, this.plugin.settings.pomodoroLongBreakInterval);
-      this.isLongBreak = isLong;
-      this.mode = 'break';
-      const durationMin = isLong
-        ? this.plugin.settings.pomodoroLongBreakDuration
-        : this.plugin.settings.pomodoroBreakDuration;
-      this.totalDurationSeconds = durationMin * 60;
-    } else {
-      this.mode = 'work';
-      this.isLongBreak = false;
-      this.totalDurationSeconds = this.plugin.settings.pomodoroWorkDuration * 60;
+    const completedToday = this.getCompletedSessionsToday();
+    const next = getNextCycleState(this.mode, completedToday, {
+      workDurationMin: this.plugin.settings.pomodoroWorkDuration,
+      breakDurationMin: this.plugin.settings.pomodoroBreakDuration,
+      longBreakDurationMin: this.plugin.settings.pomodoroLongBreakDuration,
+      longBreakInterval: this.plugin.settings.pomodoroLongBreakInterval,
+    });
+
+    this.mode = next.mode;
+    this.isLongBreak = next.isLongBreak;
+    this.totalDurationSeconds = next.totalDurationSeconds;
+    this.state = 'idle';
+    this.remainingSeconds = this.totalDurationSeconds;
+    this.endTime = 0;
+    await this.savePomodoroState();
+    this.updateDisplay();
+    this.notifyListeners();
+  }
+
+  public async previousCycle(): Promise<void> {
+    await this.handleInterruptedSessionIfNeeded();
+
+    if (this.intervalId !== null) {
+      window.clearInterval(this.intervalId);
+      this.intervalId = null;
     }
 
+    const completedToday = this.getCompletedSessionsToday();
+    const prev = getPreviousCycleState(this.mode, completedToday, {
+      workDurationMin: this.plugin.settings.pomodoroWorkDuration,
+      breakDurationMin: this.plugin.settings.pomodoroBreakDuration,
+      longBreakDurationMin: this.plugin.settings.pomodoroLongBreakDuration,
+      longBreakInterval: this.plugin.settings.pomodoroLongBreakInterval,
+    });
+
+    this.mode = prev.mode;
+    this.isLongBreak = prev.isLongBreak;
+    this.totalDurationSeconds = prev.totalDurationSeconds;
     this.state = 'idle';
     this.remainingSeconds = this.totalDurationSeconds;
     this.endTime = 0;

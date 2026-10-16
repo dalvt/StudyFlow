@@ -105,7 +105,10 @@ export class PomodoroTab implements TabComponent {
     container.empty();
 
     const status = this.plugin.pomodoro.getStatus();
-    const card = container.createDiv({ cls: 'study-flow-card study-flow-pomodoro-luxury-card' });
+    const isRunning = status.state === 'running';
+    const card = container.createDiv({
+      cls: `study-flow-card study-flow-pomodoro-luxury-card ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`,
+    });
 
     // Presets bar
     const presetsRow = card.createDiv({ cls: 'study-flow-presets-bar' });
@@ -200,15 +203,45 @@ export class PomodoroTab implements TabComponent {
       attr: { viewBox: '0 0 190 190' },
     });
 
+    // SVG Defs with color gradients
+    const defsEl = svgEl.createSvg('defs');
+    const workGrad = defsEl.createSvg('linearGradient', {
+      attr: { id: 'sf-dial-work-gradient', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
+    });
+    workGrad.createSvg('stop', { attr: { offset: '0%', 'stop-color': 'var(--color-red, #ff5e57)' } });
+    workGrad.createSvg('stop', { attr: { offset: '100%', 'stop-color': 'var(--sf-danger, #e53935)' } });
+
+    const breakGrad = defsEl.createSvg('linearGradient', {
+      attr: { id: 'sf-dial-break-gradient', x1: '0%', y1: '0%', x2: '100%', y2: '100%' },
+    });
+    breakGrad.createSvg('stop', { attr: { offset: '0%', 'stop-color': 'var(--color-green, #10b981)' } });
+    breakGrad.createSvg('stop', { attr: { offset: '100%', 'stop-color': 'var(--sf-success, #059669)' } });
+
+    // Outer subtle tick/accent ring
+    svgEl.createSvg('circle', {
+      cls: 'study-flow-dial-outer-accent',
+      attr: { cx: '95', cy: '95', r: '87' },
+    });
+
     // Track circle
     svgEl.createSvg('circle', {
       cls: 'study-flow-dial-bg',
       attr: { cx: '95', cy: '95', r: String(CIRCLE_RADIUS) },
     });
 
+    // Inner subtle accent ring
+    svgEl.createSvg('circle', {
+      cls: 'study-flow-dial-inner-accent',
+      attr: { cx: '95', cy: '95', r: '65' },
+    });
+
     // Progress circle
     svgEl.createSvg('circle', {
-      cls: ['study-flow-dial-progress', status.mode === 'work' ? 'is-work' : 'is-break'],
+      cls: [
+        'study-flow-dial-progress',
+        status.mode === 'work' ? 'is-work' : 'is-break',
+        isRunning ? 'is-running' : '',
+      ],
       attr: {
         cx: '95',
         cy: '95',
@@ -231,9 +264,9 @@ export class PomodoroTab implements TabComponent {
       cls: `study-flow-mode-pill study-flow-luxury-pill ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
     });
 
-    centerInfo.createDiv({
+    const timeHeroEl = centerInfo.createDiv({
       text: this.plugin.pomodoro.formatTime(status.remainingSeconds),
-      cls: 'study-flow-dial-time-hero',
+      cls: `study-flow-dial-time-hero ${isRunning ? 'is-running' : ''}`,
     });
 
     // Streak / Cycle dots
@@ -255,7 +288,7 @@ export class PomodoroTab implements TabComponent {
     const controlDeck = card.createDiv({ cls: 'study-flow-control-deck' });
 
     const resetBtn = controlDeck.createEl('button', {
-      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
+      cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
       attr: { 'aria-label': t('pomodoro.reset') },
     });
     setIcon(resetBtn, 'rotate-ccw');
@@ -263,9 +296,20 @@ export class PomodoroTab implements TabComponent {
       this.plugin.pomodoro.promptReset();
     });
 
-    const isRunning = status.state === 'running';
+    if (!status.isCountUp) {
+      const prevBtn = controlDeck.createEl('button', {
+        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary study-flow-deck-btn-prev',
+        attr: { 'aria-label': t('pomodoro.previousCycle') },
+      });
+      setIcon(prevBtn, 'skip-back');
+      prevBtn.addEventListener('click', async () => {
+        await this.plugin.pomodoro.previousCycle();
+        if (this.container) await this.render(this.container);
+      });
+    }
+
     const heroBtn = controlDeck.createEl('button', {
-      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'} clickable-icon`,
+      cls: `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
       attr: { 'aria-label': isRunning ? t('pomodoro.pause') : t('pomodoro.start') },
     });
     const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
@@ -276,7 +320,7 @@ export class PomodoroTab implements TabComponent {
 
     if (status.isCountUp) {
       const finishBtn = controlDeck.createEl('button', {
-        cls: 'study-flow-deck-btn study-flow-deck-btn-finish clickable-icon',
+        cls: 'study-flow-deck-btn study-flow-deck-btn-finish',
         attr: { 'aria-label': t('pomodoro.finishSession') },
       });
       setIcon(finishBtn, 'check-square');
@@ -286,16 +330,17 @@ export class PomodoroTab implements TabComponent {
       });
     } else {
       const skipBtn = controlDeck.createEl('button', {
-        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
+        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary study-flow-deck-btn-next',
         attr: { 'aria-label': t('pomodoro.skip') },
       });
       setIcon(skipBtn, 'skip-forward');
-      skipBtn.addEventListener('click', () => {
-        this.plugin.pomodoro.skipCycle();
+      skipBtn.addEventListener('click', async () => {
+        await this.plugin.pomodoro.skipCycle();
+        if (this.container) await this.render(this.container);
       });
 
       const add5Btn = controlDeck.createEl('button', {
-        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary clickable-icon',
+        cls: 'study-flow-deck-btn study-flow-deck-btn-secondary',
         attr: { 'aria-label': t('pomodoro.add5mTooltip') },
       });
       const plusIcon = add5Btn.createSpan();
@@ -536,10 +581,19 @@ export class PomodoroTab implements TabComponent {
   public updateClock(): void {
     if (!this.container) return;
     const status = this.plugin.pomodoro.getStatus();
+    const isRunning = status.state === 'running';
+
+    const card = this.container.querySelector('.study-flow-pomodoro-luxury-card') as HTMLElement | null;
+    if (card) {
+      card.classList.toggle('is-work', status.mode === 'work');
+      card.classList.toggle('is-break', status.mode === 'break');
+      card.classList.toggle('is-running', isRunning);
+    }
 
     const timeEl = this.container.querySelector('.study-flow-dial-time-hero');
     if (timeEl) {
       timeEl.setText(this.plugin.pomodoro.formatTime(status.remainingSeconds));
+      timeEl.classList.toggle('is-running', isRunning);
     }
 
     const pillEl = this.container.querySelector('.study-flow-luxury-pill');
@@ -587,8 +641,7 @@ export class PomodoroTab implements TabComponent {
     // Hero button
     const heroBtn = this.container.querySelector('.study-flow-hero-play-btn');
     if (heroBtn) {
-      const isRunning = status.state === 'running';
-      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'} clickable-icon`;
+      heroBtn.className = `study-flow-hero-play-btn ${isRunning ? 'is-running' : ''} ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
       heroBtn.setAttribute('aria-label', isRunning ? t('pomodoro.pause') : t('pomodoro.start'));
       heroBtn.empty();
       const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
@@ -598,15 +651,16 @@ export class PomodoroTab implements TabComponent {
     this.updateProgressRing(status);
   }
 
-  private updateProgressRing(status: { progressPercent: number; mode: string }): void {
+  private updateProgressRing(status: { progressPercent: number; mode: string; state?: string }): void {
     if (!this.container) return;
     const progressCircle = this.container.querySelector('.study-flow-dial-progress') as SVGCircleElement | null;
     if (progressCircle) {
       const offset = CIRCUMFERENCE * (1 - status.progressPercent / 100);
       progressCircle.setAttribute('stroke-dashoffset', String(offset));
+      const isRunning = status.state === 'running';
       progressCircle.setAttribute(
         'class',
-        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}`
+        `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'} ${isRunning ? 'is-running' : ''}`
       );
     }
   }
