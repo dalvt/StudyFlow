@@ -745,13 +745,15 @@
 }
 
 .study-flow-dial-progress.is-work {
-  stroke: url(#sf-dial-work-gradient, var(--color-red, var(--text-error, #ff5e57)));
-  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--color-red, #ef4444) 40%, transparent));
+  stroke: var(--color-red, var(--text-error, #ff5e57));
+  stroke: url(#sf-dial-work-gradient) var(--color-red, var(--text-error, #ff5e57));
+  filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--color-red, #ef4444) 45%, transparent));
 }
 
 .study-flow-dial-progress.is-break {
-  stroke: url(#sf-dial-break-gradient, var(--color-green, var(--text-success, #10b981)));
-  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--color-green, #10b981) 40%, transparent));
+  stroke: var(--color-green, var(--text-success, #10b981));
+  stroke: url(#sf-dial-break-gradient) var(--color-green, var(--text-success, #10b981));
+  filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--color-green, #10b981) 45%, transparent));
 }
 
 .study-flow-dial-progress.is-running {

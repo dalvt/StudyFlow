@@ -236,12 +236,9 @@ export class PomodoroTab implements TabComponent {
     });
 
     // Progress circle
+    const progressCls = `study-flow-dial-progress ${status.mode === 'work' ? 'is-work' : 'is-break'}${isRunning ? ' is-running' : ''}`;
     svgEl.createSvg('circle', {
-      cls: [
-        'study-flow-dial-progress',
-        status.mode === 'work' ? 'is-work' : 'is-break',
-        isRunning ? 'is-running' : '',
-      ],
+      cls: progressCls,
       attr: {
         cx: '95',
         cy: '95',
