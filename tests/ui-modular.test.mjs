@@ -128,20 +128,26 @@ test('TasksTab: unclassified grouping accurately isolates tasks without subject 
   assert.deepEqual(unclassified.map((t) => t.id), ['2', '3']);
 });
 
-test('Modals reduction: verifies obsolete modals and files are removed while PomodoroModal is kept', async () => {
+test('Modals and satellite reduction: verifies obsolete modals and pruned modules are removed while TaskCreateModal and PomodoroModal are kept', async () => {
   const fs = await import('node:fs');
   const tasksSrc = fs.readFileSync('src/tasks.ts', 'utf8');
   const habitsSrc = fs.readFileSync('src/habits.ts', 'utf8');
 
-  // Obsolete modals must not exist
+  // Obsolete modals and pruned satellite modules must not exist
   assert.ok(!tasksSrc.includes('class TasksManagerModal'));
+  assert.ok(!tasksSrc.includes('class QuickCaptureModal'));
   assert.ok(!habitsSrc.includes('class HabitsModal'));
   assert.ok(!fs.existsSync('src/planner.ts'));
   assert.ok(!fs.existsSync('src/analytics-modal.ts'));
+  assert.ok(!fs.existsSync('src/pomodoro-migration-modal.ts'));
+  assert.ok(!fs.existsSync('src/ics-export.ts'));
+  assert.ok(!fs.existsSync('src/weekly-review.ts'));
 
-  // PomodoroModal file must exist as the single mini-timer
+  // Unified TaskCreateModal and PomodoroModal must exist
+  assert.ok(fs.existsSync('src/task-modal.ts'));
   assert.ok(fs.existsSync('src/pomodoro-modal.ts'));
   const pomoSrc = fs.readFileSync('src/pomodoro-modal.ts', 'utf8');
   assert.ok(pomoSrc.includes('class PomodoroModal'));
 });
+
 

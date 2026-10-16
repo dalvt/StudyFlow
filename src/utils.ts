@@ -1,9 +1,10 @@
 import { App, normalizePath, TFile, moment } from 'obsidian';
-import type { StudyFlowSettings } from './settings';
-import { formatDailyNoteFileName } from './markdown-utils';
+import type { StudyFlowSettings } from './settings.ts';
+import { formatDailyNoteFileName } from './markdown-utils.ts';
 
-export * from './markdown-utils';
-export * from './calendar-utils';
+export * from './markdown-utils.ts';
+export * from './calendar-utils.ts';
+
 
 /**
  * Ensures a directory path exists within the vault.
@@ -59,16 +60,16 @@ export function getDailyNotePath(
   settings: StudyFlowSettings,
   targetDateOrOffset: number | string | Date = 0
 ): string {
-  let fileName: string;
+  let fileName = '';
 
   if (typeof moment === 'function') {
+    let formatted = '';
     if (typeof targetDateOrOffset === 'number') {
       const m = (moment as any)();
-      const formatted =
+      formatted =
         targetDateOrOffset !== 0
           ? m.add(targetDateOrOffset, 'days').format(settings.dailyNoteDateFormat)
           : m.format(settings.dailyNoteDateFormat);
-      fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
     } else {
       let targetDate: Date;
       if (typeof targetDateOrOffset === 'string') {
@@ -81,12 +82,16 @@ export function getDailyNotePath(
       } else {
         targetDate = targetDateOrOffset;
       }
-      const formatted = (moment as any)(targetDate).format(settings.dailyNoteDateFormat);
+      formatted = (moment as any)(targetDate).format(settings.dailyNoteDateFormat);
+    }
+    if (formatted) {
       fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
     }
-  } else {
+  }
+  if (!fileName) {
     fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, targetDateOrOffset);
   }
+
 
   const folder = settings.dailyNotesFolder.trim();
   if (!folder) {

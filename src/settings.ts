@@ -492,49 +492,6 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           })
       );
 
-    // Weekly Review Section
-    new Setting(containerEl).setName(t('settings.weeklyReviewHeading')).setHeading();
-
-    new Setting(containerEl)
-      .setName(t('settings.weeklyReviewFolderLabel'))
-      .setDesc(t('settings.weeklyReviewFolderDesc'))
-      .addText((text) =>
-        text
-          .setPlaceholder('StudyFlow/Reviews')
-          .setValue(this.plugin.settings.weeklyReviewsFolder || 'StudyFlow/Reviews')
-          .onChange(async (val) => {
-            this.plugin.settings.weeklyReviewsFolder = val.trim() || 'StudyFlow/Reviews';
-            await this.plugin.saveSettings();
-          })
-      );
-
-    const templateSetting = new Setting(containerEl)
-      .setName(t('settings.weeklyReviewTemplateLabel'))
-      .setDesc(t('settings.weeklyReviewTemplateDesc'));
-
-    templateSetting.addTextArea((ta) => {
-      ta.inputEl.rows = 8;
-      ta.inputEl.cols = 40;
-      ta.setValue(this.plugin.settings.weeklyReviewTemplate || DEFAULT_WEEKLY_REVIEW_TEMPLATE)
-        .onChange(async (val) => {
-          this.plugin.settings.weeklyReviewTemplate = val;
-          await this.plugin.saveSettings();
-        });
-    });
-
-    templateSetting.addButton((btn) =>
-      btn
-        .setButtonText(t('settings.resetTemplateBtn'))
-        .setTooltip(t('settings.resetTemplateTooltip'))
-        .onClick(async () => {
-          const effectiveLang = this.plugin.settings.language === 'en' ? 'en' : (this.plugin.settings.language === 'es' ? 'es' : getEffectiveLanguage());
-          this.plugin.settings.weeklyReviewTemplate = getDefaultWeeklyReviewTemplate(effectiveLang);
-          await this.plugin.saveSettings();
-          this.display();
-          new Notice(t('settings.templateResetNotice'));
-        })
-    );
-
     // Spaced Repetition Section
     new Setting(containerEl).setName(t('settings.headingSpacedRepetition')).setHeading();
 
@@ -594,20 +551,6 @@ export class StudyFlowSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName(t('settings.headingMaintenance')).setHeading();
 
     new Setting(containerEl)
-      .setName(t('settings.migratePomodoroLogsName'))
-      .setDesc(t('settings.migratePomodoroLogsDesc'))
-      .addButton((btn) =>
-        btn
-          .setButtonText(t('settings.migratePomodoroLogsBtn'))
-          .onClick(async () => {
-            const { scanVaultForPomodoroLogMigrations } = await import('./storage-migration.ts');
-            const { PomodoroLogMigrationModal } = await import('./pomodoro-migration-modal.ts');
-            const previews = await scanVaultForPomodoroLogMigrations(this.app);
-            new PomodoroLogMigrationModal(this.app, previews).open();
-          })
-      );
-
-    new Setting(containerEl)
       .setName(t('settings.syncHistoryName'))
       .setDesc(t('settings.syncHistoryDesc'))
       .addButton((btn) =>
@@ -625,11 +568,9 @@ export class StudyFlowSettingTab extends PluginSettingTab {
 
     const todaySec = this.plugin.settings.todaySections || {
       showNowNext: true,
-      showMiniTimer: true,
       showTodayTasks: true,
       showHabits: true,
       showSpacedRepetition: true,
-      showUpcomingDeadlines: true,
     };
     this.plugin.settings.todaySections = todaySec;
 
@@ -639,16 +580,6 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(todaySec.showNowNext).onChange(async (val) => {
           todaySec.showNowNext = val;
-          await this.plugin.saveSettings();
-        })
-      );
-
-    new Setting(containerEl)
-      .setName(t('settings.todaySectionMiniTimerName'))
-      .setDesc(t('settings.todaySectionMiniTimerDesc'))
-      .addToggle((toggle) =>
-        toggle.setValue(todaySec.showMiniTimer).onChange(async (val) => {
-          todaySec.showMiniTimer = val;
           await this.plugin.saveSettings();
         })
       );
@@ -683,15 +614,6 @@ export class StudyFlowSettingTab extends PluginSettingTab {
         })
       );
 
-    new Setting(containerEl)
-      .setName(t('settings.todaySectionUpcomingDeadlinesName'))
-      .setDesc(t('settings.todaySectionUpcomingDeadlinesDesc'))
-      .addToggle((toggle) =>
-        toggle.setValue(todaySec.showUpcomingDeadlines).onChange(async (val) => {
-          todaySec.showUpcomingDeadlines = val;
-          await this.plugin.saveSettings();
-        })
-      );
 
     new Setting(containerEl)
       .setName(t('settings.resetDefaultsName'))

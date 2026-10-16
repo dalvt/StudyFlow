@@ -34,10 +34,19 @@ export class TaskCreateModal extends Modal {
   ) {
     super(app);
     this.plugin = plugin;
-    this.knownSubjects = knownSubjects;
+    if (knownSubjects.length > 0) {
+      this.knownSubjects = knownSubjects;
+    } else {
+      const configuredTags = (plugin.settings?.subjects || []).map((s) => s.tag);
+      const taskTags = (plugin.taskIndex?.getAllTasks() || [])
+        .flatMap((t) => t.tags || [])
+        .filter((tag) => tag && !['#idea', '#icebox', '#alta', '#media', '#baja'].includes(tag.toLowerCase()));
+      this.knownSubjects = Array.from(new Set([...configuredTags, ...taskTags]));
+    }
     this.onCreated = onCreated;
     this.initialText = initialText;
   }
+
 
   onOpen(): void {
     this.previousActiveElement = document.activeElement as HTMLElement | null;

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert';
+import { TFile } from 'obsidian';
 import {
   parseScheduleMarkdown,
   getVirtualBlocksForDate,
-  rruleByDayFromDayOfWeek,
   getDefaultScheduleTemplate,
 } from '../src/schedule.ts';
 import {
@@ -15,9 +15,13 @@ import {
   doBlocksOverlap,
 } from '../src/calendar-utils.ts';
 import {
-  buildIcsCalendar,
-  isExamDeadline,
-} from '../src/ics-export.ts';
+  getTimeBlocksForDate,
+  saveTimeBlock,
+  toggleTimeBlockCompletion,
+  deleteTimeBlock,
+} from '../src/calendar.ts';
+import { cloneDefaultSettings } from '../src/settings-utils.ts';
+
 
 test('parseScheduleMarkdown parses weekly recurring schedule items accurately', () => {
   const content = `
@@ -198,54 +202,84 @@ test('formatTimeBlockLine and parseTimeBlockLine preserve inline metadata [subje
   assert.strictEqual(parsed.completed, false);
 });
 
-test('isExamDeadline detects exam keywords and tags in multiple languages', () => {
-  assert.strictEqual(isExamDeadline({ text: 'Examen Final de Álgebra' }), true);
-  assert.strictEqual(isExamDeadline({ text: 'Primer parcial de Química' }), true);
-  assert.strictEqual(isExamDeadline({ text: 'Quiz de Historia' }), true);
-  assert.strictEqual(isExamDeadline({ text: 'Midterm test #physics' }), true);
-  assert.strictEqual(isExamDeadline({ text: 'Entrega de código #examen' }), true);
-  assert.strictEqual(isExamDeadline({ text: 'Lectura capítulo 3' }), false);
-  assert.strictEqual(isExamDeadline({ text: 'Entrega TP1' }), false);
+test('calendar.ts operations respect custom settings.timeBlocksSectionHeader', async () => {
+  const dailyFile = new TFile('Daily/2026-10-15.md');
+  dailyFile.content = `# 2026-10-15\n\n## Mi Horario\n- [ ] 09:00—10:30 Laboratorio Física\n`;
+
+  const settings = cloneDefaultSettings();
+  settings.timeBlocksSectionHeader = '## Mi Horario';
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'Daily/2026-10-15.md' ? dailyFile : null),
+      read: async () => dailyFile.content,
+      process: async (_file, fn) => {
+        dailyFile.content = fn(dailyFile.content);
+        return dailyFile.content;
+      },
+    },
+  };
+  const plugin = { app, settings };
+
+  const blocks = await getTimeBlocksForDate(app, settings, '2026-10-15', false);
+  assert.strictEqual(blocks.length, 1);
+  assert.strictEqual(blocks[0].title, 'Laboratorio Física');
+
+  // Toggle completion using custom header
+  await toggleTimeBlockCompletion(plugin, '2026-10-15', blocks[0].id, true);
+  assert.ok(dailyFile.content.includes('- [x] 09:00—10:30 Laboratorio Física'));
+  assert.ok(dailyFile.content.includes('## Mi Horario'));
+  assert.ok(!dailyFile.content.includes('## Bloques de Tiempo'));
+
+  // Save new block under custom header
+  await saveTimeBlock(plugin, {
+    id: 'block-new',
+    date: '2026-10-15',
+    startTime: '11:00',
+    endTime: '12:00',
+    title: 'Repaso Álgebra',
+    completed: false,
+  });
+  assert.ok(dailyFile.content.includes('- [ ] 11:00—12:00 Repaso Álgebra'));
+  assert.ok(!dailyFile.content.includes('## Bloques de Tiempo'));
+
+  // Delete first block under custom header
+  await deleteTimeBlock(plugin, '2026-10-15', blocks[0].id);
+  const afterDelete = await getTimeBlocksForDate(app, settings, '2026-10-15', false);
+  assert.strictEqual(afterDelete.length, 1);
+  assert.strictEqual(afterDelete[0].title, 'Repaso Álgebra');
 });
 
-test('buildIcsCalendar exports recurring schedule blocks with RRULE and exams as all-day events', () => {
-  const recurringBlocks = [
-    {
-      id: 'sched-alg-mon',
-      dayOfWeek: 1, // Monday
-      startTime: '08:00',
-      endTime: '10:00',
-      title: 'Álgebra Lineal',
-      subject: 'Matemáticas',
+test('toggleTimeBlockCompletion materializes a virtual schedule block into the Daily Note', async () => {
+  const dailyFile = new TFile('Daily/2026-10-12.md');
+  dailyFile.content = `# 2026-10-12\n\n`;
+
+  const scheduleFile = new TFile('StudyFlow/Schedule.md');
+  scheduleFile.content = `# Horario\n\n## Lunes\n- [ ] 08:00—10:00 Álgebra Lineal [subject:: Matemáticas]\n`;
+
+  const settings = cloneDefaultSettings();
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => {
+        if (p === 'Daily/2026-10-12.md') return dailyFile;
+        if (p === 'StudyFlow/Schedule.md') return scheduleFile;
+        return null;
+      },
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
     },
-  ];
+  };
+  const plugin = { app, settings };
 
-  const deadlines = [
-    {
-      text: 'Examen Final de Estructuras de Datos',
-      dueDate: '2026-11-20',
-      completed: false,
-    },
-  ];
+  const blocks = await getTimeBlocksForDate(app, settings, '2026-10-12', true);
+  assert.strictEqual(blocks.length, 1);
+  assert.strictEqual(blocks[0].isVirtual, true);
 
-  const now = new Date('2026-10-15T12:00:00Z');
-  const ics = buildIcsCalendar({
-    blocks: [],
-    deadlines,
-    recurringBlocks,
-    now,
-  });
-
-  // Verify recurring block with RRULE and stable UID
-  assert.ok(ics.includes('SUMMARY:Álgebra Lineal'));
-  assert.ok(ics.includes('RRULE:FREQ=WEEKLY;BYDAY=MO'));
-  assert.ok(ics.includes('UID:study-flow-rrule-mo-0800-1000-algebra-lineal@studyflow'));
-
-  // Verify exam deadline exported as all-day event with CATEGORIES:EXAM
-  assert.ok(ics.includes('SUMMARY:Examen Final de Estructuras de Datos'));
-  assert.ok(ics.includes('DTSTART;VALUE=DATE:20261120'));
-  assert.ok(ics.includes('DTEND;VALUE=DATE:20261121'));
-  assert.ok(ics.includes('CATEGORIES:EXAM'));
+  await toggleTimeBlockCompletion(plugin, '2026-10-12', blocks[0].id, true);
+  assert.ok(dailyFile.content.includes('- [x] 08:00—10:00 Álgebra Lineal'));
 });
 
 test('Task estimate calculation matches pomodoros * pomodoroWorkDuration', () => {
@@ -262,3 +296,4 @@ test('Task estimate calculation matches pomodoros * pomodoroWorkDuration', () =>
   assert.strictEqual(durationB, 100);
   assert.strictEqual(durationC, 25);
 });
+

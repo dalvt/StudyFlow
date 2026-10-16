@@ -53,9 +53,11 @@ export class PomodoroModal extends Modal {
     const header = contentEl.createDiv({ cls: 'study-flow-mini-timer-header' });
     header.createSpan({ text: t('pomodoro.miniTimerTitle'), cls: 'study-flow-mini-timer-title' });
 
-    const badgeText = status.mode === 'work'
-      ? t('pomodoro.modeFocus')
-      : (status.isLongBreak ? t('pomodoro.modeLongBreak') : t('pomodoro.modeBreak'));
+    const badgeText = status.isCountUp
+      ? t('pomodoro.countUpActive')
+      : status.mode === 'work'
+        ? t('pomodoro.modeFocus')
+        : (status.isLongBreak ? t('pomodoro.modeLongBreak') : t('pomodoro.modeBreak'));
     header.createSpan({
       text: badgeText,
       cls: `study-flow-mini-timer-badge ${status.mode === 'work' ? 'is-work' : 'is-break'}`,
@@ -208,7 +210,7 @@ export class PomodoroModal extends Modal {
     });
     setIcon(resetBtn, 'rotate-ccw');
     resetBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.reset();
+      this.plugin.pomodoro.promptReset();
     });
 
     const isRunning = status.state === 'running';
@@ -222,23 +224,37 @@ export class PomodoroModal extends Modal {
     });
     setTimeout(() => playBtn.focus(), 20);
 
-    const skipBtn = controls.createEl('button', {
-      cls: 'study-flow-btn-icon clickable-icon',
-      attr: { 'aria-label': t('pomodoro.skipCycle') },
-    });
-    setIcon(skipBtn, 'skip-forward');
-    skipBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.skipCycle();
-    });
+    if (status.isCountUp) {
+      if (status.state === 'running' || status.state === 'paused') {
+        const finishBtn = controls.createEl('button', {
+          text: t('pomodoro.finishSession'),
+          cls: 'study-flow-btn-subtle',
+          attr: { 'aria-label': t('pomodoro.finishSession') },
+        });
+        finishBtn.addEventListener('click', async () => {
+          await this.plugin.pomodoro.finishCountUpSession();
+          this.renderUI();
+        });
+      }
+    } else {
+      const skipBtn = controls.createEl('button', {
+        cls: 'study-flow-btn-icon clickable-icon',
+        attr: { 'aria-label': t('pomodoro.skipCycle') },
+      });
+      setIcon(skipBtn, 'skip-forward');
+      skipBtn.addEventListener('click', () => {
+        this.plugin.pomodoro.skipCycle();
+      });
 
-    const add5Btn = controls.createEl('button', {
-      text: t('pomodoro.add5m'),
-      cls: 'study-flow-btn-subtle',
-      attr: { 'aria-label': t('pomodoro.add5mTooltip') },
-    });
-    add5Btn.addEventListener('click', () => {
-      this.plugin.pomodoro.addMinutes(5);
-    });
+      const add5Btn = controls.createEl('button', {
+        text: t('pomodoro.add5m'),
+        cls: 'study-flow-btn-subtle',
+        attr: { 'aria-label': t('pomodoro.add5mTooltip') },
+      });
+      add5Btn.addEventListener('click', () => {
+        this.plugin.pomodoro.addMinutes(5);
+      });
+    }
 
     // 6. Streak Footer
     const interval = status.longBreakInterval || 4;
@@ -269,12 +285,15 @@ export class PomodoroModal extends Modal {
 
     const badgeEl = this.contentEl.querySelector('.study-flow-mini-timer-badge');
     if (badgeEl) {
-      const badgeText = status.mode === 'work'
-        ? t('pomodoro.modeFocus')
-        : (status.isLongBreak ? t('pomodoro.modeLongBreak') : t('pomodoro.modeBreak'));
+      const badgeText = status.isCountUp
+        ? t('pomodoro.countUpActive')
+        : status.mode === 'work'
+          ? t('pomodoro.modeFocus')
+          : (status.isLongBreak ? t('pomodoro.modeLongBreak') : t('pomodoro.modeBreak'));
       badgeEl.setText(badgeText);
       badgeEl.className = `study-flow-mini-timer-badge ${status.mode === 'work' ? 'is-work' : 'is-break'}`;
     }
+
 
     const progressFill = this.contentEl.querySelector('.study-flow-mini-timer-progress-fill') as HTMLElement | null;
     if (progressFill) {

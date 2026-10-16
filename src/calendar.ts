@@ -13,10 +13,11 @@ import {
   formatTaskWithPriority,
   getDailyNotePath,
   getOrCreateFile,
-  PendingTaskItem,
-  TaskPriority,
+  type PendingTaskItem,
+  type TaskPriority,
   syncBlocksToMarkdown,
 } from './utils.ts';
+
 
 export * from './calendar-utils.ts';
 export * from './schedule.ts';
@@ -44,11 +45,12 @@ export async function getTimeBlocksForDate(
 ): Promise<CalendarTimeBlock[]> {
   const dailyPath = getDailyNotePath(settings, dateStr);
   const file = app.vault.getAbstractFileByPath(dailyPath);
+  const sectionHeader = settings.timeBlocksSectionHeader;
   let dailyBlocks: CalendarTimeBlock[] = [];
   if (file instanceof TFile) {
     try {
       const content = await app.vault.read(file);
-      dailyBlocks = parseTimeBlocksFromMarkdown(content, dateStr);
+      dailyBlocks = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
     } catch (err) {
       console.error(`Study Flow: Error leyendo bloques desde ${dailyPath}`, err);
     }
@@ -91,9 +93,10 @@ export async function saveTimeBlock(
   };
   const dailyPath = getDailyNotePath(plugin.settings, block.date);
   const targetFile = await getOrCreateFile(plugin.app, dailyPath, `# ${block.date}\n\n`);
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
 
   await plugin.app.vault.process(targetFile, (content) => {
-    const existing = parseTimeBlocksFromMarkdown(content, block.date);
+    const existing = parseTimeBlocksFromMarkdown(content, block.date, sectionHeader);
 
     // Overlap detection: warning only, not blocking
     const overlaps = findOverlappingBlocks(existing, persistedBlock);
@@ -109,7 +112,7 @@ export async function saveTimeBlock(
       existing.push(persistedBlock);
     }
     existing.sort((a, b) => a.startTime.localeCompare(b.startTime));
-    return syncBlocksToMarkdown(content, existing);
+    return syncBlocksToMarkdown(content, existing, sectionHeader);
   });
 }
 
@@ -124,16 +127,18 @@ export async function deleteTimeBlock(
   const dailyPath = getDailyNotePath(plugin.settings, dateStr);
   const file = plugin.app.vault.getAbstractFileByPath(dailyPath);
   if (!(file instanceof TFile)) return;
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
 
   await plugin.app.vault.process(file, (content) => {
-    const existing = parseTimeBlocksFromMarkdown(content, dateStr);
+    const existing = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
     const filtered = existing.filter((b) => b.id !== blockId);
-    return syncBlocksToMarkdown(content, filtered);
+    return syncBlocksToMarkdown(content, filtered, sectionHeader);
   });
 }
 
 /**
  * Toggles completion status of a time block directly in its Daily Note.
+ * If the block is a virtual recurring block, materializes it into the Daily Note.
  */
 export async function toggleTimeBlockCompletion(
   plugin: StudyFlowPlugin,
@@ -142,16 +147,33 @@ export async function toggleTimeBlockCompletion(
   completed: boolean
 ): Promise<void> {
   const dailyPath = getDailyNotePath(plugin.settings, dateStr);
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
+  const allBlocksForDate = await getTimeBlocksForDate(plugin.app, plugin.settings, dateStr, true);
+  const virtualCandidate = allBlocksForDate.find(
+    (b) => b.isVirtual && (b.id === blockId || `block-${b.id}` === blockId || b.id === `block-${blockId}`)
+  );
+
+  if (virtualCandidate) {
+    await saveTimeBlock(plugin, {
+      ...virtualCandidate,
+      completed,
+      isVirtual: false,
+    });
+    return;
+  }
+
   const file = plugin.app.vault.getAbstractFileByPath(dailyPath);
   if (!(file instanceof TFile)) return;
 
   await plugin.app.vault.process(file, (content) => {
-    const existing = parseTimeBlocksFromMarkdown(content, dateStr);
-    const target = existing.find((b) => b.id === blockId);
+    const existing = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
+    const target = existing.find(
+      (b) => b.id === blockId || b.id === `block-${blockId}` || `block-${b.id}` === blockId
+    );
     if (target) {
       target.completed = completed;
     }
-    return syncBlocksToMarkdown(content, existing);
+    return syncBlocksToMarkdown(content, existing, sectionHeader);
   });
 }
 
@@ -167,9 +189,10 @@ export async function syncTimeBlocksToDailyNote(
   try {
     const dailyPath = getDailyNotePath(settings, dateStr);
     const targetFile = await getOrCreateFile(app, dailyPath, `# ${dateStr}\n\n`);
+    const sectionHeader = settings.timeBlocksSectionHeader;
 
     await app.vault.process(targetFile, (content) => {
-      return syncBlocksToMarkdown(content, blocks);
+      return syncBlocksToMarkdown(content, blocks, sectionHeader);
     });
     return true;
   } catch (err) {
@@ -177,6 +200,7 @@ export async function syncTimeBlocksToDailyNote(
     return false;
   }
 }
+
 
 /**
  * Loads all deadlines across the vault (Inbox.md and Daily Notes) or directly from TaskIndex.

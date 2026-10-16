@@ -280,12 +280,23 @@ export class PomodoroManager {
         return;
       }
 
-      if (activeTask.id && (activeTask.id.startsWith('block-') || activeTask.text.includes('['))) {
+      if (
+        activeTask.id &&
+        (activeTask.id.startsWith('block-') ||
+          activeTask.id.startsWith('virtual-') ||
+          activeTask.text.includes('['))
+      ) {
         const blockId = activeTask.id.replace(/^block-/, '');
         const dateMatch = srcFile.match(/(\d{4}-\d{2}-\d{2})/);
         const dateStr = dateMatch ? dateMatch[1] : getLocalDateString(new Date());
         await toggleTimeBlockCompletion(this.plugin, dateStr, blockId, true);
+        new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
+        this.activeTask = null;
+        await this.savePomodoroState();
+        this.notifyListeners();
+        return;
       }
+
 
       const { priority } = parseTaskPriority(activeTask.text);
       const taskRecord: TaskRecord = {

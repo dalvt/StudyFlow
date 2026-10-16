@@ -1,8 +1,8 @@
-import { getLanguage, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
+import { getLanguage, Plugin, WorkspaceLeaf } from 'obsidian';
 import { PomodoroManager } from './pomodoro';
 import { PomodoroModal } from './pomodoro-modal';
 import { cloneDefaultSettings, StudyFlowSettings, StudyFlowSettingTab } from './settings';
-import { QuickCaptureModal } from './tasks';
+import { TaskCreateModal } from './task-modal';
 import { ActiveTab, StudyFlowView, VIEW_TYPE_STUDY_FLOW } from './view';
 import { ZenModeManager } from './zen';
 import { migratePluginFilesToDedicatedFolder } from './utils';
@@ -11,7 +11,6 @@ import { runStartupMigration, loadFocusSessionsFromFile } from './storage-migrat
 import type { FocusSessionRecord } from './analytics';
 import { t, setLanguage, setObsidianLanguageResolver, getEffectiveLanguage } from './i18n/index.ts';
 import { getDefaultConventions } from './conventions.ts';
-import { exportStudyFlowIcsFile } from './ics-export';
 import { handleStudyFlowProtocol } from './protocol-handler';
 
 export default class StudyFlowPlugin extends Plugin {
@@ -53,7 +52,7 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addRibbonIcon('plus-circle', t('ribbon.quickCapture'), () => {
-      new QuickCaptureModal(this.app, this).open();
+      new TaskCreateModal(this.app, this).open();
     });
 
     // Commands (Obsidian convention: no plugin prefix)
@@ -117,7 +116,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'capture-quick-task',
       name: t('commands.quickCapture'),
       callback: () => {
-        new QuickCaptureModal(this.app, this).open();
+        new TaskCreateModal(this.app, this).open();
       },
     });
 
@@ -149,7 +148,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'pomodoro-reset',
       name: t('commands.pomodoroReset'),
       callback: () => {
-        this.pomodoro.reset();
+        this.pomodoro.promptReset();
       },
     });
 
@@ -170,27 +169,6 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'generate-weekly-review',
-      name: t('commands.generateWeeklyReview'),
-      callback: async () => {
-        try {
-          const { generateWeeklyReviewFile } = await import('./weekly-review.ts');
-          const { file, isNew } = await generateWeeklyReviewFile(this.app, this);
-          new Notice(
-            isNew
-              ? t('weeklyReview.createdNotice', { path: file.path })
-              : t('weeklyReview.openedNotice', { path: file.path })
-          );
-          const leaf = this.app.workspace.getLeaf('tab');
-          await leaf.openFile(file);
-        } catch (err) {
-          console.error('Study Flow: Error generando revisión semanal', err);
-          new Notice(t('weeklyReview.errorNotice'));
-        }
-      },
-    });
-
-    this.addCommand({
       id: 'spaced-repetition-init',
       name: t('commands.initSpacedRepetition'),
       checkCallback: (checking: boolean) => {
@@ -201,42 +179,13 @@ export default class StudyFlowPlugin extends Plugin {
           try {
             const { initSpacedRepetitionForFile } = await import('./spaced-repetition.ts');
             await initSpacedRepetitionForFile(this.app, activeFile, undefined, this);
+            const { Notice } = await import('obsidian');
             new Notice(t('spaced.initializedNotice', { title: activeFile.basename }));
           } catch (err) {
             console.error('Study Flow: Error iniciando repaso espaciado', err);
           }
         })();
         return true;
-      },
-    });
-
-    this.addCommand({
-      id: 'migrate-pomodoro-logs',
-      name: t('commands.migratePomodoroLogs'),
-      callback: async () => {
-        try {
-          const { scanVaultForPomodoroLogMigrations } = await import('./storage-migration.ts');
-          const { PomodoroLogMigrationModal } = await import('./pomodoro-migration-modal.ts');
-          const previews = await scanVaultForPomodoroLogMigrations(this.app);
-          new PomodoroLogMigrationModal(this.app, previews).open();
-        } catch (err) {
-          console.error('Study Flow: Error escaneando registros de Pomodoro para migración', err);
-          new Notice(t('migration.errorNotice'));
-        }
-      },
-    });
-
-    this.addCommand({
-      id: 'export-calendar-ics',
-      name: t('commands.exportCalendarIcs'),
-      callback: async () => {
-        try {
-          const outPath = await exportStudyFlowIcsFile(this.app, this);
-          new Notice(t('ics.exportedNotice', { path: outPath }));
-        } catch (err) {
-          console.error('Study Flow: Error exportando calendario a .ics', err);
-          new Notice(t('ics.exportErrorNotice'));
-        }
       },
     });
 
@@ -248,6 +197,7 @@ export default class StudyFlowPlugin extends Plugin {
     // Add Settings Tab
     this.addSettingTab(new StudyFlowSettingTab(this.app, this));
   }
+
 
   onunload(): void {
     if (this.pomodoro) {

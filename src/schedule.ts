@@ -1,6 +1,7 @@
-import type { App, TFile } from 'obsidian';
+import { type App, TFile } from 'obsidian';
 import type { CalendarTimeBlock } from './calendar-utils.ts';
 import type { Subject } from './settings-utils.ts';
+
 
 export interface ScheduleItem {
   id: string;
@@ -228,9 +229,9 @@ export async function loadScheduleItems(
 ): Promise<ScheduleItem[]> {
   try {
     const file = app.vault.getAbstractFileByPath(schedulePath);
-    if (!file || !(file instanceof (app.vault.constructor as any).TFile || 'extension' in file)) {
-      // Check if TFile
-      const tfile = app.vault.getFiles().find((f) => f.path === schedulePath);
+    if (!file || !(file instanceof TFile || 'extension' in file)) {
+      const files = typeof app.vault.getFiles === 'function' ? app.vault.getFiles() : [];
+      const tfile = files.find((f) => f.path === schedulePath);
       if (!tfile) return [];
       const content = await app.vault.read(tfile);
       return parseScheduleMarkdown(content);
@@ -242,6 +243,7 @@ export async function loadScheduleItems(
     return [];
   }
 }
+
 
 /**
  * Provides a localized starter template for StudyFlow/Schedule.md.

@@ -1,13 +1,17 @@
 import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import {
+  type BlockLayout,
   CalendarTimeBlock,
   calculateBlockDurationMinutes,
+  computeBlockLayouts,
   deleteTimeBlock,
   formatDateKey,
   getTimeBlocksForDate,
   getWeekDays,
+  minutesToTimeString,
   saveTimeBlock,
+  snapTo15Minutes,
   timeStringToMinutes,
   toggleTimeBlockCompletion,
   doBlocksOverlap,
@@ -16,114 +20,12 @@ import { getDailyNotePath } from '../utils.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
 import { PromptModal } from './prompt-modal';
 
+export { type BlockLayout, snapTo15Minutes, minutesToTimeString, computeBlockLayouts };
+
 export interface CalendarGridCallbacks {
   onSelectDate: (dateStr: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onSwitchTab: (tab: string) => void;
-}
-
-export interface BlockLayout {
-  block: CalendarTimeBlock;
-  startMin: number;
-  endMin: number;
-  colIndex: number;
-  totalCols: number;
-  hasOverlap: boolean;
-}
-
-/**
- * Snaps minutes to the nearest 15-minute interval.
- */
-export function snapTo15Minutes(minutes: number): number {
-  return Math.round(minutes / 15) * 15;
-}
-
-/**
- * Converts minutes since 00:00 to "HH:mm".
- */
-export function minutesToTimeString(minutes: number): string {
-  const clamped = Math.max(0, Math.min(24 * 60 - 1, minutes));
-  const h = Math.floor(clamped / 60);
-  const m = clamped % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-/**
- * Computes side-by-side columns and overlap status for a list of time blocks.
- */
-export function computeBlockLayouts(blocks: CalendarTimeBlock[]): BlockLayout[] {
-  if (blocks.length === 0) return [];
-
-  const parsed = blocks.map((b) => ({
-    block: b,
-    startMin: timeStringToMinutes(b.startTime),
-    endMin: Math.max(timeStringToMinutes(b.startTime) + 15, timeStringToMinutes(b.endTime)),
-  }));
-
-  // Sort by start time, then longer duration first
-  parsed.sort((a, b) => a.startMin - b.startMin || (b.endMin - b.startMin) - (a.endMin - a.startMin));
-
-  // Partition into connected overlap clusters
-  const clusters: Array<typeof parsed> = [];
-  let currentCluster: typeof parsed = [];
-  let clusterMaxEnd = -1;
-
-  for (const item of parsed) {
-    if (currentCluster.length === 0) {
-      currentCluster.push(item);
-      clusterMaxEnd = item.endMin;
-    } else if (item.startMin < clusterMaxEnd) {
-      // Overlaps with current cluster
-      currentCluster.push(item);
-      clusterMaxEnd = Math.max(clusterMaxEnd, item.endMin);
-    } else {
-      clusters.push(currentCluster);
-      currentCluster = [item];
-      clusterMaxEnd = item.endMin;
-    }
-  }
-  if (currentCluster.length > 0) {
-    clusters.push(currentCluster);
-  }
-
-  const results: BlockLayout[] = [];
-
-  for (const cluster of clusters) {
-    const colEnds: number[] = [];
-    const clusterLayouts: Array<{ item: (typeof parsed)[0]; colIndex: number }> = [];
-
-    for (const item of cluster) {
-      let assignedCol = -1;
-      for (let c = 0; c < colEnds.length; c++) {
-        if (colEnds[c] <= item.startMin) {
-          assignedCol = c;
-          colEnds[c] = item.endMin;
-          break;
-        }
-      }
-      if (assignedCol === -1) {
-        assignedCol = colEnds.length;
-        colEnds.push(item.endMin);
-      }
-      clusterLayouts.push({ item, colIndex: assignedCol });
-    }
-
-    const totalCols = colEnds.length;
-    const hasOverlap = totalCols > 1;
-
-    for (const cl of clusterLayouts) {
-      results.push({
-        block: cl.item.block,
-        startMin: cl.item.startMin,
-        endMin: cl.item.endMin,
-        colIndex: cl.colIndex,
-        totalCols,
-        hasOverlap,
-      });
-    }
-  }
-
-  return results;
 }
 
 export class CalendarGridComponent {

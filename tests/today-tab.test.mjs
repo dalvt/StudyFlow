@@ -88,13 +88,14 @@ test('filterUpcomingDeadlines: returns 3 nearest deadlines sorted by days remain
   assert.equal(top3[2].cleanTitle, 'Parcial Química'); // 3 days
 });
 
-test('TodayTabSectionsConfig: default settings enable all 6 sections', () => {
+test('TodayTabSectionsConfig: default settings enable the 4 streamlined sections without miniTimer or separate deadlines', () => {
   const settings = cloneDefaultSettings('es');
   assert.ok(settings.todaySections);
   assert.equal(settings.todaySections.showNowNext, true);
-  assert.equal(settings.todaySections.showMiniTimer, true);
   assert.equal(settings.todaySections.showTodayTasks, true);
   assert.equal(settings.todaySections.showHabits, true);
   assert.equal(settings.todaySections.showSpacedRepetition, true);
-  assert.equal(settings.todaySections.showUpcomingDeadlines, true);
+  assert.equal('showMiniTimer' in settings.todaySections, false);
+  assert.equal('showUpcomingDeadlines' in settings.todaySections, false);
 });
+

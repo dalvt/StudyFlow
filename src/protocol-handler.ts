@@ -3,7 +3,7 @@ import type StudyFlowPlugin from './main';
 import type { ActiveTab } from './ui/types';
 import { getOrCreateFile } from './utils';
 import { appendTaskToMarkdownSection } from './markdown-utils';
-import { QuickCaptureModal } from './tasks';
+import { TaskCreateModal } from './task-modal';
 import { t } from './i18n/index.ts';
 import {
   parseProtocolAction,
@@ -118,10 +118,11 @@ export async function handleStudyFlowProtocol(
         await quickCaptureTaskText(plugin.app, plugin, parsed.text);
         new Notice(t('protocol.taskCapturedNotice', { text: parsed.text }));
       } else {
-        new QuickCaptureModal(plugin.app, plugin).open();
+        new TaskCreateModal(plugin.app, plugin).open();
       }
       break;
     }
+
     default: {
       console.warn('Study Flow Protocol: Acción no reconocida', params);
       new Notice(t('protocol.unknownActionNotice'));

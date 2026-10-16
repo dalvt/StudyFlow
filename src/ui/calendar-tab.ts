@@ -1,10 +1,9 @@
-import { App, Notice, setIcon, TFile } from 'obsidian';
+import { App, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
 import {
   CalendarTimeBlock,
   DeadlineItem,
-  createDeadlineTask,
   formatDateKey,
   formatMonthYearHeader,
   getCalendarMonthMatrix,
@@ -14,14 +13,6 @@ import {
   SHORT_DAY_NAMES_EN,
   SHORT_DAY_NAMES_SUN_FIRST_EN,
 } from '../calendar';
-import {
-  deleteTaskFromFile,
-  toggleTaskCompletionInFile,
-} from '../tasks';
-import {
-  formatDeadlineHuman,
-  TaskPriority,
-} from '../utils';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
 import {
   DayDetailCallbacks,
@@ -36,7 +27,7 @@ export class CalendarTab implements TabComponent {
   private container: HTMLElement | null = null;
   private onSwitchTab: (tab: ActiveTab) => void;
 
-  private calendarViewMode: 'month' | 'week' | 'day' | 'deadlines' = 'month';
+  private calendarViewMode: 'month' | 'week' | 'day' = 'month';
   private calendarYear: number = new Date().getFullYear();
   private calendarMonth: number = new Date().getMonth();
   private selectedCalendarDate: string = formatDateKey(new Date());
@@ -218,18 +209,12 @@ export class CalendarTab implements TabComponent {
       if (this.container) await this.render(this.container);
     });
 
-    // Right: Segmented view toggles (Mes, Semana, Día, Deadlines)
+    // Right: Segmented view toggles (Mes, Semana, Día)
     const viewSwitcher = topBar.createDiv({ cls: 'study-flow-segmented-control' });
-    const pendingDlCount = this.allDeadlines.filter((d) => !d.completed).length;
     const viewButtons = [
       { id: 'month' as const, label: t('calendar.viewMonth'), icon: 'calendar' },
       { id: 'week' as const, label: t('calendar.viewWeek'), icon: 'columns' },
       { id: 'day' as const, label: t('calendar.viewDay') || 'Día', icon: 'calendar-days' },
-      {
-        id: 'deadlines' as const,
-        label: t('calendar.viewDeadlines', { count: String(pendingDlCount) }),
-        icon: 'alert-circle',
-      },
     ];
 
     viewButtons.forEach((v) => {
@@ -258,24 +243,26 @@ export class CalendarTab implements TabComponent {
       );
     } else if (this.calendarViewMode === 'week') {
       await this.gridComponent.renderGrid(card, 'week', this.selectedCalendarDate);
-      await renderDayDetailPanel(
-        card,
-        this.app,
-        this.plugin,
-        this.getDayDetailState(),
-        this.getDayDetailCallbacks()
-      );
+      if (this.isPendingSelectorOpen) {
+        await renderDayDetailPanel(
+          card,
+          this.app,
+          this.plugin,
+          this.getDayDetailState(),
+          this.getDayDetailCallbacks()
+        );
+      }
     } else if (this.calendarViewMode === 'day') {
       await this.gridComponent.renderGrid(card, 'day', this.selectedCalendarDate);
-      await renderDayDetailPanel(
-        card,
-        this.app,
-        this.plugin,
-        this.getDayDetailState(),
-        this.getDayDetailCallbacks()
-      );
-    } else if (this.calendarViewMode === 'deadlines') {
-      await this.renderDeadlinesMasterHub(card, container);
+      if (this.isPendingSelectorOpen) {
+        await renderDayDetailPanel(
+          card,
+          this.app,
+          this.plugin,
+          this.getDayDetailState(),
+          this.getDayDetailCallbacks()
+        );
+      }
     }
   }
 
@@ -351,219 +338,6 @@ export class CalendarTab implements TabComponent {
           this.calendarMonth = cell.month;
         }
         if (this.container) await this.render(this.container);
-      });
-    });
-  }
-
-  private async renderDeadlinesMasterHub(card: HTMLElement, tabContainer: HTMLElement): Promise<void> {
-    const hubWrapper = card.createDiv({ cls: 'study-flow-deadlines-hub' });
-
-    // Header bar
-    const hubHeader = hubWrapper.createDiv({ cls: 'study-flow-hub-header' });
-    const hubTitle = hubHeader.createDiv({ cls: 'study-flow-hub-title' });
-    const dlIcon = hubTitle.createSpan();
-    setIcon(dlIcon, 'target');
-    hubTitle.createEl('h3', { text: t('calendar.deadlinesHubTitle') });
-
-    // Inline form for master hub
-    const formWrapper = hubWrapper.createDiv({
-      cls: `study-flow-block-create-form ${this.isAddingDeadline ? '' : 'is-hidden'}`,
-    });
-
-    const newDlBtn = hubHeader.createEl('button', {
-      cls: 'mod-cta study-flow-btn-sm',
-    });
-    const plusIcon = newDlBtn.createSpan();
-    setIcon(plusIcon, 'plus');
-    newDlBtn.createSpan({ text: t('calendar.newDeadline') });
-    newDlBtn.addEventListener('click', () => {
-      this.isAddingDeadline = !this.isAddingDeadline;
-      formWrapper.toggleClass('is-hidden', !this.isAddingDeadline);
-    });
-    const r1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
-    const titleIn = r1.createEl('input', {
-      type: 'text',
-      cls: 'study-flow-block-title-input',
-      attr: { placeholder: t('calendar.masterHubDeadlinePlaceholder') },
-    });
-    const dateIn = r1.createEl('input', {
-      type: 'date',
-      cls: 'study-flow-date-input',
-      value: this.selectedCalendarDate,
-    });
-    const timeIn = r1.createEl('input', {
-      type: 'text',
-      cls: 'study-flow-time-input',
-      attr: { placeholder: t('calendar.deadlineTimePlaceholder') },
-    });
-
-    const r2 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
-    const prioIn = r2.createEl('select', {
-      cls: 'study-flow-select-input dropdown',
-      attr: { 'aria-label': t('tasks.priorityName') },
-    });
-    [
-      { val: 'none', label: t('priority.noPriority') },
-      { val: 'high', label: t('priority.high') },
-      { val: 'medium', label: t('priority.medium') },
-      { val: 'low', label: t('priority.low') },
-    ].forEach((p) => {
-      const opt = prioIn.createEl('option', { value: p.val, text: p.label });
-      if (p.val === 'high') opt.selected = true;
-    });
-
-    const pomosIn = r2.createEl('input', {
-      type: 'number',
-      cls: 'study-flow-number-input',
-      attr: {
-        placeholder: t('calendar.pomodoroEstimatePlaceholder'),
-        min: '0',
-        max: '20',
-        'aria-label': t('calendar.pomodoroEstimateAria'),
-      },
-    });
-
-    const saveHubDl = r2.createEl('button', {
-      cls: 'mod-cta study-flow-btn-sm',
-      text: t('calendar.saveDeadlineBtn'),
-    });
-    const cancelHubDl = r2.createEl('button', {
-      cls: 'study-flow-btn-sm',
-      text: t('common.cancel'),
-    });
-
-    saveHubDl.addEventListener('click', async () => {
-      const tVal = titleIn.value.trim();
-      const d = dateIn.value.trim();
-      if (!tVal || !d) {
-        new Notice(t('calendar.enterTitleAndDateNotice'));
-        return;
-      }
-      const ok = await createDeadlineTask(
-        this.app,
-        this.plugin.settings,
-        tVal,
-        d,
-        timeIn.value.trim() || undefined,
-        prioIn.value as TaskPriority,
-        pomosIn.value ? parseInt(pomosIn.value, 10) : undefined
-      );
-      if (ok) {
-        this.isAddingDeadline = false;
-        new Notice(t('calendar.deadlineCreatedNotice', { date: d }));
-        if (this.container) await this.render(this.container);
-      }
-    });
-
-    cancelHubDl.addEventListener('click', () => {
-      this.isAddingDeadline = false;
-      formWrapper.addClass('is-hidden');
-    });
-
-    // Urgency Groups
-    const overdue = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining < 0);
-    const dueToday = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining === 0);
-    const dueSoon = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining > 0 && d.daysRemaining <= 7);
-    const dueLater = this.allDeadlines.filter((d) => !d.completed && d.daysRemaining > 7);
-    const completed = this.allDeadlines.filter((d) => d.completed);
-
-    const groups = [
-      { key: 'overdue', label: t('calendar.groupOverdue'), icon: 'alert-triangle', items: overdue, cls: 'is-overdue-group' },
-      { key: 'today', label: t('calendar.groupToday'), icon: 'alert-circle', items: dueToday, cls: 'is-today-group' },
-      { key: 'soon', label: t('calendar.groupSoon'), icon: 'clock', items: dueSoon, cls: 'is-soon-group' },
-      { key: 'later', label: t('calendar.groupLater'), icon: 'calendar', items: dueLater, cls: 'is-later-group' },
-      { key: 'completed', label: t('calendar.groupCompleted'), icon: 'check-circle-2', items: completed, cls: 'is-completed-group' },
-    ];
-
-    if (this.allDeadlines.length === 0) {
-      hubWrapper.createDiv({
-        cls: 'study-flow-empty-tasks',
-        text: t('calendar.noDeadlinesRegistered'),
-      });
-      return;
-    }
-
-    groups.forEach((grp) => {
-      if (grp.items.length === 0) return;
-
-      const groupSection = hubWrapper.createDiv({ cls: `study-flow-hub-group ${grp.cls}` });
-      const grpHeader = groupSection.createDiv({ cls: 'study-flow-hub-group-header' });
-      const grpIcon = grpHeader.createSpan({ cls: 'study-flow-group-icon' });
-      setIcon(grpIcon, grp.icon);
-      grpHeader.createSpan({ text: ` ${grp.label} (${grp.items.length})`, cls: 'study-flow-hub-group-title' });
-
-      const listEl = groupSection.createDiv({ cls: 'study-flow-deadlines-hub-list' });
-      grp.items.forEach((item) => {
-        const itemCard = listEl.createDiv({
-          cls: `study-flow-deadline-hub-card ${item.completed ? 'is-completed' : ''}`,
-        });
-
-        const cb = itemCard.createEl('input', {
-          type: 'checkbox',
-          cls: 'study-flow-task-cb',
-        });
-        cb.checked = item.completed;
-        cb.addEventListener('change', async () => {
-          await toggleTaskCompletionInFile(this.app, item, cb.checked);
-          if (this.container) await this.render(this.container);
-        });
-
-        const textSpan = itemCard.createSpan({
-          text: item.cleanTitle,
-          cls: `study-flow-deadline-item-title ${item.completed ? 'is-strikethrough' : ''}`,
-        });
-        textSpan.addEventListener('click', () => {
-          cb.checked = !cb.checked;
-          cb.dispatchEvent(new Event('change'));
-        });
-
-        const dText = formatDeadlineHuman(item.daysRemaining, item.dueDate);
-        let badgeCls = 'study-flow-deadline-badge';
-        if (item.daysRemaining < 0) badgeCls += ' is-overdue';
-        else if (item.daysRemaining === 0) badgeCls += ' is-today';
-        else if (item.daysRemaining <= 3) badgeCls += ' is-soon';
-        itemCard.createSpan({ text: dText, cls: badgeCls });
-
-        if (item.dueTime) {
-          itemCard.createSpan({ text: `⏰ ${item.dueTime}`, cls: 'study-flow-time-chip' });
-        }
-
-        // Source note chip
-        const srcFile = this.app.vault.getAbstractFileByPath(item.sourceFile);
-        const srcName = srcFile instanceof TFile ? srcFile.basename : item.sourceFile;
-        const srcChip = itemCard.createSpan({ text: `#${srcName}`, cls: 'study-flow-source-chip' });
-        srcChip.addEventListener('click', () => {
-          if (srcFile instanceof TFile) {
-            this.app.workspace.getLeaf(false).openFile(srcFile);
-          }
-        });
-
-        // Quick Focus
-        const pomoBtn = itemCard.createEl('button', {
-          cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': t('tasks.focusPomodoroTooltip') },
-        });
-        setIcon(pomoBtn, 'timer');
-        pomoBtn.addEventListener('click', async () => {
-          this.plugin.pomodoro.setActiveTask({
-            id: item.id,
-            text: item.text,
-            sourceFile: item.sourceFile,
-          });
-          this.onSwitchTab('pomodoro');
-        });
-
-        // Delete
-        const delBtn = itemCard.createEl('button', {
-          cls: 'study-flow-icon-action-btn',
-          attr: { 'aria-label': t('calendar.deleteDeadlineTooltip') },
-        });
-        setIcon(delBtn, 'trash-2');
-        delBtn.addEventListener('click', async () => {
-          await deleteTaskFromFile(this.app, item);
-          new Notice(t('calendar.deadlineDeletedNotice'));
-          if (this.container) await this.render(this.container);
-        });
       });
     });
   }

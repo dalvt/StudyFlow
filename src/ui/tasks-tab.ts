@@ -575,7 +575,38 @@ export class TasksTab implements TabComponent {
           });
       });
 
-      // 3. Promote / Convert
+      // 3. Pomodoro & Subtask actions for active tasks
+      if (!task.completed && !task.isIdea) {
+        menu.addItem((item) => {
+          item
+            .setTitle(t('tasks.incrementPomodoroTooltip'))
+            .setIcon('plus-circle')
+            .onClick(async () => {
+              const res = await incrementTaskPomodoroInFile(this.app, task);
+              if (res) {
+                new Notice(t('tasks.pomodoroIncrementedNotice', { text: task.text }));
+                if (this.container) await this.render(this.container);
+              }
+            });
+        });
+
+        if ((task.completedPomodoros || 0) > 0) {
+          menu.addItem((item) => {
+            item
+              .setTitle(t('tasks.decrementPomodoroTooltip'))
+              .setIcon('minus-circle')
+              .onClick(async () => {
+                const res = await decrementTaskPomodoroInFile(this.app, task);
+                if (res) {
+                  new Notice(t('tasks.pomodoroDecrementedNotice', { text: task.text }));
+                  if (this.container) await this.render(this.container);
+                }
+              });
+          });
+        }
+      }
+
+      // 4. Promote / Convert
       if (task.isIdea) {
         menu.addItem((item) => {
           item
@@ -601,7 +632,7 @@ export class TasksTab implements TabComponent {
         });
       }
 
-      // 4. Open in note
+      // 5. Open in note
       menu.addItem((item) => {
         item
           .setTitle(t('tasks.menuOpenInNote'))
@@ -613,7 +644,7 @@ export class TasksTab implements TabComponent {
 
       menu.addSeparator();
 
-      // 5. Delete
+      // 6. Delete
       menu.addItem((item) => {
         item
           .setTitle(t('tasks.menuDelete'))
@@ -860,45 +891,9 @@ export class TasksTab implements TabComponent {
     const actionsToolbar = itemCard.createDiv({ cls: 'study-flow-task-actions-toolbar' });
 
     if (!task.completed && !task.isIdea) {
-      // Quick Pomodoro decrement (if at least 1 completed)
-      if ((task.completedPomodoros || 0) > 0) {
-        const minusPomoBtn = actionsToolbar.createEl('button', {
-          cls: 'study-flow-icon-action-btn study-flow-pomo-minus-btn clickable-icon',
-          attr: { 'aria-label': t('tasks.decrementPomodoroTooltip') },
-        });
-        const mIcon = minusPomoBtn.createSpan({ cls: 'study-flow-btn-icon' });
-        setIcon(mIcon, 'minus');
-        minusPomoBtn.createSpan({ text: '1' });
-        minusPomoBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const res = await decrementTaskPomodoroInFile(this.app, task);
-          if (res) {
-            new Notice(t('tasks.pomodoroDecrementedNotice', { text: task.text }));
-            if (this.container) await this.render(this.container);
-          }
-        });
-      }
-
-      // Quick Pomodoro increment
-      const addPomoBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn study-flow-pomo-step-btn clickable-icon',
-        attr: { 'aria-label': t('tasks.incrementPomodoroTooltip') },
-      });
-      const aIcon = addPomoBtn.createSpan({ cls: 'study-flow-btn-icon' });
-      setIcon(aIcon, 'plus');
-      addPomoBtn.createSpan({ text: '1' });
-      addPomoBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const res = await incrementTaskPomodoroInFile(this.app, task);
-        if (res) {
-          new Notice(t('tasks.pomodoroIncrementedNotice', { text: task.text }));
-          if (this.container) await this.render(this.container);
-        }
-      });
-
       // Link to Pomodoro
       const linkPomodoroBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn clickable-icon',
+        cls: 'study-flow-icon-action-btn clickable-icon study-flow-task-primary-action',
         attr: { 'aria-label': t('tasks.focusPomodoroTooltip') },
       });
       setIcon(linkPomodoroBtn, 'timer');
@@ -914,7 +909,7 @@ export class TasksTab implements TabComponent {
 
       // Add subtask quick button
       const addSubBtn = actionsToolbar.createEl('button', {
-        cls: 'study-flow-icon-action-btn clickable-icon',
+        cls: 'study-flow-icon-action-btn clickable-icon study-flow-task-hover-action',
         attr: { 'aria-label': t('tasks.addSubtaskTooltip') },
       });
       setIcon(addSubBtn, 'list-plus');
@@ -951,7 +946,7 @@ export class TasksTab implements TabComponent {
 
     // Edit inline button
     const editBtn = actionsToolbar.createEl('button', {
-      cls: 'study-flow-icon-action-btn clickable-icon',
+      cls: 'study-flow-icon-action-btn clickable-icon study-flow-task-hover-action',
       attr: { 'aria-label': t('tasks.editTooltip') },
     });
     setIcon(editBtn, 'pencil');
@@ -959,17 +954,6 @@ export class TasksTab implements TabComponent {
       e.stopPropagation();
       this.editingTaskId = this.editingTaskId === task.id ? null : task.id;
       if (this.container) void this.render(this.container);
-    });
-
-    // Delete button
-    const delBtn = actionsToolbar.createEl('button', {
-      cls: 'study-flow-icon-action-btn study-flow-delete-btn clickable-icon',
-      attr: { 'aria-label': t('tasks.deleteTooltip') },
-    });
-    setIcon(delBtn, 'trash-2');
-    delBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await handleDeleteTask();
     });
 
     // Context Menu Trigger Button ("...")

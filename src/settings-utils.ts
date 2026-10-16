@@ -39,12 +39,11 @@ export interface Subject {
 
 export interface TodayTabSectionsConfig {
   showNowNext: boolean;
-  showMiniTimer: boolean;
   showTodayTasks: boolean;
   showHabits: boolean;
   showSpacedRepetition: boolean;
-  showUpcomingDeadlines: boolean;
 }
+
 
 export interface StudyFlowSettings {
   schemaVersion: number;
@@ -147,13 +146,12 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   calendarEndHour: 22,
   todaySections: {
     showNowNext: true,
-    showMiniTimer: true,
     showTodayTasks: true,
     showHabits: true,
     showSpacedRepetition: true,
-    showUpcomingDeadlines: true,
   },
 };
+
 
 export function cloneDefaultSettings(lang?: SupportedConventionLanguage): StudyFlowSettings {
   const base: StudyFlowSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
