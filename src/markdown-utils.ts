@@ -1729,6 +1729,8 @@ export function syncHabitsToMarkdown(
     streak?: number;
     lastCompletedDate?: string;
     history?: string[];
+    frequency?: HabitFrequency;
+    restDays?: string[];
   }>
 ): string {
   if (!content || content.trim().length === 0) {
@@ -1736,7 +1738,7 @@ export function syncHabitsToMarkdown(
   }
 
   const lines = content.split(/\r?\n/);
-  const habitLineRegex = /^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*streak:\s*(\d+)\s*\|\s*last:\s*([^>|]*?)(?:\s*\|\s*history:\s*([^>]*?))?\s*-->)?$/;
+  const habitLineRegex = /^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*(.*?)\s*-->)?$/;
 
   const habitMapById = new Map<string, (typeof habits)[0]>();
   const habitMapByName = new Map<string, (typeof habits)[0]>();

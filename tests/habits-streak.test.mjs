@@ -254,3 +254,56 @@ test('Pomodoro habit integration: completing habit via syncHabitsToMarkdown mark
   assert.ok(updatedMarkdown.includes('streak: 3'));
   assert.ok(updatedMarkdown.includes('last: 2026-10-14'));
 });
+
+test('syncHabitsToMarkdown correctly matches existing habits with frequency metadata in place without duplicating', () => {
+  const content = `# Mis Hábitos
+- [ ] 🏃‍♂️ Running <!-- streak: 2 | last: 2026-10-10 | freq: weekly | target: 3 | history: 2026-10-08,2026-10-10 -->
+- [ ] 🧘 Meditación <!-- streak: 5 | last: 2026-10-13 | history: 2026-10-13 -->
+
+Nota al pie.
+`;
+
+  const habits = [
+    {
+      name: '🏃‍♂️ Running',
+      completedToday: true,
+      streak: 3,
+      lastCompletedDate: '2026-10-14',
+      history: ['2026-10-08', '2026-10-10', '2026-10-14'],
+      frequency: { type: 'weekly', weeklyTarget: 3 },
+      restDays: [],
+    },
+    {
+      name: '🧘 Meditación',
+      completedToday: false,
+      streak: 5,
+      lastCompletedDate: '2026-10-13',
+      history: ['2026-10-13'],
+      frequency: { type: 'daily' },
+      restDays: [],
+    },
+  ];
+
+  const updated = syncHabitsToMarkdown(content, habits);
+
+  const lines = updated.trim().split('\n');
+  const runningIndex = lines.findIndex((l) => l.includes('🏃‍♂️ Running'));
+  const medIndex = lines.findIndex((l) => l.includes('🧘 Meditación'));
+  const noteIndex = lines.findIndex((l) => l.includes('Nota al pie.'));
+
+  assert.ok(runningIndex !== -1, 'Running habit must exist');
+  assert.ok(medIndex !== -1, 'Meditación habit must exist');
+  assert.ok(noteIndex !== -1, 'Footer note must exist');
+  assert.ok(runningIndex < medIndex, 'Running must stay in its original position before Meditación');
+  assert.ok(medIndex < noteIndex, 'Meditación must stay before footer note');
+
+  const runningOccurrences = lines.filter((l) => l.includes('🏃‍♂️ Running')).length;
+  assert.strictEqual(runningOccurrences, 1, 'Running habit must not be duplicated');
+
+  assert.ok(lines[runningIndex].includes('- [x] 🏃‍♂️ Running'));
+  assert.ok(lines[runningIndex].includes('streak: 3'));
+  assert.ok(lines[runningIndex].includes('last: 2026-10-14'));
+  assert.ok(lines[runningIndex].includes('freq: weekly'));
+  assert.ok(lines[runningIndex].includes('target: 3'));
+});
+
