@@ -178,69 +178,99 @@ export async function renderTimeBlocksColumn(
 
   // Inline Add/Edit Block Form
   const formWrapper = timeBlocksCol.createDiv({
-    cls: `study-flow-block-create-form ${state.isAddingTimeBlock ? '' : 'is-hidden'}`,
-  });
-  const formRow1 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
-  const startInput = formRow1.createEl('input', {
-    type: 'text',
-    cls: 'study-flow-time-input',
-    value: '09:00',
-    attr: { placeholder: '09:00' },
-  });
-  formRow1.createSpan({ text: '—', cls: 'study-flow-time-sep' });
-  const endInput = formRow1.createEl('input', {
-    type: 'text',
-    cls: 'study-flow-time-input',
-    value: '10:30',
-    attr: { placeholder: '10:30' },
-  });
-  const titleInput = formRow1.createEl('input', {
-    type: 'text',
-    cls: 'study-flow-block-title-input',
-    attr: { placeholder: t('calendar.blockTitlePlaceholder') },
-  });
-
-  const formRow2 = formWrapper.createDiv({ cls: 'study-flow-form-row' });
-  const noteInput = formRow2.createEl('input', {
-    type: 'text',
-    cls: 'study-flow-block-note-input',
-    attr: { placeholder: t('calendar.blockNotePlaceholder') },
-  });
-  const saveBlockBtn = formRow2.createEl('button', {
-    cls: 'mod-cta study-flow-btn-sm',
-    text: t('common.save'),
-  });
-  const cancelBlockBtn = formRow2.createEl('button', {
-    cls: 'study-flow-btn-sm',
-    text: t('common.cancel'),
+    cls: `study-flow-block-create-form study-flow-timeblock-create-form ${state.isAddingTimeBlock ? '' : 'is-hidden'}`,
   });
 
   const addBlockBtn = tbHeader.createEl('button', {
-    cls: 'study-flow-icon-action-btn-styled',
+    cls: `study-flow-icon-action-btn-styled ${state.isAddingTimeBlock ? 'is-active' : ''}`,
     attr: { 'aria-label': t('calendar.addBlockTooltip') },
   });
   const addBlockIcon = addBlockBtn.createSpan();
   setIcon(addBlockIcon, 'plus');
   addBlockBtn.createSpan({ text: t('calendar.newBlock') });
+
+  // Row 1: Full-width Title Input
+  const formRow1 = formWrapper.createDiv({ cls: 'study-flow-form-row is-full-width' });
+  const titleInput = formRow1.createEl('input', {
+    type: 'text',
+    cls: 'study-flow-block-title-input',
+    attr: {
+      placeholder: t('calendar.blockTitlePlaceholder'),
+      'aria-label': t('calendar.blockTitlePlaceholder'),
+    },
+  });
+
+  // Row 2: Time range and Linked Note
+  const formRow2 = formWrapper.createDiv({ cls: 'study-flow-form-row is-split-row' });
+  const timeGroup = formRow2.createDiv({
+    cls: 'study-flow-time-range-group',
+    attr: { title: 'Horario (HH:MM)' },
+  });
+  const startInput = timeGroup.createEl('input', {
+    type: 'text',
+    cls: 'study-flow-time-input',
+    value: '09:00',
+    attr: { placeholder: '09:00', maxlength: '5', 'aria-label': 'Hora de inicio' },
+  });
+  timeGroup.createSpan({ text: '—', cls: 'study-flow-time-sep' });
+  const endInput = timeGroup.createEl('input', {
+    type: 'text',
+    cls: 'study-flow-time-input',
+    value: '10:30',
+    attr: { placeholder: '10:30', maxlength: '5', 'aria-label': 'Hora de fin' },
+  });
+
+  const noteWrap = formRow2.createDiv({ cls: 'study-flow-input-with-icon is-note-input' });
+  const noteIcon = noteWrap.createSpan({ cls: 'study-flow-input-icon' });
+  setIcon(noteIcon, 'file-text');
+  const noteInput = noteWrap.createEl('input', {
+    type: 'text',
+    cls: 'study-flow-block-note-input',
+    attr: {
+      placeholder: t('calendar.blockNotePlaceholder'),
+      'aria-label': t('calendar.blockNotePlaceholder'),
+    },
+  });
+
+  // Row 3: Action Buttons
+  const formActions = formWrapper.createDiv({ cls: 'study-flow-form-actions' });
+  const cancelBlockBtn = formActions.createEl('button', {
+    cls: 'study-flow-btn-sm',
+    text: t('common.cancel'),
+  });
+  const saveBlockBtn = formActions.createEl('button', {
+    cls: 'mod-cta study-flow-btn-sm',
+    text: t('common.save'),
+  });
+
   addBlockBtn.addEventListener('click', () => {
     state.isAddingTimeBlock = !state.isAddingTimeBlock;
+    addBlockBtn.toggleClass('is-active', state.isAddingTimeBlock);
     if (state.isAddingTimeBlock) {
       state.editingBlockId = null;
       saveBlockBtn.setText(t('common.save'));
       titleInput.value = '';
       noteInput.value = '';
+      startInput.value = '09:00';
+      endInput.value = '10:30';
+      formWrapper.removeClass('is-hidden');
+      setTimeout(() => titleInput.focus(), 50);
+    } else {
+      formWrapper.addClass('is-hidden');
     }
-    formWrapper.toggleClass('is-hidden', !state.isAddingTimeBlock);
   });
 
-  saveBlockBtn.addEventListener('click', async () => {
+  const handleSaveBlock = async () => {
     const title = titleInput.value.trim();
-    const startTime = startInput.value.trim();
-    const endTime = endInput.value.trim();
+    let startTime = startInput.value.trim();
+    let endTime = endInput.value.trim();
     if (!title || !startTime || !endTime) {
       new Notice(t('calendar.completeTimeFieldsNotice'));
       return;
     }
+    if (startTime.length === 4 && startTime[1] === ':') startTime = '0' + startTime;
+    if (endTime.length === 4 && endTime[1] === ':') endTime = '0' + endTime;
+
     const blockId = state.editingBlockId || String(Date.now());
     const existing = blocks.find((b) => b.id === state.editingBlockId);
     const newBlock: CalendarTimeBlock = {
@@ -258,16 +288,31 @@ export async function renderTimeBlocksColumn(
     await saveTimeBlock(plugin, newBlock);
     state.isAddingTimeBlock = false;
     state.editingBlockId = null;
+    addBlockBtn.removeClass('is-active');
     saveBlockBtn.setText(t('common.save'));
     new Notice(t('calendar.blockSavedNotice', { title }));
     await callbacks.onRefresh();
-  });
+  };
 
-  cancelBlockBtn.addEventListener('click', () => {
+  const handleCancelBlock = () => {
     state.isAddingTimeBlock = false;
     state.editingBlockId = null;
+    addBlockBtn.removeClass('is-active');
     saveBlockBtn.setText(t('common.save'));
     formWrapper.addClass('is-hidden');
+  };
+
+  saveBlockBtn.addEventListener('click', handleSaveBlock);
+  cancelBlockBtn.addEventListener('click', handleCancelBlock);
+
+  formWrapper.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSaveBlock();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelBlock();
+    }
   });
 
   // Time Blocks List
@@ -364,13 +409,14 @@ export async function renderTimeBlocksColumn(
       editBtn.addEventListener('click', () => {
         state.editingBlockId = block.id;
         state.isAddingTimeBlock = true;
+        addBlockBtn.addClass('is-active');
         startInput.value = block.startTime;
         endInput.value = block.endTime;
         titleInput.value = block.title;
         noteInput.value = block.linkedNote || '';
         saveBlockBtn.setText(t('common.update'));
         formWrapper.removeClass('is-hidden');
-        titleInput.focus();
+        setTimeout(() => titleInput.focus(), 50);
       });
 
       // Action: Delete Block
@@ -409,35 +455,55 @@ export async function renderDeadlinesColumn(
 
   // Inline Add Deadline Form
   const dlFormWrapper = deadlinesCol.createDiv({
-    cls: `study-flow-block-create-form ${state.isAddingDeadline ? '' : 'is-hidden'}`,
+    cls: `study-flow-block-create-form is-deadline-form ${state.isAddingDeadline ? '' : 'is-hidden'}`,
   });
 
   const addDlBtn = dlHeader.createEl('button', {
-    cls: 'study-flow-icon-action-btn-styled',
+    cls: `study-flow-icon-action-btn-styled ${state.isAddingDeadline ? 'is-active' : ''}`,
     attr: { 'aria-label': t('calendar.addDeadlineTooltip') },
   });
   const addDlIcon = addDlBtn.createSpan();
   setIcon(addDlIcon, 'plus');
   addDlBtn.createSpan({ text: t('calendar.newDeadline') });
-  addDlBtn.addEventListener('click', () => {
-    state.isAddingDeadline = !state.isAddingDeadline;
-    dlFormWrapper.toggleClass('is-hidden', !state.isAddingDeadline);
-  });
-  const dlRow1 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
+
+  // Row 1: Full-width Title Input
+  const dlRow1 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row is-full-width' });
   const dlTitleInput = dlRow1.createEl('input', {
     type: 'text',
     cls: 'study-flow-block-title-input',
-    attr: { placeholder: t('calendar.deadlineTitlePlaceholder') },
-  });
-  const dlTimeInput = dlRow1.createEl('input', {
-    type: 'text',
-    cls: 'study-flow-time-input',
-    attr: { placeholder: t('calendar.deadlineTimePlaceholder') },
+    attr: {
+      placeholder: t('calendar.deadlineTitlePlaceholder'),
+      'aria-label': t('calendar.deadlineTitlePlaceholder'),
+    },
   });
 
-  const dlRow2 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row' });
-  const prioritySelect = dlRow2.createEl('select', {
-    cls: 'study-flow-select-input dropdown',
+  // Row 2: Due time, Priority select, Pomodoro estimate
+  const dlRow2 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row is-options-row' });
+
+  // Time with clock icon
+  const dlTimeWrap = dlRow2.createDiv({
+    cls: 'study-flow-input-with-icon is-time-input',
+    attr: { title: t('calendar.deadlineTimePlaceholder') },
+  });
+  const clockIcon = dlTimeWrap.createSpan({ cls: 'study-flow-input-icon' });
+  setIcon(clockIcon, 'clock');
+  const dlTimeInput = dlTimeWrap.createEl('input', {
+    type: 'text',
+    cls: 'study-flow-time-input',
+    attr: {
+      placeholder: '23:59',
+      maxlength: '5',
+      'aria-label': t('calendar.deadlineTimePlaceholder'),
+    },
+  });
+
+  // Priority select (custom chevron, NO .dropdown class collision!)
+  const prioWrap = dlRow2.createDiv({
+    cls: 'study-flow-select-wrapper',
+    attr: { title: t('calendar.deadlinePriorityAria') },
+  });
+  const prioritySelect = prioWrap.createEl('select', {
+    cls: 'study-flow-select-input',
     attr: { 'aria-label': t('calendar.deadlinePriorityAria') },
   });
   const priorities: Array<{ val: TaskPriority; label: string }> = [
@@ -451,33 +517,56 @@ export async function renderDeadlinesColumn(
     if (p.val === 'high') opt.selected = true;
   });
 
-  const pomoInput = dlRow2.createEl('input', {
+  // Pomodoro estimate with 🍅 icon
+  const pomoWrap = dlRow2.createDiv({
+    cls: 'study-flow-input-with-icon is-pomo-input',
+    attr: { title: t('calendar.pomodoroEstimateAria') },
+  });
+  const pomoIcon = pomoWrap.createSpan({ cls: 'study-flow-input-icon pomo-icon', text: '🍅' });
+  const pomoInput = pomoWrap.createEl('input', {
     type: 'number',
     cls: 'study-flow-number-input',
     attr: {
-      placeholder: t('calendar.pomodoroEstimatePlaceholder'),
+      placeholder: 'Est.',
       min: '0',
       max: '20',
       'aria-label': t('calendar.pomodoroEstimateAria'),
     },
   });
 
-  const saveDlBtn = dlRow2.createEl('button', {
-    cls: 'mod-cta study-flow-btn-sm',
-    text: t('calendar.createDeadlineBtn'),
-  });
-  const cancelDlBtn = dlRow2.createEl('button', {
+  // Row 3: Action buttons (Right-aligned)
+  const dlActions = dlFormWrapper.createDiv({ cls: 'study-flow-form-actions' });
+  const cancelDlBtn = dlActions.createEl('button', {
     cls: 'study-flow-btn-sm',
     text: t('common.cancel'),
   });
+  const saveDlBtn = dlActions.createEl('button', {
+    cls: 'mod-cta study-flow-btn-sm',
+    text: t('calendar.createDeadlineBtn'),
+  });
 
-  saveDlBtn.addEventListener('click', async () => {
+  addDlBtn.addEventListener('click', () => {
+    state.isAddingDeadline = !state.isAddingDeadline;
+    addDlBtn.toggleClass('is-active', state.isAddingDeadline);
+    dlFormWrapper.toggleClass('is-hidden', !state.isAddingDeadline);
+    if (state.isAddingDeadline) {
+      dlTitleInput.value = '';
+      dlTimeInput.value = '';
+      pomoInput.value = '';
+      setTimeout(() => dlTitleInput.focus(), 50);
+    }
+  });
+
+  const handleSaveDeadline = async () => {
     const tVal = dlTitleInput.value.trim();
     if (!tVal) {
       new Notice(t('calendar.enterDeadlineTitleNotice'));
       return;
     }
-    const timeVal = dlTimeInput.value.trim() || undefined;
+    let timeVal = dlTimeInput.value.trim() || undefined;
+    if (timeVal && timeVal.length === 4 && timeVal[1] === ':') {
+      timeVal = '0' + timeVal;
+    }
     const prioVal = prioritySelect.value as TaskPriority;
     const pomoVal = pomoInput.value ? parseInt(pomoInput.value, 10) : undefined;
 
@@ -491,15 +580,37 @@ export async function renderDeadlinesColumn(
       pomoVal
     );
     if (ok) {
+      if (plugin.taskIndex) {
+        const inboxPath = plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+        const file = app.vault.getAbstractFileByPath(inboxPath);
+        if (file instanceof TFile) {
+          await plugin.taskIndex.indexFile(file);
+        }
+      }
       state.isAddingDeadline = false;
+      addDlBtn.removeClass('is-active');
       new Notice(t('calendar.deadlineCreatedNotice', { date: state.selectedCalendarDate }));
       await callbacks.onRefresh();
     }
-  });
+  };
 
-  cancelDlBtn.addEventListener('click', () => {
+  const handleCancelDeadline = () => {
     state.isAddingDeadline = false;
+    addDlBtn.removeClass('is-active');
     dlFormWrapper.addClass('is-hidden');
+  };
+
+  saveDlBtn.addEventListener('click', handleSaveDeadline);
+  cancelDlBtn.addEventListener('click', handleCancelDeadline);
+
+  dlFormWrapper.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSaveDeadline();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelDeadline();
+    }
   });
 
   // List of day deadlines
@@ -525,6 +636,12 @@ export async function renderDeadlinesColumn(
       cb.checked = item.completed;
       cb.addEventListener('change', async () => {
         await toggleTaskCompletionInFile(app, item, cb.checked);
+        if (plugin.taskIndex) {
+          const file = app.vault.getAbstractFileByPath(item.sourceFile);
+          if (file instanceof TFile) {
+            await plugin.taskIndex.indexFile(file);
+          }
+        }
         await callbacks.onRefresh();
       });
 
@@ -574,6 +691,12 @@ export async function renderDeadlinesColumn(
       setIcon(delBtn, 'trash-2');
       delBtn.addEventListener('click', async () => {
         await deleteTaskFromFile(app, item);
+        if (plugin.taskIndex) {
+          const file = app.vault.getAbstractFileByPath(item.sourceFile);
+          if (file instanceof TFile) {
+            await plugin.taskIndex.indexFile(file);
+          }
+        }
         new Notice(t('calendar.deadlineDeletedNotice'));
         await callbacks.onRefresh();
       });
@@ -809,7 +932,11 @@ export async function applySelectedTasksToDate(
     });
 
     if (state.markMigratedInSource) {
-      await markTasksAsMigrated(app, selected);
+      await markTasksAsMigrated(app, selected, plugin);
+    }
+
+    if (plugin.taskIndex) {
+      await plugin.taskIndex.indexFile(targetFile);
     }
 
     state.selectedPendingTaskIds.clear();
@@ -829,7 +956,11 @@ export async function applySelectedTasksToDate(
 /**
  * Marks tasks in source file with [>] (migrated)
  */
-export async function markTasksAsMigrated(app: App, selected: PendingTaskItem[]): Promise<void> {
+export async function markTasksAsMigrated(
+  app: App,
+  selected: PendingTaskItem[],
+  plugin?: StudyFlowPlugin
+): Promise<void> {
   const tasksByFile = new Map<string, PendingTaskItem[]>();
   for (const task of selected) {
     const fileTasks = tasksByFile.get(task.sourceFile) || [];
@@ -849,6 +980,9 @@ export async function markTasksAsMigrated(app: App, selected: PendingTaskItem[])
         }
         return updated;
       });
+      if (plugin?.taskIndex) {
+        await plugin.taskIndex.indexFile(file);
+      }
     }
   }
 }

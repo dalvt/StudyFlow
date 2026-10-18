@@ -2979,42 +2979,232 @@ body.is-study-flow-zen .workspace-split {
   color: var(--interactive-accent);
 }
 
-/* Forms */
+/* Forms in Day Detail */
 .study-flow-block-create-form {
   background: var(--background-primary);
-  border: 1px solid var(--interactive-accent);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--interactive-accent);
   border-radius: var(--radius-m);
-  padding: 10px 12px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-normal) 10%, transparent);
-  animation: study-flow-fade-in 0.15s ease;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  animation: study-flow-fade-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 6px;
+}
+
+.study-flow-block-create-form.is-deadline-form {
+  border-left-color: var(--sf-danger, #e53e3e);
 }
 
 .study-flow-form-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+}
+
+.study-flow-form-row.is-full-width {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.study-flow-form-row.is-split-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
+.study-flow-form-row.is-options-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.study-flow-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.study-flow-time-range-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 2px 6px;
+}
+
+.study-flow-time-range-group .study-flow-time-input {
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  width: 48px;
+  height: 24px;
+  box-shadow: none;
+}
+
+.study-flow-time-range-group .study-flow-time-input:focus {
+  outline: none;
+  background: var(--background-modifier-hover);
+  border-radius: 3px;
+}
+
+.study-flow-input-with-icon {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.study-flow-input-icon {
+  position: absolute;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  width: 14px;
+  height: 14px;
+  z-index: 1;
+}
+
+.study-flow-input-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.study-flow-input-icon.pomo-icon {
+  font-size: 12px;
+}
+
+.study-flow-input-with-icon input {
+  width: 100%;
+  padding-left: 28px;
+}
+
+.study-flow-input-with-icon.is-time-input {
+  flex: 0 0 auto;
+  width: 82px;
+}
+
+.study-flow-input-with-icon.is-pomo-input {
+  flex: 0 0 auto;
+  width: 84px;
+}
+
+.study-flow-input-with-icon.is-note-input {
+  flex: 1 1 140px;
+}
+
+.study-flow-select-wrapper {
+  flex: 0 0 auto;
+}
+
 .study-flow-date-input,
-.study-flow-select-input,
 .study-flow-number-input {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: var(--font-ui-smaller);
   color: var(--text-normal);
+  height: 30px;
+  box-sizing: border-box;
+}
+
+.study-flow-select-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: var(--background-secondary);
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  padding: 5px 28px 5px 10px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-normal);
+  line-height: 1.4;
+  cursor: pointer;
+  min-width: 95px;
+  height: 30px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.study-flow-select-input:hover {
+  border-color: var(--interactive-accent);
+}
+
+.study-flow-select-input:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+.study-flow-block-title-input {
+  width: 100%;
+  height: 32px;
+  padding: 6px 10px;
+  font-size: var(--font-ui-small);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+
+.study-flow-block-note-input {
+  height: 30px;
+  font-size: var(--font-ui-smaller);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  box-sizing: border-box;
 }
 
 .study-flow-btn-sm {
-  padding: 4px 12px;
+  padding: 5px 14px;
   font-size: 12px;
+  font-weight: 500;
   border-radius: var(--radius-s);
   cursor: pointer;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.study-flow-empty-tasks {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background: var(--background-primary-alt, var(--background-primary));
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.4;
 }
 
 /* Time Block Cards */
@@ -3061,9 +3251,13 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-timeblock-title {
   flex: 1;
+  min-width: 0;
   font-size: var(--font-ui-small);
   font-weight: 500;
   color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .study-flow-timeblock-note-link {
@@ -3077,11 +3271,16 @@ body.is-study-flow-zen .workspace-split {
   padding: 2px 6px;
   cursor: pointer;
   color: var(--text-accent);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .study-flow-timeblock-note-link svg {
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
 }
 
 /* Day Deadlines List */
@@ -3113,10 +3312,14 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-deadline-item-title {
   flex: 1;
+  min-width: 0;
   font-size: var(--font-ui-small);
   font-weight: 500;
   color: var(--text-normal);
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .study-flow-time-chip {

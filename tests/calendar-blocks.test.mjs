@@ -10,6 +10,8 @@ import {
   parseTimeBlocksFromMarkdown,
 } from '../src/calendar-utils.ts';
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
+import { createDeadlineTask } from '../src/calendar.ts';
+import { TFile } from 'obsidian';
 
 test('formatTimeBlockLine formats uncompleted block with linked note in [[note]] syntax', () => {
   const line = formatTimeBlockLine({
@@ -181,4 +183,48 @@ test('findOverlappingBlocks identifies conflicts and ignores self when editing',
   const overlaps4 = findOverlappingBlocks(existing, { id: 'b1', startTime: '09:00', endTime: '11:15' });
   assert.equal(overlaps4.length, 1);
   assert.equal(overlaps4[0].id, 'b2');
+});
+
+test('createDeadlineTask writes formatted deadline task with priority, due date, due time, and pomodoro estimate', async () => {
+  const inboxFile = new TFile();
+  inboxFile.path = 'StudyFlow/Inbox.md';
+  inboxFile.basename = 'Inbox';
+  inboxFile.content = '# Inbox\n\n## Tareas\n\n## Icebox\n';
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'StudyFlow/Inbox.md' ? inboxFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
+      create: async (p, content) => {
+        inboxFile.content = content;
+        return inboxFile;
+      },
+    },
+  };
+
+  const settings = {
+    inboxFilePath: 'StudyFlow/Inbox.md',
+    tasksSectionHeader: '## Tareas',
+    iceboxSectionHeader: '## Icebox',
+  };
+
+  const ok = await createDeadlineTask(
+    app,
+    settings,
+    'Entrega TP Algoritmos',
+    '2026-10-25',
+    '23:59',
+    'high',
+    4
+  );
+
+  assert.equal(ok, true);
+  assert.ok(inboxFile.content.includes('## Tareas'));
+  assert.ok(inboxFile.content.includes('- [ ]'));
+  assert.ok(inboxFile.content.includes('Entrega TP Algoritmos'));
+  assert.ok(inboxFile.content.includes('📅 2026-10-25 23:59'));
 });
