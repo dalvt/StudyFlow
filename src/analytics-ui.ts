@@ -2,7 +2,6 @@ import { App, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   buildAnalyticsSummary,
-  computeSubjectsAnalyticsSummary,
   formatMinutesHuman,
 } from './analytics';
 import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from './storage-migration';
@@ -237,135 +236,7 @@ export async function renderAnalyticsDashboard(
     }
   }
 
-  // 5. Weekly Subject Progress Section (Materia)
-  const subjectsSummary = computeSubjectsAnalyticsSummary(
-    sessions,
-    tasks,
-    plugin.settings.subjects || []
-  );
-
-  const subjectsCard = rootWrapper.createDiv({ cls: 'study-flow-card study-flow-subjects-card' });
-  const subHeader = subjectsCard.createDiv({ cls: 'study-flow-chart-header' });
-  const subTitleLeft = subHeader.createDiv({ cls: 'study-flow-chart-title-left' });
-  const subIcon = subTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
-  setIcon(subIcon, 'book-open');
-  subTitleLeft.createEl('h4', { text: t('analytics.subjectsSectionTitle') });
-
-  subHeader.createDiv({
-    cls: 'study-flow-chart-badge',
-    text: `${subjectsSummary.weekStartDate} — ${subjectsSummary.weekEndDate}`,
-  });
-
-  if (subjectsSummary.subjects.length === 0) {
-    const emptyBox = subjectsCard.createDiv({ cls: 'study-flow-empty-state' });
-    const emptyIcon = emptyBox.createDiv({ cls: 'study-flow-empty-icon' });
-    setIcon(emptyIcon, 'book-open');
-    emptyBox.createEl('h4', { text: t('analytics.subjectsEmptyTitle') });
-    emptyBox.createEl('p', { text: t('analytics.subjectsEmptyDesc') });
-    const settingsBtn = emptyBox.createEl('button', {
-      cls: 'mod-cta study-flow-btn-sm',
-      text: t('analytics.goToSettingsBtn'),
-    });
-    settingsBtn.addEventListener('click', () => {
-      try {
-        const settingObj = (app as any).setting;
-        if (settingObj?.open) {
-          settingObj.open();
-          if (settingObj.openTabById && plugin.manifest?.id) {
-            settingObj.openTabById(plugin.manifest.id);
-          }
-        }
-      } catch (e) {
-        console.error('Error opening settings:', e);
-      }
-    });
-  } else {
-    const subList = subjectsCard.createDiv({ cls: 'study-flow-subjects-list' });
-    for (const item of subjectsSummary.subjects) {
-      const row = subList.createDiv({ cls: 'study-flow-subject-progress-item' });
-
-      // Header row of subject
-      const itemHeader = row.createDiv({ cls: 'study-flow-subject-item-header' });
-      const titleBox = itemHeader.createDiv({ cls: 'study-flow-subject-item-title-box' });
-
-      const badge = titleBox.createSpan({ cls: 'study-flow-subject-badge' });
-      if (item.subject.color) {
-        const dot = badge.createSpan({ cls: 'study-flow-subject-dot' });
-        dot.style.backgroundColor = item.subject.color;
-      }
-      const nameEl = badge.createSpan({ text: item.subject.name });
-      if (item.subject.color) {
-        nameEl.style.color = item.subject.color;
-      }
-
-      titleBox.createSpan({
-        text: item.subject.tag,
-        cls: 'study-flow-subject-item-tag',
-      });
-
-      // Goal streak badge (racha de cumplimiento de metas)
-      const streakBadge = itemHeader.createSpan({
-        cls: `study-flow-subject-streak-badge ${item.goalStreakWeeks > 0 ? '' : 'is-zero'}`,
-      });
-      const flameIcon = streakBadge.createSpan();
-      setIcon(flameIcon, 'flame');
-      streakBadge.createSpan({
-        text: item.goalStreakWeeks > 0
-          ? t('analytics.subjectStreak', { count: String(item.goalStreakWeeks) })
-          : t('analytics.subjectStreakNone'),
-      });
-
-      // Goal vs Actual Bar row (barra meta vs real)
-      const metaRow = row.createDiv({ cls: 'study-flow-subject-meta-row' });
-      const goalHours = item.subject.weeklyGoalHours || 0;
-      const actualHoursStr = formatMinutesHuman(item.actualMinutes);
-      const goalHoursStr = `${goalHours}h`;
-
-      metaRow.createSpan({
-        cls: 'study-flow-subject-time-text',
-        text: `${actualHoursStr} / ${goalHoursStr} (${item.percentage}%)`,
-      });
-
-      if (item.actualMinutes >= item.goalMinutes && item.goalMinutes > 0) {
-        const metBadge = metaRow.createSpan({ cls: 'study-flow-subject-goal-met-badge' });
-        const checkIcon = metBadge.createSpan();
-        setIcon(checkIcon, 'check');
-        metBadge.createSpan({ text: t('analytics.subjectGoalMet') });
-      }
-
-      // Progress bar track & fill
-      const track = row.createDiv({ cls: 'study-flow-subject-track' });
-      const fill = track.createDiv({ cls: 'study-flow-subject-fill' });
-      fill.style.width = `${Math.min(100, Math.max(0, item.percentage))}%`;
-      if (item.subject.color) {
-        fill.style.backgroundColor = item.subject.color;
-      }
-
-      // Pomodoros row (estimado vs real de pomodoros por materia)
-      const pomoRow = row.createDiv({ cls: 'study-flow-subject-pomo-row' });
-      const pomoText = item.estimatedPomodoros > 0
-        ? t('analytics.subjectPomodorosEstimateVsReal', {
-            completed: String(item.completedPomodoros),
-            estimated: String(item.estimatedPomodoros),
-          })
-        : t('analytics.subjectPomodorosCompleted', {
-            completed: String(item.completedPomodoros),
-          });
-
-      pomoRow.createSpan({ text: pomoText });
-
-      if (item.actualSessionsCount > 0) {
-        pomoRow.createSpan({
-          text: item.actualSessionsCount === 1
-            ? t('analytics.kpiSessionsCompleted_one', { count: '1' })
-            : t('analytics.kpiSessionsCompleted_other', { count: String(item.actualSessionsCount) }),
-          cls: 'study-flow-text-muted',
-        });
-      }
-    }
-  }
-
-  // 6. Two-Column Lower Grid: Tag Distribution & Breakdown
+  // 5. Two-Column Lower Grid: Tag Distribution & Breakdown
   const subGrid = rootWrapper.createDiv({ cls: 'study-flow-analytics-subgrid' });
 
   // Left: Distribution by tag/subject
