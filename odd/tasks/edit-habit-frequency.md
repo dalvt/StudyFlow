@@ -30,9 +30,9 @@ Currently, habits can only have their frequency defined at initial creation time
 - [x] TASK-3: Add i18n keys and create `HabitEditModal` in `src/habit-edit-modal.ts`.
   - Route: delegated direct (Writer trigger)
   - Checks: `npm run check-types && npm test` (216/216 passed)
-- [ ] TASK-4: Wire `HabitEditModal` to habit cards and frequency badges in `src/ui/habits-tab.ts` and update styles in `styles.css`.
+- [x] TASK-4: Wire `HabitEditModal` to habit cards and frequency badges in `src/ui/habits-tab.ts` and update styles in `styles.css`.
   - Route: delegated direct (Writer trigger)
-  - Checks: `npm test && npm run build`
+  - Checks: `npm test && npm run build` (216/216 passed, build green)
 
 ## Engram Mirror Status
 - Mirror: Pending (Engram MCP server not configured in active session)

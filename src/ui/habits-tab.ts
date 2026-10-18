@@ -11,7 +11,9 @@ import {
   renderHabitHeatmap,
   toggleHabitRestDay,
   toggleHabitStatus,
-} from '../habits';
+  updateHabitInFile,
+} from '../habits.ts';
+import { HabitEditModal } from '../habit-edit-modal.ts';
 import { t } from '../i18n/index.ts';
 
 export class HabitsTab implements TabComponent {
@@ -119,6 +121,14 @@ export class HabitsTab implements TabComponent {
       emptyState.createEl('p', { text: t('habits.emptyDesc') });
     } else {
       this.habits.forEach((habit) => {
+        const openEditModal = () => {
+          new HabitEditModal(this.app, this.plugin, habit, async (updates) => {
+            this.habits = await updateHabitInFile(this.app, path, habit.id, updates);
+            new Notice(t('habits.habitUpdatedNotice', { name: updates.name }));
+            if (this.container) await this.render(this.container);
+          }).open();
+        };
+
         const hCard = listContainer.createDiv({
           cls: `study-flow-task-card study-flow-habit-card ${habit.completedToday ? 'is-done' : ''} ${habit.isRestDayToday ? 'is-rest-day' : ''}`,
         });
@@ -159,6 +169,13 @@ export class HabitsTab implements TabComponent {
         } else {
           freqBadge.setText(t('habits.frequencyDaily'));
         }
+        freqBadge.addClass('is-clickable');
+        freqBadge.setAttribute('title', t('habits.editHabitTooltip'));
+        freqBadge.setAttribute('aria-label', t('habits.editHabitTooltip'));
+        freqBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditModal();
+        });
 
         // Weekly progress
         const prog = computeHabitWeeklyProgress(habit);
@@ -202,6 +219,17 @@ export class HabitsTab implements TabComponent {
           ? t('habits.weeksStreak', { count: String(habit.streak) })
           : t('habits.daysStreak', { count: String(habit.streak) });
         streakBadge.createSpan({ text: streakText });
+
+        // Edit button
+        const editBtn = hCard.createEl('button', {
+          cls: 'study-flow-icon-action-btn',
+          attr: { 'aria-label': t('habits.editHabitTooltip') },
+        });
+        setIcon(editBtn, 'pencil');
+        editBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditModal();
+        });
 
         // Delete button
         const delBtn = hCard.createEl('button', {

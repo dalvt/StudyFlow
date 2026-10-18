@@ -4644,6 +4644,16 @@ body.is-study-flow-zen .workspace-split {
   color: var(--text-muted);
 }
 
+.study-flow-habit-freq-badge.is-clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.study-flow-habit-freq-badge.is-clickable:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
 .study-flow-habit-progress-row {
   display: flex;
   align-items: center;

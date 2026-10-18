@@ -99,7 +99,7 @@ export class HabitEditModal extends Modal {
     }
 
     // Modal buttons
-    const btnContainer = contentEl.createDiv({ cls: 'study-flow-modal-buttons' });
+    const btnContainer = contentEl.createDiv({ cls: 'study-flow-modal-footer study-flow-modal-buttons' });
     const cancelBtn = btnContainer.createEl('button', { text: t('common.cancel') });
     cancelBtn.addEventListener('click', () => this.close());
 
