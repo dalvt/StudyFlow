@@ -54,7 +54,7 @@ export class HabitsTab implements TabComponent {
     });
 
     const freqSelect = addSection.createEl('select', {
-      cls: 'study-flow-tasks-sort-select study-flow-habit-freq-select dropdown',
+      cls: 'study-flow-habit-freq-select',
       attr: { 'aria-label': t('habits.frequencyLabel') },
     });
     freqSelect.createEl('option', { value: 'daily', text: t('habits.freqDailyOption') });
