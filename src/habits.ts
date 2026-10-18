@@ -1,6 +1,6 @@
 import { App, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { getOrCreateFile, getLocalDateString } from './utils';
+import { getOrCreateFile, getLocalDateString } from './utils.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
@@ -12,7 +12,7 @@ import {
   type HabitWeeklyProgress,
   parseHabitLine,
   syncHabitsToMarkdown,
-} from './markdown-utils';
+} from './markdown-utils.ts';
 import { t } from './i18n/index.ts';
 
 export {
@@ -172,6 +172,36 @@ export async function addHabitToFile(
     restDays: [],
     isRestDayToday: false,
   });
+
+  await saveHabitsToFile(app, filePath, habits);
+  return habits;
+}
+
+/**
+ * Updates an existing habit's frequency and optionally its name.
+ * Recalculates streak based on the updated frequency.
+ */
+export async function updateHabitInFile(
+  app: App,
+  filePath: string,
+  habitId: string,
+  updates: {
+    name?: string;
+    frequency?: HabitFrequency;
+  }
+): Promise<HabitItem[]> {
+  const habits = await loadHabitsFromFile(app, filePath);
+  const target = habits.find((h) => h.id === habitId);
+  if (!target) return habits;
+
+  if (updates.name !== undefined && updates.name.trim()) {
+    target.name = updates.name.trim();
+  }
+  if (updates.frequency !== undefined) {
+    target.frequency = updates.frequency;
+  }
+
+  target.streak = calculateHabitStreak(target);
 
   await saveHabitsToFile(app, filePath, habits);
   return habits;

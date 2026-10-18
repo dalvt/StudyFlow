@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { TFile } from 'obsidian';
+import { updateHabitInFile } from '../src/habits.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
@@ -305,5 +307,87 @@ Nota al pie.
   assert.ok(lines[runningIndex].includes('last: 2026-10-14'));
   assert.ok(lines[runningIndex].includes('freq: weekly'));
   assert.ok(lines[runningIndex].includes('target: 3'));
+});
+
+test('calculateHabitStreak: recalculates correctly when habit frequency changes between daily, weekly, and specific_days', () => {
+  const ref = new Date('2026-10-18T12:00:00');
+  const habit = {
+    history: ['2026-10-12', '2026-10-14', '2026-10-16'],
+    restDays: [],
+    frequency: { type: 'daily' },
+  };
+
+  // As a daily habit, missing Saturday (Oct 17) and Sunday (Oct 18) breaks the daily streak
+  assert.strictEqual(calculateHabitStreak(habit, ref), 0);
+
+  // Frequency updated to weekly with target of 3
+  // Current ISO week has 3 completed days (12, 14, 16) >= target 3 -> streak is 1
+  habit.frequency = { type: 'weekly', weeklyTarget: 3 };
+  assert.strictEqual(calculateHabitStreak(habit, ref), 1);
+
+  // Frequency updated to weekly with higher target of 4
+  // 3 completed days < target 4 -> streak drops to 0
+  habit.frequency = { type: 'weekly', weeklyTarget: 4 };
+  assert.strictEqual(calculateHabitStreak(habit, ref), 0);
+
+  // Frequency updated to specific_days: Mon (1), Wed (3), Fri (5)
+  // All 3 scheduled days were completed, Sunday is not scheduled -> streak is 3
+  habit.frequency = { type: 'specific_days', daysOfWeek: [1, 3, 5] };
+  assert.strictEqual(calculateHabitStreak(habit, ref), 3);
+});
+
+test('updateHabitInFile: updates frequency and name, recalculates streak, and persists to file with mock App vault', async () => {
+  const habitsFile = new TFile('Habits.md');
+  habitsFile.content = `# Registro de Hábitos
+
+- [ ] 🏃‍♂️ Running <!-- streak: 0 | last: 2026-10-16 | freq: daily | history: 2026-10-12,2026-10-14,2026-10-16 -->
+- [ ] 📚 Lectura <!-- streak: 2 | last: 2026-10-16 | freq: daily | history: 2026-10-15,2026-10-16 -->
+`;
+
+  let processCalled = false;
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'Habits.md' ? habitsFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        processCalled = true;
+        f.content = fn(f.content);
+        return f.content;
+      },
+      create: async (p, content) => {
+        habitsFile.content = content;
+        return habitsFile;
+      },
+    },
+  };
+
+  // 1. Update frequency from daily to weekly (target 3) and rename
+  const updatedHabits = await updateHabitInFile(app, 'Habits.md', 'running', {
+    name: '🏃‍♂️ Running 5K',
+    frequency: { type: 'weekly', weeklyTarget: 3 },
+  });
+
+  assert.ok(processCalled, 'app.vault.process should be called');
+  assert.strictEqual(updatedHabits.length, 2);
+
+  const target = updatedHabits.find((h) => h.id === 'running');
+  assert.ok(target, 'Target habit must be found in returned list');
+  assert.strictEqual(target.name, '🏃‍♂️ Running 5K');
+  assert.deepStrictEqual(target.frequency, { type: 'weekly', weeklyTarget: 3 });
+
+  // Verify file content was updated
+  assert.ok(habitsFile.content.includes('- [ ] 🏃‍♂️ Running 5K'));
+  assert.ok(habitsFile.content.includes('freq: weekly'));
+  assert.ok(habitsFile.content.includes('target: 3'));
+  assert.ok(habitsFile.content.includes('- [ ] 📚 Lectura'), 'Other habits are preserved');
+  assert.ok(habitsFile.content.includes('# Registro de Hábitos'), 'Headers are preserved');
+
+  // 2. Non-existent habit id returns habits unmodified without changing file
+  const beforeContent = habitsFile.content;
+  const noopResult = await updateHabitInFile(app, 'Habits.md', 'non-existent-id', {
+    name: 'Ghost Habit',
+  });
+  assert.strictEqual(noopResult.length, 2);
+  assert.strictEqual(habitsFile.content, beforeContent);
 });
 

@@ -24,9 +24,9 @@ Currently, habits can only have their frequency defined at initial creation time
 - [x] TASK-1: Fix habit regex in `syncHabitsToMarkdown` in `src/markdown-utils.ts` and add unit test in `tests/habits-streak.test.mjs`.
   - Route: delegated direct (Writer trigger)
   - Checks: `npm test` (214/214 passed)
-- [ ] TASK-2: Add `updateHabitInFile` in `src/habits.ts` with streak recalculation and unit tests.
+- [x] TASK-2: Add `updateHabitInFile` in `src/habits.ts` with streak recalculation and unit tests.
   - Route: delegated direct (Writer trigger)
-  - Checks: `npm test`
+  - Checks: `npm test` (216/216 passed)
 - [ ] TASK-3: Add i18n keys and create `HabitEditModal` in `src/habit-edit-modal.ts`.
   - Route: delegated direct (Writer trigger)
   - Checks: `npm run check-types`
