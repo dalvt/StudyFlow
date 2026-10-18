@@ -2062,6 +2062,202 @@ body,
   margin-top: 1px;
 }
 
+/* Focus Allocation Card (Option 2: Horizontal Allocation Bar) */
+.study-flow-allocation-card {
+  padding: 18px;
+  border-radius: var(--radius-l);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.study-flow-allocation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.study-flow-allocation-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-flow-allocation-icon {
+  display: inline-flex;
+  color: var(--interactive-accent);
+}
+
+.study-flow-allocation-title-wrap h4 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-allocation-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.study-flow-allocation-badge {
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  background: var(--background-modifier-hover);
+  color: var(--text-accent);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.study-flow-allocation-tabs {
+  display: inline-flex;
+  background: var(--background-modifier-hover);
+  padding: 2px;
+  border-radius: var(--radius-round, 9999px);
+  gap: 2px;
+}
+
+.study-flow-allocation-tab-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-round, 9999px);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.study-flow-allocation-tab-btn:hover {
+  color: var(--text-normal);
+}
+
+.study-flow-allocation-tab-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--interactive-accent) 30%, transparent);
+}
+
+/* Horizontal Continuous Allocation Bar */
+.study-flow-allocation-bar {
+  display: flex;
+  width: 100%;
+  height: 16px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--background-modifier-hover);
+  gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.study-flow-allocation-segment {
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  cursor: pointer;
+  border-radius: 2px;
+  min-width: 4px;
+}
+
+.study-flow-allocation-segment:first-child {
+  border-top-left-radius: 9999px;
+  border-bottom-left-radius: 9999px;
+}
+
+.study-flow-allocation-segment:last-child {
+  border-top-right-radius: 9999px;
+  border-bottom-right-radius: 9999px;
+}
+
+.study-flow-allocation-segment:hover {
+  opacity: 0.85;
+  filter: brightness(1.15);
+}
+
+/* Category Grid / List */
+.study-flow-allocation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.study-flow-allocation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--background-primary) 50%, var(--background-secondary));
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+  transition: all 0.15s ease;
+}
+
+.study-flow-allocation-row:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+
+.study-flow-allocation-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.study-flow-allocation-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.study-flow-allocation-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.study-flow-allocation-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.study-flow-allocation-item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.study-flow-allocation-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.study-flow-allocation-pct-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  min-width: 42px;
+  text-align: center;
+}
+
 /* Two-column subgrid */
 .study-flow-analytics-subgrid {
   display: grid;

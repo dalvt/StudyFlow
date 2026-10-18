@@ -464,6 +464,15 @@ export const en = {
   'analytics.habitStreakDays': ' {count} days',
   'analytics.habitDoneToday': '✓ Done today',
   'analytics.habitPendingToday': '○ Pending',
+  'analytics.allocationTitle': 'Total Focus Distribution',
+  'analytics.allocationRangeWeek': 'This week',
+  'analytics.allocationRangeTotal': 'All time',
+  'analytics.allocationTotalBadge': 'Total: {total}',
+  'analytics.allocationSessionsCount_one': '{count} session',
+  'analytics.allocationSessionsCount_other': '{count} sessions',
+  'analytics.allocationEmpty': 'No focus sessions recorded in this period.',
+  'analytics.allocationGeneralCategory': 'General / Unclassified',
+  'analytics.allocationOthers': 'Other activities',
 
   // Settings Tab
   'settings.headingPomodoro': 'Pomodoro',

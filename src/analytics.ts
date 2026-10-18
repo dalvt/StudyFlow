@@ -1,7 +1,8 @@
 import type { App } from 'obsidian';
 import type { HabitItem } from './habits';
 import type { TaskRecord } from './tasks';
-import type { StudyFlowSettings } from './settings';
+import type { Subject } from './settings-utils.ts';
+import { matchesSubjectTag, normalizeTag } from './subject-analytics.ts';
 export * from './subject-analytics.ts';
 
 export interface FocusSessionRecord {
@@ -30,6 +31,21 @@ export interface TagFocusStat {
   totalMinutes: number;
   sessionCount: number;
   percentage: number;
+}
+
+export interface FocusAllocationItem {
+  id: string;
+  name: string;
+  color: string;
+  totalMinutes: number;
+  sessionCount: number;
+  percentage: number;
+}
+
+export interface FocusAllocationSummary {
+  totalMinutes: number;
+  totalSessions: number;
+  items: FocusAllocationItem[];
 }
 
 export interface HabitsOverviewStat {
@@ -67,8 +83,8 @@ export interface AnalyticsSummary {
   tasks: TasksOverviewStat;
 }
 
-import { extractTagsFromText, getLocalDateString } from './markdown-utils.ts';
-export { extractTagsFromText, getLocalDateString };
+import { extractTagsFromText, getLocalDateString, getCleanTaskDisplayTitle } from './markdown-utils.ts';
+export { extractTagsFromText, getLocalDateString, getCleanTaskDisplayTitle };
 
 /**
  * Formats a duration in minutes into a human-readable string (e.g. "2h 30m" or "45m").
@@ -174,6 +190,159 @@ export function computeTagDistribution(
 
   stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
   return stats.slice(0, maxTags);
+}
+
+export const FOCUS_ALLOCATION_PALETTE = [
+  'var(--sf-accent, #6366f1)',
+  '#10b981', // Emerald
+  '#f59e0b', // Amber
+  '#3b82f6', // Blue
+  '#ec4899', // Pink
+  '#8b5cf6', // Violet
+  '#06b6d4', // Cyan
+  '#f97316', // Orange
+  '#14b8a6', // Teal
+  '#84cc16', // Lime
+];
+
+/**
+ * Resolves the primary category, title and optional subject color for a focus session.
+ * Prioritizes configured subjects -> specific tags -> clean task title -> General.
+ */
+export function resolveSessionCategory(
+  session: FocusSessionRecord,
+  subjects: Subject[] = [],
+  generalLabel: string = 'General'
+): { id: string; name: string; color?: string } {
+  // 1. Try matching configured subjects
+  if (subjects && subjects.length > 0) {
+    for (const s of subjects) {
+      if (matchesSubjectTag(s.tag, session.tags, session.taskText)) {
+        return { id: `subject-${s.id}`, name: s.name, color: s.color };
+      }
+      if (session.taskText && s.name) {
+        const escaped = s.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`\\b${escaped}\\b`, 'i').test(session.taskText)) {
+          return { id: `subject-${s.id}`, name: s.name, color: s.color };
+        }
+      }
+    }
+  }
+
+  // 2. Try explicit tags (ignore pure #general)
+  if (session.tags && session.tags.length > 0) {
+    const specificTags = session.tags.filter((t) => normalizeTag(t) !== '#general');
+    if (specificTags.length > 0) {
+      const primaryTag = normalizeTag(specificTags[0]);
+      return { id: `tag-${primaryTag}`, name: primaryTag };
+    }
+  }
+
+  // 3. Fallback to clean task text if present
+  if (session.taskText && session.taskText.trim()) {
+    const cleanTitle = getCleanTaskDisplayTitle(session.taskText).trim();
+    if (cleanTitle) {
+      const slug = cleanTitle.toLowerCase().replace(/\s+/g, '-').slice(0, 30);
+      return { id: `task-${slug}`, name: cleanTitle };
+    }
+  }
+
+  // 4. Default to General
+  return { id: 'general', name: generalLabel };
+}
+
+/**
+ * Computes focus time allocation grouped by subject, tag or task, with relative percentages.
+ */
+export function computeFocusAllocation(
+  sessions: FocusSessionRecord[],
+  subjects: Subject[] = [],
+  maxItems: number = 6,
+  generalLabel: string = 'General',
+  othersLabel: string = 'Otras actividades'
+): FocusAllocationSummary {
+  if (!sessions || sessions.length === 0) {
+    return { totalMinutes: 0, totalSessions: 0, items: [] };
+  }
+
+  const categoryMap = new Map<string, { id: string; name: string; color?: string; totalMinutes: number; sessionCount: number }>();
+  let grandTotalMinutes = 0;
+  let validSessionsCount = 0;
+
+  for (const session of sessions) {
+    const mins = session.durationMinutes || 0;
+    if (mins <= 0) continue;
+    grandTotalMinutes += mins;
+    validSessionsCount += 1;
+
+    const cat = resolveSessionCategory(session, subjects, generalLabel);
+    const existing = categoryMap.get(cat.id);
+    if (existing) {
+      existing.totalMinutes += mins;
+      existing.sessionCount += 1;
+      if (!existing.color && cat.color) existing.color = cat.color;
+    } else {
+      categoryMap.set(cat.id, {
+        id: cat.id,
+        name: cat.name,
+        color: cat.color,
+        totalMinutes: mins,
+        sessionCount: 1,
+      });
+    }
+  }
+
+  if (grandTotalMinutes === 0) {
+    return { totalMinutes: 0, totalSessions: validSessionsCount, items: [] };
+  }
+
+  const sorted = Array.from(categoryMap.values()).sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  let paletteIndex = 0;
+  const items: FocusAllocationItem[] = [];
+
+  const mainItemsCount = sorted.length > maxItems ? maxItems - 1 : sorted.length;
+  for (let i = 0; i < mainItemsCount; i++) {
+    const item = sorted[i];
+    let finalColor = item.color;
+    if (!finalColor) {
+      finalColor = FOCUS_ALLOCATION_PALETTE[paletteIndex % FOCUS_ALLOCATION_PALETTE.length];
+      paletteIndex++;
+    }
+    const pct = Math.max(1, Math.round((item.totalMinutes / grandTotalMinutes) * 100));
+    items.push({
+      id: item.id,
+      name: item.name,
+      color: finalColor,
+      totalMinutes: item.totalMinutes,
+      sessionCount: item.sessionCount,
+      percentage: pct,
+    });
+  }
+
+  if (sorted.length > maxItems) {
+    let othersMins = 0;
+    let othersSessions = 0;
+    for (let i = mainItemsCount; i < sorted.length; i++) {
+      othersMins += sorted[i].totalMinutes;
+      othersSessions += sorted[i].sessionCount;
+    }
+    const othersPct = Math.max(1, Math.round((othersMins / grandTotalMinutes) * 100));
+    items.push({
+      id: 'others',
+      name: othersLabel,
+      color: 'var(--text-muted, #94a3b8)',
+      totalMinutes: othersMins,
+      sessionCount: othersSessions,
+      percentage: othersPct,
+    });
+  }
+
+  return {
+    totalMinutes: grandTotalMinutes,
+    totalSessions: validSessionsCount,
+    items,
+  };
 }
 
 /**

@@ -466,6 +466,15 @@ export const es: TranslationDict = {
   'analytics.habitStreakDays': ' {count} días',
   'analytics.habitDoneToday': '✓ Listo hoy',
   'analytics.habitPendingToday': '○ Pendiente',
+  'analytics.allocationTitle': 'Distribución Total de Focus',
+  'analytics.allocationRangeWeek': 'Esta semana',
+  'analytics.allocationRangeTotal': 'Total acumulado',
+  'analytics.allocationTotalBadge': 'Total: {total}',
+  'analytics.allocationSessionsCount_one': '{count} sesión',
+  'analytics.allocationSessionsCount_other': '{count} sesiones',
+  'analytics.allocationEmpty': 'No hay sesiones de focus registradas en este período.',
+  'analytics.allocationGeneralCategory': 'General / Sin clasificar',
+  'analytics.allocationOthers': 'Otras actividades',
 
   // Settings Tab
   'settings.headingPomodoro': 'Pomodoro',

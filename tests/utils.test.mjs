@@ -171,6 +171,63 @@ test('computeTagDistribution calculates percentages by tag', async () => {
   assert.equal(dist[1].percentage, 25);
 });
 
+test('computeFocusAllocation handles empty sessions gracefully', async () => {
+  const { computeFocusAllocation } = await import('../src/analytics.ts');
+  const res = computeFocusAllocation([]);
+  assert.equal(res.totalMinutes, 0);
+  assert.equal(res.totalSessions, 0);
+  assert.equal(res.items.length, 0);
+});
+
+test('computeFocusAllocation groups by taskText when tags are empty (user real data pattern)', async () => {
+  const { computeFocusAllocation } = await import('../src/analytics.ts');
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-17', durationMinutes: 50, taskText: 'Physics', tags: [] },
+    { id: '2', timestamp: 2, date: '2026-10-17', durationMinutes: 50, taskText: 'Physics', tags: [] },
+    { id: '3', timestamp: 3, date: '2026-10-17', durationMinutes: 50, taskText: 'Numeric Methods', tags: [] },
+    { id: '4', timestamp: 4, date: '2026-10-18', durationMinutes: 50, taskText: 'Physics', tags: [] },
+  ];
+
+  const res = computeFocusAllocation(sessions, []);
+  assert.equal(res.totalMinutes, 200);
+  assert.equal(res.totalSessions, 4);
+  assert.equal(res.items.length, 2);
+
+  // Physics has 150m (75%)
+  assert.equal(res.items[0].name, 'Physics');
+  assert.equal(res.items[0].totalMinutes, 150);
+  assert.equal(res.items[0].sessionCount, 3);
+  assert.equal(res.items[0].percentage, 75);
+
+  // Numeric Methods has 50m (25%)
+  assert.equal(res.items[1].name, 'Numeric Methods');
+  assert.equal(res.items[1].totalMinutes, 50);
+  assert.equal(res.items[1].sessionCount, 1);
+  assert.equal(res.items[1].percentage, 25);
+});
+
+test('computeFocusAllocation prioritizes configured subjects and preserves subject colors', async () => {
+  const { computeFocusAllocation } = await import('../src/analytics.ts');
+  const subjects = [
+    { id: 'phys-1', name: 'Física I', tag: '#physics', color: '#ff5500', weeklyGoalHours: 5 },
+  ];
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-17', durationMinutes: 60, taskText: 'Guía 2 #physics', tags: ['#physics'] },
+    { id: '2', timestamp: 2, date: '2026-10-17', durationMinutes: 40, taskText: '', tags: [] },
+  ];
+
+  const res = computeFocusAllocation(sessions, subjects, 6, 'General');
+  assert.equal(res.totalMinutes, 100);
+  assert.equal(res.items[0].name, 'Física I');
+  assert.equal(res.items[0].color, '#ff5500');
+  assert.equal(res.items[0].totalMinutes, 60);
+  assert.equal(res.items[0].percentage, 60);
+
+  assert.equal(res.items[1].name, 'General');
+  assert.equal(res.items[1].totalMinutes, 40);
+  assert.equal(res.items[1].percentage, 40);
+});
+
 test('computeTasksOverview calculates priority breakdown and rate', async () => {
   const { computeTasksOverview } = await import('../src/analytics.ts');
   const tasks = [
