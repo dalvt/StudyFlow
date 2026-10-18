@@ -223,10 +223,23 @@ export interface HeatmapDay {
   completedCount: number;
   totalHabits: number;
   intensity: number; // 0, 1, 2, 3, 4
+  isToday?: boolean;
+  isFuture?: boolean;
+}
+
+export interface HeatmapYearWeek {
+  weekIndex: number;
+  monthLabel?: string;
+  days: HeatmapDay[];
+}
+
+export interface HeatmapYearData {
+  weeks: HeatmapYearWeek[];
+  totalCompletedInYear: number;
 }
 
 /**
- * Computes habit consistency over the last N days (default 35 days: 5 full weeks).
+ * Computes habit consistency over the last N days (for backward compatibility).
  */
 export function computeHabitHeatmap(habits: HabitItem[], numDays: number = 35): HeatmapDay[] {
   const days: HeatmapDay[] = [];
@@ -261,35 +274,190 @@ export function computeHabitHeatmap(habits: HabitItem[], numDays: number = 35): 
 }
 
 /**
- * Renders a GitHub-style habit activity heatmap in the target container.
+ * Computes 52 weeks of habit consistency aligned to Monday-Sunday columns, exactly like GitHub.
+ */
+export function computeHabitHeatmapYear(
+  habits: HabitItem[],
+  referenceDate: Date = new Date(),
+  numWeeks: number = 52
+): HeatmapYearData {
+  const todayStr = getLocalDateString(referenceDate);
+  const totalHabits = habits.length;
+
+  // Day of week where Monday is 0 and Sunday is 6
+  const refDayOfWeek = (referenceDate.getDay() + 6) % 7;
+
+  // End date is Sunday of current week
+  const endDate = new Date(referenceDate);
+  endDate.setDate(endDate.getDate() + (6 - refDayOfWeek));
+  endDate.setHours(23, 59, 59, 999);
+
+  // Start date is Monday 51 weeks before
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - (numWeeks * 7 - 1));
+  startDate.setHours(0, 0, 0, 0);
+
+  const MONTH_NAMES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const MONTH_NAMES_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const isSpanish = t('habits.heatmapLess') === 'Menos';
+  const monthNames = isSpanish ? MONTH_NAMES_ES : MONTH_NAMES_EN;
+
+  const weeks: HeatmapYearWeek[] = [];
+  let totalCompletedInYear = 0;
+  let lastMonthSeen = -1;
+  let weeksSinceLastMonthLabel = 99;
+
+  const currentCursor = new Date(startDate);
+
+  for (let w = 0; w < numWeeks; w++) {
+    const days: HeatmapDay[] = [];
+    let weekMonthLabel: string | undefined = undefined;
+
+    for (let d = 0; d < 7; d++) {
+      const dateStr = getLocalDateString(currentCursor);
+      const isToday = dateStr === todayStr;
+      const isFuture = dateStr > todayStr;
+      const dayOfWeek = d; // 0 (Mon) to 6 (Sun)
+
+      let completedCount = 0;
+      let intensity = 0;
+
+      if (!isFuture) {
+        completedCount = habits.filter((h) => h.history && h.history.includes(dateStr)).length;
+        if (completedCount > 0) {
+          totalCompletedInYear += completedCount;
+          const ratio = totalHabits > 0 ? completedCount / totalHabits : 0;
+          if (ratio >= 0.99) intensity = 4;
+          else if (ratio >= 0.66) intensity = 3;
+          else if (ratio >= 0.33) intensity = 2;
+          else intensity = 1;
+        }
+      }
+
+      // Check month label when we encounter a new month in week's early days
+      if (d === 0 || d === 1) {
+        const curMonth = currentCursor.getMonth();
+        if (curMonth !== lastMonthSeen && weeksSinceLastMonthLabel >= 3) {
+          weekMonthLabel = monthNames[curMonth];
+          lastMonthSeen = curMonth;
+          weeksSinceLastMonthLabel = 0;
+        }
+      }
+
+      days.push({
+        date: dateStr,
+        dayOfWeek,
+        completedCount,
+        totalHabits,
+        intensity,
+        isToday,
+        isFuture,
+      });
+
+      currentCursor.setDate(currentCursor.getDate() + 1);
+    }
+
+    weeksSinceLastMonthLabel++;
+    weeks.push({
+      weekIndex: w,
+      monthLabel: weekMonthLabel,
+      days,
+    });
+  }
+
+  return {
+    weeks,
+    totalCompletedInYear,
+  };
+}
+
+/**
+ * Renders a full-year GitHub-style habit activity heatmap in the target container.
  */
 export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]): HTMLElement {
   const card = container.createDiv({ cls: 'study-flow-heatmap-card' });
+  const yearData = computeHabitHeatmapYear(habits, new Date(), 52);
+
+  // 1. Header
   const header = card.createDiv({ cls: 'study-flow-heatmap-header' });
   const title = header.createSpan({ cls: 'study-flow-heatmap-title' });
   const iconSpan = title.createSpan();
   setIcon(iconSpan, 'flame');
   title.createSpan({ text: t('habits.heatmapTitle') });
 
-  const grid = card.createDiv({ cls: 'study-flow-heatmap-grid' });
-  const days = computeHabitHeatmap(habits, 35);
-
-  days.forEach((day) => {
-    const cell = grid.createDiv({
-      cls: `study-flow-heatmap-cell is-level-${day.intensity}`,
+  if (yearData.totalCompletedInYear > 0) {
+    header.createSpan({
+      cls: 'study-flow-heatmap-badge',
+      text: t('habits.heatmapYearBadge', { count: String(yearData.totalCompletedInYear) }),
     });
-    const pct = day.totalHabits > 0 ? Math.round((day.completedCount / day.totalHabits) * 100) : 0;
-    cell.setAttribute(
-      'title',
-      t('habits.heatmapCellTooltip', {
-        date: day.date,
-        completed: day.completedCount,
-        total: day.totalHabits,
-        pct,
-      })
-    );
-  });
+  }
 
+  // 2. Horizontal Scroll Wrap
+  const scrollWrap = card.createDiv({ cls: 'study-flow-heatmap-scroll-wrap' });
+  const githubContainer = scrollWrap.createDiv({ cls: 'study-flow-heatmap-github-container' });
+
+  // 2a. Months row
+  const monthsRow = githubContainer.createDiv({ cls: 'study-flow-heatmap-months-row' });
+  monthsRow.createDiv({ cls: 'study-flow-heatmap-weekday-spacer' });
+  const monthsTrack = monthsRow.createDiv({ cls: 'study-flow-heatmap-months-track' });
+  for (const week of yearData.weeks) {
+    const slot = monthsTrack.createDiv({ cls: 'study-flow-heatmap-month-slot' });
+    if (week.monthLabel) {
+      slot.createSpan({ cls: 'study-flow-heatmap-month-text', text: week.monthLabel });
+    }
+  }
+
+  // 2b. Body row (Weekday column + 52 Week columns)
+  const bodyRow = githubContainer.createDiv({ cls: 'study-flow-heatmap-body-row' });
+
+  // Weekdays on left
+  const weekdaysCol = bodyRow.createDiv({ cls: 'study-flow-heatmap-weekdays-col' });
+  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayMon') });
+  weekdaysCol.createSpan();
+  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayWed') });
+  weekdaysCol.createSpan();
+  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayFri') });
+  weekdaysCol.createSpan();
+  weekdaysCol.createSpan();
+
+  // 52 Week columns
+  const weeksTrack = bodyRow.createDiv({ cls: 'study-flow-heatmap-weeks-track' });
+  for (const week of yearData.weeks) {
+    const weekCol = weeksTrack.createDiv({ cls: 'study-flow-heatmap-week-col' });
+    for (const day of week.days) {
+      const cellCls = [
+        'study-flow-heatmap-cell',
+        `is-level-${day.intensity}`,
+        day.isToday ? 'is-today-cell' : '',
+        day.isFuture ? 'is-future' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const cell = weekCol.createDiv({ cls: cellCls });
+
+      if (!day.isFuture) {
+        const pct = day.totalHabits > 0 ? Math.round((day.completedCount / day.totalHabits) * 100) : 0;
+        const tooltip = day.completedCount > 0
+          ? t('habits.heatmapCellTooltip', {
+              date: day.date,
+              completed: day.completedCount,
+              total: day.totalHabits,
+              pct,
+            })
+          : t('habits.heatmapCellEmpty', { date: day.date });
+
+        cell.setAttribute('title', day.isToday ? `${tooltip} [${t('analytics.chartTodayPill')}]` : tooltip);
+      }
+    }
+  }
+
+  // Auto-scroll to the end (today) so recent weeks are immediately visible
+  setTimeout(() => {
+    scrollWrap.scrollLeft = scrollWrap.scrollWidth;
+  }, 10);
+
+  // 3. Legend at bottom
   const legend = card.createDiv({ cls: 'study-flow-heatmap-legend' });
   legend.createSpan({ text: t('habits.heatmapLess'), cls: 'study-flow-legend-label' });
   for (let lvl = 0; lvl <= 4; lvl++) {

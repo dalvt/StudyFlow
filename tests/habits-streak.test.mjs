@@ -391,3 +391,53 @@ test('updateHabitInFile: updates frequency and name, recalculates streak, and pe
   assert.strictEqual(habitsFile.content, beforeContent);
 });
 
+test('computeHabitHeatmapYear generates 52 full weeks aligned Mon-Sun with correct days and counts', async () => {
+  const { computeHabitHeatmapYear } = await import('../src/habits.ts');
+  const ref = new Date('2026-10-18T12:00:00'); // Sunday
+  const habits = [
+    {
+      id: 'h1',
+      name: 'Physics',
+      history: ['2026-10-17', '2026-10-18'],
+      completedToday: true,
+      streak: 2,
+      lastCompletedDate: '2026-10-18',
+    },
+    {
+      id: 'h2',
+      name: 'Math',
+      history: ['2026-10-18'],
+      completedToday: true,
+      streak: 1,
+      lastCompletedDate: '2026-10-18',
+    },
+  ];
+
+  const res = computeHabitHeatmapYear(habits, ref, 52);
+  assert.strictEqual(res.weeks.length, 52);
+
+  // Each week has exactly 7 days
+  for (const w of res.weeks) {
+    assert.strictEqual(w.days.length, 7);
+    assert.strictEqual(w.days[0].dayOfWeek, 0); // Monday
+    assert.strictEqual(w.days[6].dayOfWeek, 6); // Sunday
+  }
+
+  // The last day of week 51 is 2026-10-18 (Sunday)
+  const lastWeek = res.weeks[51];
+  const lastDay = lastWeek.days[6];
+  assert.strictEqual(lastDay.date, '2026-10-18');
+  assert.strictEqual(lastDay.isToday, true);
+  assert.strictEqual(lastDay.completedCount, 2);
+  assert.strictEqual(lastDay.intensity, 4); // 2/2 = 100% -> level 4
+
+  // Saturday 2026-10-17 is day 5 of week 51
+  const satDay = lastWeek.days[5];
+  assert.strictEqual(satDay.date, '2026-10-17');
+  assert.strictEqual(satDay.completedCount, 1);
+  assert.strictEqual(satDay.intensity, 2); // 1/2 = 50% -> level 2
+
+  // Total completed count
+  assert.strictEqual(res.totalCompletedInYear, 3);
+});
+

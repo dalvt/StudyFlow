@@ -1525,7 +1525,7 @@ export function parseHabitLine(line: string, today: string = getLocalDateString(
  */
 export function formatHabitLine(h: HabitItemData): string {
   const check = h.completedToday ? 'x' : ' ';
-  const histStr = (h.history || []).slice(-60).join(',');
+  const histStr = (h.history || []).slice(-370).join(',');
   const parts: string[] = [
     `streak: ${h.streak || 0}`,
     `last: ${h.lastCompletedDate || ''}`,
@@ -1817,7 +1817,7 @@ export function formatHabitsToMarkdown(
   const lines: string[] = ['# Registro de Hábitos', ''];
   for (const h of habits) {
     const check = h.completedToday ? 'x' : ' ';
-    const histStr = (h.history || []).slice(-60).join(',');
+    const histStr = (h.history || []).slice(-370).join(',');
     lines.push(
       `- [${check}] ${h.name} <!-- streak: ${h.streak || 0} | last: ${h.lastCompletedDate || ''} | history: ${histStr} -->`
     );
