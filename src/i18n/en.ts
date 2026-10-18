@@ -510,7 +510,7 @@ export const en = {
   'settings.excludedFoldersDesc': 'Folders excluded from task index (comma-separated, default: Templates, templates).',
   'settings.headingNotes': 'Notes',
   'settings.dailyNotesFolderName': 'Daily Notes folder',
-  'settings.dailyNotesFolderDesc': 'Relative path where daily notes are stored (e.g. Daily).',
+  'settings.dailyNotesFolderDesc': 'Relative path where daily notes are stored (e.g. StudyFlow/Daily).',
   'settings.dailyNoteFormatName': 'Daily Note date format',
   'settings.dailyNoteFormatDesc': 'Moment.js compatible date format (default: YYYY-MM-DD).',
   'settings.inboxFilePathName': 'Inbox file path',

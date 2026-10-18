@@ -225,7 +225,7 @@ export async function loadAllDeadlines(
   }
 
   // 2. Daily notes folder files (recent/today)
-  const dailyFolder = app.vault.getAbstractFileByPath(settings.dailyNotesFolder || 'Daily');
+  const dailyFolder = app.vault.getAbstractFileByPath(settings.dailyNotesFolder || 'StudyFlow/Daily');
   if (dailyFolder && 'children' in dailyFolder && Array.isArray((dailyFolder as any).children)) {
     const children = (dailyFolder as any).children as any[];
     children.forEach((child) => {

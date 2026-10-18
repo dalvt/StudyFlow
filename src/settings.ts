@@ -283,10 +283,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.dailyNotesFolderDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('Daily')
+          .setPlaceholder('StudyFlow/Daily')
           .setValue(this.plugin.settings.dailyNotesFolder)
           .onChange(async (value) => {
-            this.plugin.settings.dailyNotesFolder = value.trim() || 'Daily';
+            this.plugin.settings.dailyNotesFolder = value.trim() || 'StudyFlow/Daily';
             await this.plugin.saveSettings();
           })
       );

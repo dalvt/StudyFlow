@@ -119,7 +119,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   pomodoroSound: 'bell',
   enableSessionClosingReview: true,
   enableBreakTips: true,
-  dailyNotesFolder: 'Daily',
+  dailyNotesFolder: 'StudyFlow/Daily',
   dailyNoteDateFormat: 'YYYY-MM-DD',
   inboxFilePath: 'StudyFlow/Inbox.md',
   habitsFilePath: 'StudyFlow/Habits.md',

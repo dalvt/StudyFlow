@@ -512,7 +512,7 @@ export const es: TranslationDict = {
   'settings.excludedFoldersDesc': 'Carpetas omitidas del índice de tareas (separadas por coma, por defecto: Templates, templates).',
   'settings.headingNotes': 'Notas',
   'settings.dailyNotesFolderName': 'Carpeta de Notas Diarias',
-  'settings.dailyNotesFolderDesc': 'Ruta relativa donde se almacenan las notas diarias (ej. Daily).',
+  'settings.dailyNotesFolderDesc': 'Ruta relativa donde se almacenan las notas diarias (ej. StudyFlow/Daily).',
   'settings.dailyNoteFormatName': 'Formato de fecha de la Nota Diaria',
   'settings.dailyNoteFormatDesc': 'Formato de fecha compatible con Moment.js (por defecto: YYYY-MM-DD).',
   'settings.inboxFilePathName': 'Ruta de archivo Inbox',

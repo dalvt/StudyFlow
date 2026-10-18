@@ -22,7 +22,7 @@ export async function ensureFolderExists(app: App, folderPath: string): Promise<
     if (!part) continue;
     current = current ? `${current}/${part}` : part;
     const file = app.vault.getAbstractFileByPath(current);
-    if (!file) {
+    if (!file && typeof app.vault.createFolder === 'function') {
       await app.vault.createFolder(current);
     }
   }
@@ -140,6 +140,44 @@ export async function migratePluginFilesToDedicatedFolder(
     }
     if (settings.habitsFilePath === 'Habits.md') {
       settings.habitsFilePath = 'StudyFlow/Habits.md';
+    }
+
+    // 3. Migrate root Daily folder to StudyFlow/Daily
+    const rootDaily = app.vault.getAbstractFileByPath('Daily');
+    const targetDailyPath = settings.dailyNotesFolder || 'StudyFlow/Daily';
+
+    if (
+      rootDaily &&
+      !(rootDaily instanceof TFile) &&
+      'children' in (rootDaily as any) &&
+      (targetDailyPath === 'Daily' || targetDailyPath === 'StudyFlow/Daily')
+    ) {
+      await ensureFolderExists(app, 'StudyFlow');
+      const newFolderPath = 'StudyFlow/Daily';
+      const existingInTarget = app.vault.getAbstractFileByPath(newFolderPath);
+
+      if (!existingInTarget) {
+        if (app.fileManager && typeof app.fileManager.renameFile === 'function') {
+          await app.fileManager.renameFile(rootDaily as any, newFolderPath);
+          settings.dailyNotesFolder = newFolderPath;
+        }
+      } else if ('children' in (existingInTarget as any)) {
+        const children = [...(rootDaily as any).children];
+        for (const child of children) {
+          const destPath = `${newFolderPath}/${child.name}`;
+          if (!app.vault.getAbstractFileByPath(destPath) && app.fileManager?.renameFile) {
+            await app.fileManager.renameFile(child, destPath);
+          }
+        }
+        if ((rootDaily as any).children.length === 0 && app.vault.delete) {
+          await app.vault.delete(rootDaily as any);
+        }
+        settings.dailyNotesFolder = newFolderPath;
+      }
+    }
+
+    if (settings.dailyNotesFolder === 'Daily') {
+      settings.dailyNotesFolder = 'StudyFlow/Daily';
     }
   } catch (err) {
     console.error('Study Flow: Error migrando archivos a la carpeta dedicada StudyFlow', err);

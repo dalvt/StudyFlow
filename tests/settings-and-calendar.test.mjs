@@ -66,6 +66,7 @@ test('DEFAULT_SETTINGS contains all required settings and defaults', () => {
   assert.equal(DEFAULT_SETTINGS.language, 'auto');
   assert.deepEqual(DEFAULT_SETTINGS.subjects, []);
   assert.equal(DEFAULT_SETTINGS.weeklyReviewsFolder, 'StudyFlow/Reviews');
+  assert.equal(DEFAULT_SETTINGS.dailyNotesFolder, 'StudyFlow/Daily');
   assert.ok(DEFAULT_SETTINGS.weeklyReviewTemplate.includes('Revisión Semanal'));
 });
 

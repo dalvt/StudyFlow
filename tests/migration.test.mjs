@@ -10,6 +10,7 @@ import {
 } from '../src/migration-utils.ts';
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
 import { parseTimeBlocksFromMarkdown } from '../src/calendar-utils.ts';
+import { migratePluginFilesToDedicatedFolder } from '../src/utils.ts';
 
 test('parseSessionsFromJsonl parses JSON lines and skips blank lines and malformed entries', () => {
   const jsonlContent = `{"id":"s1","timestamp":1700000000000,"date":"2026-10-12","durationMinutes":25,"tags":["#algebra"],"taskText":"Estudiar álgebra"}
@@ -141,4 +142,50 @@ test('migrated calendarBlocks sync to daily note markdown and round-trip parse a
   assert.equal(parsedBlocks[0].completed, false);
   assert.equal(parsedBlocks[1].title, 'Bloque Práctico');
   assert.equal(parsedBlocks[1].completed, true);
+});
+
+test('migratePluginFilesToDedicatedFolder moves root Daily folder to StudyFlow/Daily and updates settings', async () => {
+  const rootDaily = {
+    name: 'Daily',
+    path: 'Daily',
+    children: [
+      { name: '2026-10-18.md', path: 'Daily/2026-10-18.md' },
+    ],
+  };
+
+  const filesMap = new Map();
+  filesMap.set('Daily', rootDaily);
+
+  const renamed = [];
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => filesMap.get(p) || null,
+      createFolder: async (p) => {
+        const folder = { name: p.split('/').pop(), path: p, children: [] };
+        filesMap.set(p, folder);
+        return folder;
+      },
+    },
+    fileManager: {
+      renameFile: async (file, newPath) => {
+        renamed.push({ from: file.path, to: newPath });
+        filesMap.delete(file.path);
+        file.path = newPath;
+        filesMap.set(newPath, file);
+      },
+    },
+  };
+
+  const settings = {
+    dailyNotesFolder: 'Daily',
+    inboxFilePath: 'StudyFlow/Inbox.md',
+    habitsFilePath: 'StudyFlow/Habits.md',
+  };
+
+  await migratePluginFilesToDedicatedFolder(app, settings);
+
+  assert.equal(settings.dailyNotesFolder, 'StudyFlow/Daily');
+  assert.equal(renamed.length, 1);
+  assert.equal(renamed[0].from, 'Daily');
+  assert.equal(renamed[0].to, 'StudyFlow/Daily');
 });

@@ -203,7 +203,7 @@ test('formatTimeBlockLine and parseTimeBlockLine preserve inline metadata [subje
 });
 
 test('calendar.ts operations respect custom settings.timeBlocksSectionHeader', async () => {
-  const dailyFile = new TFile('Daily/2026-10-15.md');
+  const dailyFile = new TFile('StudyFlow/Daily/2026-10-15.md');
   dailyFile.content = `# 2026-10-15\n\n## Mi Horario\n- [ ] 09:00—10:30 Laboratorio Física\n`;
 
   const settings = cloneDefaultSettings();
@@ -211,7 +211,7 @@ test('calendar.ts operations respect custom settings.timeBlocksSectionHeader', a
 
   const app = {
     vault: {
-      getAbstractFileByPath: (p) => (p === 'Daily/2026-10-15.md' ? dailyFile : null),
+      getAbstractFileByPath: (p) => (p === 'StudyFlow/Daily/2026-10-15.md' ? dailyFile : null),
       read: async () => dailyFile.content,
       process: async (_file, fn) => {
         dailyFile.content = fn(dailyFile.content);
@@ -251,7 +251,7 @@ test('calendar.ts operations respect custom settings.timeBlocksSectionHeader', a
 });
 
 test('toggleTimeBlockCompletion materializes a virtual schedule block into the Daily Note', async () => {
-  const dailyFile = new TFile('Daily/2026-10-12.md');
+  const dailyFile = new TFile('StudyFlow/Daily/2026-10-12.md');
   dailyFile.content = `# 2026-10-12\n\n`;
 
   const scheduleFile = new TFile('StudyFlow/Schedule.md');
@@ -261,7 +261,7 @@ test('toggleTimeBlockCompletion materializes a virtual schedule block into the D
   const app = {
     vault: {
       getAbstractFileByPath: (p) => {
-        if (p === 'Daily/2026-10-12.md') return dailyFile;
+        if (p === 'StudyFlow/Daily/2026-10-12.md') return dailyFile;
         if (p === 'StudyFlow/Schedule.md') return scheduleFile;
         return null;
       },
