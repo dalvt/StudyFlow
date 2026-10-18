@@ -21,6 +21,8 @@ export class HabitsTab implements TabComponent {
   private plugin: StudyFlowPlugin;
   private container: HTMLElement | null = null;
   private habits: HabitItem[] = [];
+  private isRendering = false;
+  private pendingRender = false;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     this.app = app;
@@ -29,12 +31,19 @@ export class HabitsTab implements TabComponent {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.empty();
+    if (this.isRendering) {
+      this.pendingRender = true;
+      return;
+    }
 
-    const path = this.plugin.settings.habitsFilePath || 'Habits.md';
-    this.habits = await loadHabitsFromFile(this.app, path);
+    this.isRendering = true;
+    try {
+      const path = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
+      this.habits = await loadHabitsFromFile(this.app, path);
 
-    const card = container.createDiv({ cls: 'study-flow-card' });
+      container.empty();
+
+      const card = container.createDiv({ cls: 'study-flow-card' });
 
     // Stats bar
     const completedCount = this.habits.filter((h) => h.completedToday).length;
@@ -248,6 +257,15 @@ export class HabitsTab implements TabComponent {
 
     // Heatmap consistency visualization
     renderHabitHeatmap(container, this.habits);
+    } finally {
+      this.isRendering = false;
+      if (this.pendingRender) {
+        this.pendingRender = false;
+        if (this.container) {
+          void this.render(this.container);
+        }
+      }
+    }
   }
 
   public async onHabitsModified(): Promise<void> {
@@ -258,5 +276,7 @@ export class HabitsTab implements TabComponent {
 
   destroy(): void {
     this.container = null;
+    this.isRendering = false;
+    this.pendingRender = false;
   }
 }

@@ -7,6 +7,8 @@ export class AnalyticsTab implements TabComponent {
   private app: App;
   private plugin: StudyFlowPlugin;
   private container: HTMLElement | null = null;
+  private isRendering = false;
+  private pendingRender = false;
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     this.app = app;
@@ -15,13 +17,27 @@ export class AnalyticsTab implements TabComponent {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.empty();
+    if (this.isRendering) {
+      this.pendingRender = true;
+      return;
+    }
 
-    await renderAnalyticsDashboard(container, this.app, this.plugin, async () => {
-      if (this.container) {
-        await this.render(this.container);
+    this.isRendering = true;
+    try {
+      await renderAnalyticsDashboard(container, this.app, this.plugin, async () => {
+        if (this.container) {
+          await this.render(this.container);
+        }
+      });
+    } finally {
+      this.isRendering = false;
+      if (this.pendingRender) {
+        this.pendingRender = false;
+        if (this.container) {
+          void this.render(this.container);
+        }
       }
-    });
+    }
   }
 
   public async refresh(): Promise<void> {
@@ -38,5 +54,7 @@ export class AnalyticsTab implements TabComponent {
 
   destroy(): void {
     this.container = null;
+    this.isRendering = false;
+    this.pendingRender = false;
   }
 }

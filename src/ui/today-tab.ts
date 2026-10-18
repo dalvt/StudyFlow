@@ -39,6 +39,9 @@ export class TodayTab implements TabComponent {
   private habitsSectionEl: HTMLElement | null = null;
   private spacedSectionEl: HTMLElement | null = null;
 
+  private isRendering = false;
+  private pendingRender = false;
+
   constructor(app: App, plugin: StudyFlowPlugin, onSwitchTab: (tab: ActiveTab) => void) {
     this.app = app;
     this.plugin = plugin;
@@ -47,8 +50,15 @@ export class TodayTab implements TabComponent {
 
   public async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.empty();
-    container.addClass('study-flow-today-tab');
+    if (this.isRendering) {
+      this.pendingRender = true;
+      return;
+    }
+
+    this.isRendering = true;
+    try {
+      container.empty();
+      container.addClass('study-flow-today-tab');
 
     const cfg = this.plugin.settings.todaySections || {
       showNowNext: true,
@@ -85,6 +95,15 @@ export class TodayTab implements TabComponent {
       this.spacedSectionEl = container.createDiv({ cls: 'study-flow-today-section study-flow-today-spaced-sec' });
       await this.renderSpacedSection();
     }
+    } finally {
+      this.isRendering = false;
+      if (this.pendingRender) {
+        this.pendingRender = false;
+        if (this.container) {
+          void this.render(this.container);
+        }
+      }
+    }
   }
 
   // --- Incremental Updates ---
@@ -111,6 +130,8 @@ export class TodayTab implements TabComponent {
     this.todayTasksSectionEl = null;
     this.habitsSectionEl = null;
     this.spacedSectionEl = null;
+    this.isRendering = false;
+    this.pendingRender = false;
   }
 
   // --- 1. Ahora / Siguiente ---

@@ -73,15 +73,15 @@ export async function renderAnalyticsDashboard(
   plugin: StudyFlowPlugin,
   onRefresh?: () => Promise<void>
 ): Promise<void> {
-  container.empty();
-  const rootWrapper = container.createDiv({ cls: 'study-flow-analytics-wrapper' });
-
   // 1. Fetch data
   const habits = await loadHabitsFromFile(app, plugin.settings.habitsFilePath || 'Habits.md');
   const tasks = await loadAllCurrentTasks(app, plugin);
   const sessions = await loadFocusSessionsFromFile(app);
   plugin.focusSessions = sessions;
   const summary = buildAnalyticsSummary(sessions, habits, tasks);
+
+  container.empty();
+  const rootWrapper = container.createDiv({ cls: 'study-flow-analytics-wrapper' });
 
   // 2. Header bar with sync action
   const headerCard = rootWrapper.createDiv({ cls: 'study-flow-analytics-header' });
