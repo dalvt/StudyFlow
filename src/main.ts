@@ -30,6 +30,10 @@ export default class StudyFlowPlugin extends Plugin {
     this.focusSessions = await loadFocusSessionsFromFile(this.app);
     await this.saveSettings();
 
+    this.app.workspace.onLayoutReady(async () => {
+      this.focusSessions = await loadFocusSessionsFromFile(this.app);
+    });
+
     // Initialize reactive TaskIndex
     this.taskIndex = new TaskIndex(this);
     this.taskIndex.init();

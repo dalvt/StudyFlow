@@ -11,6 +11,7 @@ import {
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
 import { parseTimeBlocksFromMarkdown } from '../src/calendar-utils.ts';
 import { migratePluginFilesToDedicatedFolder } from '../src/utils.ts';
+import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from '../src/storage-migration.ts';
 
 test('parseSessionsFromJsonl parses JSON lines and skips blank lines and malformed entries', () => {
   const jsonlContent = `{"id":"s1","timestamp":1700000000000,"date":"2026-10-12","durationMinutes":25,"tags":["#algebra"],"taskText":"Estudiar álgebra"}
@@ -188,4 +189,62 @@ test('migratePluginFilesToDedicatedFolder moves root Daily folder to StudyFlow/D
   assert.equal(renamed.length, 1);
   assert.equal(renamed[0].from, 'Daily');
   assert.equal(renamed[0].to, 'StudyFlow/Daily');
+});
+
+test('loadFocusSessionsFromFile falls back to adapter.read when getAbstractFileByPath returns null', async () => {
+  const jsonl = '{"id":"s1","timestamp":1792254338421,"date":"2026-10-17","durationMinutes":50,"taskText":"Physics","tags":[]}\n';
+  const app = {
+    vault: {
+      getAbstractFileByPath: () => null,
+      adapter: {
+        exists: async (p) => p === SESSIONS_FILE_PATH,
+        read: async (p) => (p === SESSIONS_FILE_PATH ? jsonl : ''),
+      },
+    },
+  };
+
+  const sessions = await loadFocusSessionsFromFile(app);
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0].id, 's1');
+  assert.equal(sessions[0].date, '2026-10-17');
+  assert.equal(sessions[0].durationMinutes, 50);
+});
+
+test('syncHistoricalSessionsFromVault populates plugin.focusSessions with existing and imported sessions', async () => {
+  const jsonl = '{"id":"s1","timestamp":1792254338421,"date":"2026-10-17","durationMinutes":50,"taskText":"Physics","tags":[]}\n';
+  const dailyNoteContent = `# 2026-10-18\n- 🍅 13:10 · Math\n`;
+
+  const files = [
+    {
+      basename: '2026-10-18',
+      path: 'StudyFlow/Daily/2026-10-18.md',
+    },
+  ];
+
+  let storedJsonl = jsonl;
+  const dummyFile = { path: SESSIONS_FILE_PATH };
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === SESSIONS_FILE_PATH ? dummyFile : null),
+      adapter: {
+        exists: async (p) => true,
+        read: async (p) => storedJsonl,
+      },
+      createFolder: async () => {},
+      create: async () => dummyFile,
+      getMarkdownFiles: () => files,
+      read: async () => dailyNoteContent,
+      process: async (file, fn) => {
+        storedJsonl = fn(storedJsonl);
+      },
+    },
+  };
+
+  const plugin = { focusSessions: [] };
+  const added = await syncHistoricalSessionsFromVault(app, { pomodoroWorkDuration: 50 }, plugin);
+
+  assert.equal(added, 1);
+  assert.equal(plugin.focusSessions.length, 2);
+  assert.equal(plugin.focusSessions[0].date, '2026-10-17');
+  assert.equal(plugin.focusSessions[1].date, '2026-10-18');
 });

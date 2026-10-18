@@ -78,10 +78,8 @@ export async function renderAnalyticsDashboard(
   // 1. Fetch data
   const habits = await loadHabitsFromFile(app, plugin.settings.habitsFilePath || 'Habits.md');
   const tasks = await loadAllCurrentTasks(app, plugin);
-  const sessions =
-    plugin.focusSessions && plugin.focusSessions.length > 0
-      ? plugin.focusSessions
-      : await loadFocusSessionsFromFile(app);
+  const sessions = await loadFocusSessionsFromFile(app);
+  plugin.focusSessions = sessions;
   const summary = buildAnalyticsSummary(sessions, habits, tasks);
 
   // 2. Header bar with sync action
@@ -221,10 +219,9 @@ export async function renderAnalyticsDashboard(
 
     // Track
     const track = col.createDiv({ cls: 'study-flow-bar-track' });
-    const fillPercent = Math.max(
-      day.totalMinutes > 0 ? 10 : 3,
-      Math.round((day.totalMinutes / maxDayMinutes) * 100)
-    );
+    const fillPercent = day.totalMinutes > 0
+      ? Math.max(6, Math.round((day.totalMinutes / maxDayMinutes) * 100))
+      : 0;
 
     const fill = track.createDiv({
       cls: `study-flow-bar-fill ${day.isToday ? 'is-today-fill' : ''}`,

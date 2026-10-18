@@ -30,17 +30,26 @@ export async function loadFocusSessionsFromFile(
 ): Promise<FocusSessionRecord[]> {
   const normalized = normalizePath(filePath);
   const file = app.vault.getAbstractFileByPath(normalized);
-  if (!(file instanceof TFile)) {
-    return [];
+  if (file instanceof TFile) {
+    try {
+      const content = await app.vault.read(file);
+      return parseSessionsFromJsonl(content);
+    } catch (err) {
+      console.error('Study Flow: Error leyendo sesiones desde Sessions.jsonl', err);
+    }
   }
 
+  // Fallback to adapter in case vault index is not yet loaded (e.g. during startup)
   try {
-    const content = await app.vault.read(file);
-    return parseSessionsFromJsonl(content);
+    if (app.vault.adapter && (await app.vault.adapter.exists(normalized))) {
+      const content = await app.vault.adapter.read(normalized);
+      return parseSessionsFromJsonl(content);
+    }
   } catch (err) {
-    console.error('Study Flow: Error leyendo sesiones desde Sessions.jsonl', err);
-    return [];
+    console.error('Study Flow: Error leyendo sesiones via adapter desde Sessions.jsonl', err);
   }
+
+  return [];
 }
 
 /**
@@ -222,9 +231,7 @@ export async function syncHistoricalSessionsFromVault(
           };
 
           await appendFocusSessionToFile(app, newSession);
-          if (plugin) {
-            plugin.focusSessions.push(newSession);
-          }
+          existingSessions.push(newSession);
           addedCount++;
         }
       }
@@ -233,8 +240,8 @@ export async function syncHistoricalSessionsFromVault(
     }
   }
 
-  if (plugin && addedCount > 0) {
-    plugin.focusSessions.sort((a, b) => a.timestamp - b.timestamp);
+  if (plugin) {
+    plugin.focusSessions = existingSessions.sort((a, b) => a.timestamp - b.timestamp);
   }
 
   return addedCount;

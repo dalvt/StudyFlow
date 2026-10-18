@@ -5,7 +5,7 @@ import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateStrin
 import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, TaskRecord } from './tasks';
 import { toggleTimeBlockCompletion } from './calendar';
 import { extractTagsFromText, FocusSessionRecord } from './analytics';
-import { appendFocusSessionToFile } from './storage-migration';
+import { appendFocusSessionToFile, loadFocusSessionsFromFile } from './storage-migration';
 import { PomodoroClosingReviewModal, PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
 import { t } from './i18n/index.ts';
 import { formatPomodoroLogLine } from './conventions.ts';
@@ -1104,12 +1104,17 @@ export class PomodoroManager {
         interrupted,
       };
 
-      if (!this.plugin.focusSessions) {
-        this.plugin.focusSessions = [];
+      if (!this.plugin.focusSessions || this.plugin.focusSessions.length === 0) {
+        this.plugin.focusSessions = await loadFocusSessionsFromFile(this.plugin.app);
       }
       this.plugin.focusSessions.push(session);
 
       await appendFocusSessionToFile(this.plugin.app, session);
+      try {
+        (this.plugin.app.workspace as any)?.trigger?.('study-flow:focus-session-recorded', session);
+      } catch (triggerErr) {
+        console.error('Study Flow: Error disparando evento focus-session-recorded', triggerErr);
+      }
       return session;
     } catch (err) {
       console.error('Study Flow Assistant: Error guardando métricas de sesión de enfoque', err);

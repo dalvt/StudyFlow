@@ -28,21 +28,21 @@
   --sf-accent-subtle: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
   --sf-accent-border: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
 
-  --sf-danger: var(--text-error);
-  --sf-danger-subtle: color-mix(in srgb, var(--text-error) 14%, transparent);
-  --sf-danger-border: color-mix(in srgb, var(--text-error) 28%, transparent);
+  --sf-danger: var(--text-error, var(--color-red, #ef4444));
+  --sf-danger-subtle: color-mix(in srgb, var(--sf-danger) 14%, transparent);
+  --sf-danger-border: color-mix(in srgb, var(--sf-danger) 28%, transparent);
 
-  --sf-success: var(--text-success);
-  --sf-success-subtle: color-mix(in srgb, var(--text-success) 14%, transparent);
-  --sf-success-border: color-mix(in srgb, var(--text-success) 28%, transparent);
+  --sf-success: var(--text-success, var(--color-green, #10b981));
+  --sf-success-subtle: color-mix(in srgb, var(--sf-success) 14%, transparent);
+  --sf-success-border: color-mix(in srgb, var(--sf-success) 28%, transparent);
 
-  --sf-warning: var(--text-warning);
-  --sf-warning-subtle: color-mix(in srgb, var(--text-warning) 15%, transparent);
-  --sf-warning-border: color-mix(in srgb, var(--text-warning) 28%, transparent);
+  --sf-warning: var(--text-warning, var(--color-orange, #f59e0b));
+  --sf-warning-subtle: color-mix(in srgb, var(--sf-warning) 15%, transparent);
+  --sf-warning-border: color-mix(in srgb, var(--sf-warning) 28%, transparent);
 
-  --sf-info: var(--text-accent);
-  --sf-info-subtle: color-mix(in srgb, var(--text-accent) 14%, transparent);
-  --sf-info-border: color-mix(in srgb, var(--text-accent) 28%, transparent);
+  --sf-info: var(--text-accent, var(--color-blue, #3b82f6));
+  --sf-info-subtle: color-mix(in srgb, var(--sf-info) 14%, transparent);
+  --sf-info-border: color-mix(in srgb, var(--sf-info) 28%, transparent);
 
   /* Native Surfaces, Borders & Shadows */
   --sf-bg-primary: var(--background-primary);
@@ -2002,17 +2002,22 @@
 }
 
 .study-flow-bar-track {
+  position: relative;
   width: 100%;
   max-width: 32px;
   flex: 1;
+  min-height: 0;
+  height: 100%;
   background: var(--background-modifier-hover);
   border-radius: 6px 6px 2px 2px;
   overflow: hidden;
-  display: flex;
-  align-items: flex-end;
 }
 
 .study-flow-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
   border-radius: 6px 6px 2px 2px;
   background: var(--sf-accent);

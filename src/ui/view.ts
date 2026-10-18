@@ -117,6 +117,17 @@ export class StudyFlowView extends ItemView {
         if (file.path === habitsPath) {
           await this.habitsTab.onHabitsModified();
           await this.todayTab.onHabitsChanged();
+          if (this.activeTab === 'analytics') {
+            await this.analyticsTab.refresh();
+          }
+        }
+      })
+    );
+
+    this.registerEvent(
+      (this.app.workspace as any).on('study-flow:focus-session-recorded', async () => {
+        if (this.activeTab === 'analytics') {
+          await this.analyticsTab.refresh();
         }
       })
     );
@@ -311,9 +322,13 @@ export class StudyFlowView extends ItemView {
     for (const [id, container] of this.tabContainers.entries()) {
       const isSelected = id === tab;
       container.toggleClass('is-hidden', !isSelected);
-      if (isSelected && !this.tabRendered.get(id)) {
-        await this.tabComponents[id].render(container);
-        this.tabRendered.set(id, true);
+      if (isSelected) {
+        if (!this.tabRendered.get(id)) {
+          await this.tabComponents[id].render(container);
+          this.tabRendered.set(id, true);
+        } else if (id === 'analytics') {
+          await this.analyticsTab.refresh();
+        }
       }
     }
   }
