@@ -3,7 +3,11 @@
 /* ==========================================================================
    0. Design Tokens (Obsidian Native Derivative Tokens)
    ========================================================================== */
-:root {
+:root,
+body,
+.theme-dark,
+.theme-light,
+.study-flow-container {
   /* Corner Radii derived from Obsidian variables */
   --sf-radius-xs: var(--radius-s, 4px);
   --sf-radius-s: var(--radius-s, 4px);
@@ -23,10 +27,10 @@
   --sf-space-3xl: 32px;
 
   /* Accent & Semantic Palette derived from Obsidian native theme */
-  --sf-accent: var(--interactive-accent);
-  --sf-accent-hover: var(--interactive-accent-hover);
-  --sf-accent-subtle: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
-  --sf-accent-border: color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+  --sf-accent: var(--color-accent, var(--interactive-accent, var(--text-accent, #38bdf8)));
+  --sf-accent-hover: var(--color-accent-hover, var(--interactive-accent-hover, #0284c7));
+  --sf-accent-subtle: color-mix(in srgb, var(--sf-accent) 15%, transparent);
+  --sf-accent-border: color-mix(in srgb, var(--sf-accent) 28%, transparent);
 
   --sf-danger: var(--text-error, var(--color-red, #ef4444));
   --sf-danger-subtle: color-mix(in srgb, var(--sf-danger) 14%, transparent);
@@ -2020,13 +2024,14 @@
   right: 0;
   width: 100%;
   border-radius: 6px 6px 2px 2px;
-  background: var(--sf-accent);
+  background: var(--sf-accent, var(--color-accent, var(--text-accent, #38bdf8)));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sf-accent, #38bdf8) 30%, transparent);
   transition: height 0.3s ease;
 }
 
 .study-flow-bar-fill.is-today-fill {
-  background: var(--sf-success);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--sf-success) 40%, transparent);
+  background: var(--sf-success, var(--color-green, #10b981));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sf-success, #10b981) 40%, transparent);
 }
 
 .study-flow-bar-label {
@@ -2127,7 +2132,7 @@
 
 .study-flow-tag-fill {
   height: 100%;
-  background: var(--interactive-accent);
+  background: var(--sf-accent, var(--color-accent, var(--text-accent, #38bdf8)));
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -4619,6 +4624,7 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-subject-fill {
   height: 100%;
+  background: var(--sf-accent, var(--color-accent, var(--text-accent, #38bdf8)));
   border-radius: 4px;
   transition: width 0.3s ease;
 }
