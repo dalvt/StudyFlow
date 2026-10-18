@@ -714,6 +714,14 @@ export const es: TranslationDict = {
   'habits.restDayMarkedNotice': 'Día de descanso marcado para "{name}". Tu racha se mantiene intacta.',
   'habits.restDayUnmarkedNotice': 'Día de descanso desmarcado para "{name}".',
   'habits.weeksStreak': '{count} sem',
+  'habits.editModalTitle': 'Editar Hábito',
+  'habits.editHabitTooltip': 'Editar hábito y frecuencia',
+  'habits.nameLabel': 'Nombre del hábito',
+  'habits.nameDesc': 'Título o descripción de la rutina diaria',
+  'habits.frequencyDesc': 'Define con qué frecuencia debes realizar este hábito',
+  'habits.timesPerWeekDesc': 'Número de veces por semana como meta (1 a 7)',
+  'habits.habitUpdatedNotice': '✓ Hábito actualizado: {name}',
+  'habits.enterNameNotice': 'Por favor ingresa un nombre para el hábito',
 
   // Today Tab
   'today.heading': '¿Qué hago ahora?',

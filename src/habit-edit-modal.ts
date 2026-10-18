@@ -1,0 +1,154 @@
+import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
+import type StudyFlowPlugin from './main';
+import type { HabitFrequency, HabitFrequencyType, HabitItem } from './habits.ts';
+import { t } from './i18n/index.ts';
+
+export class HabitEditModal extends Modal {
+  private plugin: StudyFlowPlugin;
+  private habit: HabitItem;
+  private onSave: (updates: { name: string; frequency: HabitFrequency }) => Promise<void> | void;
+
+  private name: string = '';
+  private freqType: HabitFrequencyType = 'daily';
+  private weeklyTarget: number = 3;
+  private previousActiveElement: HTMLElement | null = null;
+
+  constructor(
+    app: App,
+    plugin: StudyFlowPlugin,
+    habit: HabitItem,
+    onSave: (updates: { name: string; frequency: HabitFrequency }) => Promise<void> | void
+  ) {
+    super(app);
+    this.plugin = plugin;
+    this.habit = habit;
+    this.onSave = onSave;
+
+    this.name = habit.name;
+    const freq = habit.frequency || { type: 'daily' };
+    this.freqType = freq.type || 'daily';
+    this.weeklyTarget = freq.weeklyTarget || 3;
+  }
+
+  onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('study-flow-modal', 'study-flow-habit-edit-modal');
+
+    // Header
+    const header = contentEl.createDiv({ cls: 'study-flow-modal-header' });
+    const title = header.createEl('h2', { text: t('habits.editModalTitle') });
+    const iconSpan = title.createSpan({ cls: 'study-flow-header-icon' });
+    setIcon(iconSpan, 'flame');
+
+    // Habit Name setting
+    new Setting(contentEl)
+      .setName(t('habits.nameLabel'))
+      .setDesc(t('habits.nameDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('habits.newHabitPlaceholder'))
+          .setValue(this.name)
+          .onChange((val) => {
+            this.name = val;
+          });
+        text.inputEl.focus();
+      });
+
+    // Frequency setting
+    let targetSetting: Setting | null = null;
+    new Setting(contentEl)
+      .setName(t('habits.frequencyLabel'))
+      .setDesc(t('habits.frequencyDesc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('daily', t('habits.freqDailyOption'))
+          .addOption('weekly', t('habits.freqWeeklyOption'))
+          .addOption('specific_days', t('habits.freqWeekdaysOption'))
+          .setValue(this.freqType)
+          .onChange((val: string) => {
+            this.freqType = val as HabitFrequencyType;
+            if (targetSetting) {
+              targetSetting.settingEl.toggleClass('is-hidden', this.freqType !== 'weekly');
+            }
+          });
+      });
+
+    // Weekly target setting
+    targetSetting = new Setting(contentEl)
+      .setName(t('habits.timesPerWeekPlaceholder'))
+      .setDesc(t('habits.timesPerWeekDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder('3')
+          .setValue(String(this.weeklyTarget))
+          .onChange((val) => {
+            const num = parseInt(val, 10);
+            if (!isNaN(num) && num >= 1 && num <= 7) {
+              this.weeklyTarget = num;
+            }
+          });
+        text.inputEl.type = 'number';
+        text.inputEl.min = '1';
+        text.inputEl.max = '7';
+      });
+
+    if (this.freqType !== 'weekly') {
+      targetSetting.settingEl.addClass('is-hidden');
+    }
+
+    // Modal buttons
+    const btnContainer = contentEl.createDiv({ cls: 'study-flow-modal-buttons' });
+    const cancelBtn = btnContainer.createEl('button', { text: t('common.cancel') });
+    cancelBtn.addEventListener('click', () => this.close());
+
+    const saveBtn = btnContainer.createEl('button', {
+      text: t('common.save'),
+      cls: 'mod-cta',
+    });
+
+    const handleSave = async () => {
+      const trimmedName = this.name.trim();
+      if (!trimmedName) {
+        new Notice(t('habits.enterNameNotice'));
+        return;
+      }
+      let frequency: HabitFrequency = { type: 'daily' };
+      if (this.freqType === 'weekly') {
+        frequency = {
+          type: 'weekly',
+          weeklyTarget: Math.max(1, Math.min(7, this.weeklyTarget || 3)),
+        };
+      } else if (this.freqType === 'specific_days') {
+        frequency = {
+          type: 'specific_days',
+          daysOfWeek: [1, 2, 3, 4, 5],
+        };
+      }
+
+      this.close();
+      await this.onSave({
+        name: trimmedName,
+        frequency,
+      });
+    };
+
+    saveBtn.addEventListener('click', handleSave);
+
+    contentEl.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSave();
+      }
+    });
+  }
+
+  onClose(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
+  }
+}

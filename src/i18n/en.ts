@@ -712,6 +712,14 @@ export const en = {
   'habits.restDayMarkedNotice': 'Rest day marked for "{name}". Streak preserved.',
   'habits.restDayUnmarkedNotice': 'Rest day unmarked for "{name}".',
   'habits.weeksStreak': '{count} wks',
+  'habits.editModalTitle': 'Edit Habit',
+  'habits.editHabitTooltip': 'Edit habit and frequency',
+  'habits.nameLabel': 'Habit Name',
+  'habits.nameDesc': 'Title or description of the daily routine',
+  'habits.frequencyDesc': 'Define how often you need to complete this habit',
+  'habits.timesPerWeekDesc': 'Target number of times per week (1 to 7)',
+  'habits.habitUpdatedNotice': '✓ Habit updated: {name}',
+  'habits.enterNameNotice': 'Please enter a habit name',
 
   // Today Tab
   'today.heading': 'What do I do now?',

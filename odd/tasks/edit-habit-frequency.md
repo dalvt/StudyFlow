@@ -27,9 +27,9 @@ Currently, habits can only have their frequency defined at initial creation time
 - [x] TASK-2: Add `updateHabitInFile` in `src/habits.ts` with streak recalculation and unit tests.
   - Route: delegated direct (Writer trigger)
   - Checks: `npm test` (216/216 passed)
-- [ ] TASK-3: Add i18n keys and create `HabitEditModal` in `src/habit-edit-modal.ts`.
+- [x] TASK-3: Add i18n keys and create `HabitEditModal` in `src/habit-edit-modal.ts`.
   - Route: delegated direct (Writer trigger)
-  - Checks: `npm run check-types`
+  - Checks: `npm run check-types && npm test` (216/216 passed)
 - [ ] TASK-4: Wire `HabitEditModal` to habit cards and frequency badges in `src/ui/habits-tab.ts` and update styles in `styles.css`.
   - Route: delegated direct (Writer trigger)
   - Checks: `npm test && npm run build`
