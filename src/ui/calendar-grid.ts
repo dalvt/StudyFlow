@@ -263,10 +263,19 @@ export class CalendarGridComponent {
         preview.style.height = `${(heightMins / 60) * this.hourHeight}px`;
       };
 
-      const onPointerUp = async () => {
+      const cleanupDrag = () => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerCancel);
         preview.remove();
+      };
+
+      const onPointerCancel = () => {
+        cleanupDrag();
+      };
+
+      const onPointerUp = async () => {
+        cleanupDrag();
 
         const startTime = minutesToTimeString(startMins);
         const endTime = minutesToTimeString(currentEndMins);
@@ -300,6 +309,7 @@ export class CalendarGridComponent {
 
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerCancel);
     });
 
     // Render Blocks

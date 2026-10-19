@@ -845,8 +845,7 @@ export function renderPendingTasksSelectorColumn(
   }
 
   const taskListEl = selectorCol.createDiv({
-    cls: 'study-flow-task-list-cards',
-    attr: { style: 'max-height: 280px; overflow-y: auto;' },
+    cls: 'study-flow-task-list-cards study-flow-task-list-cards-selector',
   });
 
   if (pendingTasks.length === 0) {

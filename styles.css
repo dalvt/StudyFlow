@@ -515,6 +515,10 @@ body,
   flex-wrap: wrap;
 }
 
+.study-flow-presets-group-modal {
+  margin-bottom: 16px;
+}
+
 .study-flow-utilities-group {
   display: inline-flex;
   align-items: center;
@@ -1317,6 +1321,10 @@ body,
   gap: 6px;
   max-height: 480px;
   overflow-y: auto;
+}
+
+.study-flow-task-list-cards-selector {
+  max-height: 280px;
 }
 
 .study-flow-task-card {
@@ -2287,6 +2295,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 14px;
 }
 
 .study-flow-allocation-row {

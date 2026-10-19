@@ -16,6 +16,17 @@ export class ZenModeManager {
 
   constructor(plugin: StudyFlowPlugin) {
     this.plugin = plugin;
+    this.plugin.registerDomEvent(window, 'keydown', (evt: KeyboardEvent) => {
+      if (!this.isZenActive || evt.key !== 'Escape') {
+        return;
+      }
+      const isModalOpen = !!document.querySelector('.modal-container, .modal, .prompt, .menu');
+      if (shouldZenIgnoreEscape(document.activeElement, isModalOpen)) {
+        return;
+      }
+      evt.preventDefault();
+      this.disableZen();
+    });
   }
 
   public subscribe(listener: ZenListener): () => void {
@@ -74,19 +85,6 @@ export class ZenModeManager {
     // 4. Create floating exit pill
     this.showIndicator();
 
-    // 5. Register escape key listener
-    this.keydownHandler = (evt: KeyboardEvent) => {
-      if (evt.key === 'Escape') {
-        const isModalOpen = !!document.querySelector('.modal-container, .modal, .prompt, .menu');
-        if (shouldZenIgnoreEscape(document.activeElement, isModalOpen)) {
-          return;
-        }
-        evt.preventDefault();
-        this.disableZen();
-      }
-    };
-    window.addEventListener('keydown', this.keydownHandler);
-
     this.isZenActive = true;
     this.notify();
 
@@ -116,11 +114,6 @@ export class ZenModeManager {
 
     // 3. Remove indicator and event listeners
     this.hideIndicator();
-
-    if (this.keydownHandler) {
-      window.removeEventListener('keydown', this.keydownHandler);
-      this.keydownHandler = null;
-    }
 
     this.isZenActive = false;
     this.notify();
@@ -163,6 +156,9 @@ export class ZenModeManager {
     if (this.indicatorEl) {
       this.indicatorEl.remove();
       this.indicatorEl = null;
+    }
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.querySelectorAll('.study-flow-zen-indicator').forEach((el) => el.remove());
     }
   }
 

@@ -38,8 +38,7 @@ export class PomodoroAdjustModal extends Modal {
     contentEl.createEl('h2', { text: t('pomodoro.customTimesTitle') });
 
     // Quick selection presets inside modal
-    const quickBar = contentEl.createDiv({ cls: 'study-flow-presets-group' });
-    quickBar.style.marginBottom = '16px';
+    const quickBar = contentEl.createDiv({ cls: 'study-flow-presets-group study-flow-presets-group-modal' });
     const quickPresets = [
       { name: '25 / 5', work: 25, break: 5 },
       { name: '50 / 10', work: 50, break: 10 },

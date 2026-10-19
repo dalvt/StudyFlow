@@ -314,7 +314,7 @@ export async function renderAnalyticsDashboard(
     }
 
     // Detail items list
-    const list = allocBody.createDiv({ cls: 'study-flow-allocation-list', attr: { style: 'margin-top: 14px;' } });
+    const list = allocBody.createDiv({ cls: 'study-flow-allocation-list' });
     for (const item of allocation.items) {
       const row = list.createDiv({ cls: 'study-flow-allocation-row' });
 

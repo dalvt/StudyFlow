@@ -34,7 +34,7 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
   - Verification: `tests/migration.test.mjs`, `npm test`, `npm run check-types`.
   - Evidence: Commit ID
 
-- [ ] **Task 4: Event Listener Leaks & Static Inline Styles Cleanup**
+- [x] **Task 4: Event Listener Leaks & Static Inline Styles Cleanup**
   - Fix raw `window.addEventListener` in `src/zen.ts` and prevent duplicate indicator DOM nodes.
   - Add `pointercancel` and destroy/view-close cleanup to drag listeners in `src/ui/calendar-grid.ts`.
   - Move static layout styles (`pomodoro-tab`, `analytics-ui`, `calendar-day-detail`) to `styles.css`.
