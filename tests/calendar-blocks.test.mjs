@@ -228,3 +228,47 @@ test('createDeadlineTask writes formatted deadline task with priority, due date,
   assert.ok(inboxFile.content.includes('Entrega TP Algoritmos'));
   assert.ok(inboxFile.content.includes('📅 2026-10-25 23:59'));
 });
+
+test('syncBlocksToMarkdown preserves subject and color metadata in time blocks', () => {
+  const initial = `# 2026-10-19\n\n## Tareas\n- [ ] Tarea previa\n`;
+  const blocks = [
+    {
+      startTime: '10:00',
+      endTime: '11:30',
+      title: 'Álgebra Lineal',
+      completed: false,
+      subject: 'Matemáticas',
+      color: '#4f46e5',
+      linkedNote: 'Algebra.md',
+    },
+    {
+      startTime: '14:00',
+      endTime: '15:30',
+      title: 'Taller de Redes',
+      completed: true,
+      subject: 'Redes',
+      color: '#0d9488',
+    },
+  ];
+
+  const synced = syncBlocksToMarkdown(initial, blocks);
+  assert.ok(synced.includes('[subject:: Matemáticas]'));
+  assert.ok(synced.includes('[color:: #4f46e5]'));
+  assert.ok(synced.includes('[subject:: Redes]'));
+  assert.ok(synced.includes('[color:: #0d9488]'));
+  assert.ok(synced.includes('[[Algebra.md]]'));
+
+  // Round-trip parse check
+  const parsed = parseTimeBlocksFromMarkdown(synced, '2026-10-19');
+  assert.strictEqual(parsed.length, 2);
+  assert.strictEqual(parsed[0].title, 'Álgebra Lineal');
+  assert.strictEqual(parsed[0].subject, 'Matemáticas');
+  assert.strictEqual(parsed[0].color, '#4f46e5');
+  assert.strictEqual(parsed[0].linkedNote, 'Algebra.md');
+  assert.strictEqual(parsed[0].completed, false);
+
+  assert.strictEqual(parsed[1].title, 'Taller de Redes');
+  assert.strictEqual(parsed[1].subject, 'Redes');
+  assert.strictEqual(parsed[1].color, '#0d9488');
+  assert.strictEqual(parsed[1].completed, true);
+});

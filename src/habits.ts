@@ -58,6 +58,18 @@ function getTodayString(): string {
   return getLocalDateString();
 }
 
+function parseHabitsFromLines(lines: string[], today: string = getTodayString()): HabitItem[] {
+  const habits: HabitItem[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseHabitLine(lines[i], today);
+    if (parsed) {
+      parsed.streak = calculateHabitStreak(parsed);
+      habits.push(parsed as HabitItem);
+    }
+  }
+  return habits;
+}
+
 /**
  * Loads habits from Habits.md file. If file does not exist, initializes it.
  */
@@ -67,18 +79,7 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
   const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHabitsContent);
   const content = await app.vault.read(file);
   const lines = content.split(/\r?\n/);
-  const habits: HabitItem[] = [];
-  const today = getTodayString();
-
-  for (let i = 0; i < lines.length; i++) {
-    const parsed = parseHabitLine(lines[i], today);
-    if (parsed) {
-      parsed.streak = calculateHabitStreak(parsed);
-      habits.push(parsed as HabitItem);
-    }
-  }
-
-  return habits;
+  return parseHabitsFromLines(lines, getTodayString());
 }
 
 /**
@@ -102,33 +103,44 @@ export async function toggleHabitStatus(
   habitId: string,
   newCompleted: boolean
 ): Promise<HabitItem[]> {
-  const habits = await loadHabitsFromFile(app, filePath);
-  const target = habits.find((h) => h.id === habitId);
-  if (!target) return habits;
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
 
-  const today = getTodayString();
-  if (!target.history) target.history = [];
-  if (!target.restDays) target.restDays = [];
-
-  if (newCompleted) {
-    target.completedToday = true;
-    target.lastCompletedDate = today;
-    if (!target.history.includes(today)) {
-      target.history.push(today);
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const today = getTodayString();
+    const lines = content.split(/\r?\n/);
+    const habits = parseHabitsFromLines(lines, today);
+    const target = habits.find((h) => h.id === habitId);
+    if (!target) {
+      updatedHabits = habits;
+      return content;
     }
-    target.restDays = target.restDays.filter((d) => d !== today);
-    target.isRestDayToday = false;
-  } else {
-    target.completedToday = false;
-    target.history = target.history.filter((d) => d !== today);
-    const sorted = [...target.history].sort();
-    target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
-  }
 
-  target.streak = calculateHabitStreak(target);
+    if (!target.history) target.history = [];
+    if (!target.restDays) target.restDays = [];
 
-  await saveHabitsToFile(app, filePath, habits);
-  return habits;
+    if (newCompleted) {
+      target.completedToday = true;
+      target.lastCompletedDate = today;
+      if (!target.history.includes(today)) {
+        target.history.push(today);
+      }
+      target.restDays = target.restDays.filter((d) => d !== today);
+      target.isRestDayToday = false;
+    } else {
+      target.completedToday = false;
+      target.history = target.history.filter((d) => d !== today);
+      const sorted = [...target.history].sort();
+      target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
+    }
+
+    target.streak = calculateHabitStreak(target);
+    updatedHabits = habits;
+    return syncHabitsToMarkdown(content, habits);
+  });
+
+  return updatedHabits;
 }
 
 /**
@@ -139,30 +151,41 @@ export async function toggleHabitRestDay(
   filePath: string,
   habitId: string
 ): Promise<HabitItem[]> {
-  const habits = await loadHabitsFromFile(app, filePath);
-  const target = habits.find((h) => h.id === habitId);
-  if (!target) return habits;
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
 
-  const today = getTodayString();
-  if (!target.restDays) target.restDays = [];
-  if (!target.history) target.history = [];
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const today = getTodayString();
+    const lines = content.split(/\r?\n/);
+    const habits = parseHabitsFromLines(lines, today);
+    const target = habits.find((h) => h.id === habitId);
+    if (!target) {
+      updatedHabits = habits;
+      return content;
+    }
 
-  if (target.restDays.includes(today)) {
-    target.restDays = target.restDays.filter((d) => d !== today);
-    target.isRestDayToday = false;
-  } else {
-    target.restDays.push(today);
-    target.isRestDayToday = true;
-    target.completedToday = false;
-    target.history = target.history.filter((d) => d !== today);
-    const sorted = [...target.history].sort();
-    target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
-  }
+    if (!target.restDays) target.restDays = [];
+    if (!target.history) target.history = [];
 
-  target.streak = calculateHabitStreak(target);
+    if (target.restDays.includes(today)) {
+      target.restDays = target.restDays.filter((d) => d !== today);
+      target.isRestDayToday = false;
+    } else {
+      target.restDays.push(today);
+      target.isRestDayToday = true;
+      target.completedToday = false;
+      target.history = target.history.filter((d) => d !== today);
+      const sorted = [...target.history].sort();
+      target.lastCompletedDate = sorted.length > 0 ? sorted[sorted.length - 1] : '';
+    }
 
-  await saveHabitsToFile(app, filePath, habits);
-  return habits;
+    target.streak = calculateHabitStreak(target);
+    updatedHabits = habits;
+    return syncHabitsToMarkdown(content, habits);
+  });
+
+  return updatedHabits;
 }
 
 /**
@@ -174,21 +197,30 @@ export async function addHabitToFile(
   name: string,
   frequency: HabitFrequency = { type: 'daily' }
 ): Promise<HabitItem[]> {
-  const habits = await loadHabitsFromFile(app, filePath);
-  habits.push({
-    id: createHabitId(name),
-    name: name.trim(),
-    completedToday: false,
-    streak: 0,
-    lastCompletedDate: '',
-    history: [],
-    frequency,
-    restDays: [],
-    isRestDayToday: false,
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
+
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const today = getTodayString();
+    const lines = content.split(/\r?\n/);
+    const habits = parseHabitsFromLines(lines, today);
+    habits.push({
+      id: createHabitId(name),
+      name: name.trim(),
+      completedToday: false,
+      streak: 0,
+      lastCompletedDate: '',
+      history: [],
+      frequency,
+      restDays: [],
+      isRestDayToday: false,
+    });
+    updatedHabits = habits;
+    return syncHabitsToMarkdown(content, habits);
   });
 
-  await saveHabitsToFile(app, filePath, habits);
-  return habits;
+  return updatedHabits;
 }
 
 /**
@@ -204,31 +236,52 @@ export async function updateHabitInFile(
     frequency?: HabitFrequency;
   }
 ): Promise<HabitItem[]> {
-  const habits = await loadHabitsFromFile(app, filePath);
-  const target = habits.find((h) => h.id === habitId);
-  if (!target) return habits;
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
 
-  if (updates.name !== undefined && updates.name.trim()) {
-    target.name = updates.name.trim();
-  }
-  if (updates.frequency !== undefined) {
-    target.frequency = updates.frequency;
-  }
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const today = getTodayString();
+    const lines = content.split(/\r?\n/);
+    const habits = parseHabitsFromLines(lines, today);
+    const target = habits.find((h) => h.id === habitId);
+    if (!target) {
+      updatedHabits = habits;
+      return content;
+    }
 
-  target.streak = calculateHabitStreak(target);
+    if (updates.name !== undefined && updates.name.trim()) {
+      target.name = updates.name.trim();
+    }
+    if (updates.frequency !== undefined) {
+      target.frequency = updates.frequency;
+    }
 
-  await saveHabitsToFile(app, filePath, habits);
-  return habits;
+    target.streak = calculateHabitStreak(target);
+    updatedHabits = habits;
+    return syncHabitsToMarkdown(content, habits);
+  });
+
+  return updatedHabits;
 }
 
 /**
  * Deletes a habit from the list.
  */
 export async function deleteHabitFromFile(app: App, filePath: string, habitId: string): Promise<HabitItem[]> {
-  let habits = await loadHabitsFromFile(app, filePath);
-  habits = habits.filter((h) => h.id !== habitId);
-  await saveHabitsToFile(app, filePath, habits);
-  return habits;
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
+
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const today = getTodayString();
+    const lines = content.split(/\r?\n/);
+    const habits = parseHabitsFromLines(lines, today);
+    updatedHabits = habits.filter((h) => h.id !== habitId);
+    return syncHabitsToMarkdown(content, updatedHabits);
+  });
+
+  return updatedHabits;
 }
 
 export interface HeatmapDay {

@@ -214,6 +214,7 @@ export class TodayTab implements TabComponent {
         id: blockId,
         text: block.title,
         sourceFile: dailyPath,
+        isTimeBlock: true,
       });
       const status = this.plugin.pomodoro.getStatus();
       if (status.state === 'idle' || status.state === 'paused') {

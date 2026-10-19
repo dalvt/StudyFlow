@@ -1,10 +1,10 @@
 import { App, Modal, Setting, setIcon } from 'obsidian';
-import type StudyFlowPlugin from './main';
-import type { ActivePomodoroTask } from './pomodoro-state';
-import type { FocusSessionRecord } from './analytics';
-import { getDailyNotePath, getOrCreateFile, getLocalDateString } from './utils';
-import { appendClosingNoteToDailyContent } from './markdown-utils';
-import { updateFocusSessionInFile } from './storage-migration';
+import type StudyFlowPlugin from './main.ts';
+import type { ActivePomodoroTask } from './pomodoro-state.ts';
+import type { FocusSessionRecord } from './analytics.ts';
+import { getDailyNotePath, getOrCreateFile, getLocalDateString } from './utils.ts';
+import { appendClosingNoteToDailyContent } from './markdown-utils.ts';
+import { updateFocusSessionInFile } from './storage-migration.ts';
 import { t } from './i18n/index.ts';
 
 export class PomodoroClosingReviewModal extends Modal {

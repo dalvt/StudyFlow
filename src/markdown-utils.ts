@@ -991,6 +991,20 @@ export function locateTaskLineIndex(lines: string[], locator: TaskLocator): Loca
       matchesPosition = computeLineHash(candidateLine) === locator.lineHash;
     } else if (locator.originalLine !== undefined) {
       matchesPosition = candidateLine === locator.originalLine;
+      if (!matchesPosition) {
+        const match = candidateLine.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+        if (match) {
+          const rawTarget = locator.text || locator.originalLine;
+          const cleanTarget = rawTarget.replace(/^\s*-\s*\[.\]\s*/, '').trim();
+          const lineTitle = match[2].trim();
+          const cleanLineTitle = lineTitle.replace(/^[💡🧊]\s*/u, '').trim();
+          const cleanLocatorText = cleanTarget.replace(/^[💡🧊]\s*/u, '').trim();
+          matchesPosition =
+            lineTitle === cleanTarget ||
+            cleanLineTitle === cleanLocatorText ||
+            getCleanTaskDisplayTitle(cleanLineTitle) === getCleanTaskDisplayTitle(cleanLocatorText);
+        }
+      }
     } else if (locator.text) {
       const match = candidateLine.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
       if (match) {
@@ -1041,6 +1055,33 @@ export function locateTaskLineIndex(lines: string[], locator: TaskLocator): Loca
 
     if (isMatch) {
       matchingIndices.push(i);
+    }
+  }
+
+  // 3. Fallback: If locator.originalLine is provided but fails to match any line
+  // (which happens if the task in markdown is indented like `  - [ ] Task`),
+  // fall back to matching by locator.text (strip `- [ ] ` prefix and match trimmed text).
+  if (matchingIndices.length === 0 && locator.originalLine !== undefined) {
+    const rawTarget = locator.text || locator.originalLine;
+    const cleanTarget = rawTarget.replace(/^\s*-\s*\[.\]\s*/, '').trim();
+
+    if (cleanTarget) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const match = line.match(/^(\s*-\s+(?:\[.\]\s+)?)(.*)$/);
+        if (match) {
+          const lineTitle = match[2].trim();
+          const cleanLineTitle = lineTitle.replace(/^[💡🧊]\s*/u, '').trim();
+          const cleanLocatorText = cleanTarget.replace(/^[💡🧊]\s*/u, '').trim();
+          if (
+            lineTitle === cleanTarget ||
+            cleanLineTitle === cleanLocatorText ||
+            getCleanTaskDisplayTitle(cleanLineTitle) === getCleanTaskDisplayTitle(cleanLocatorText)
+          ) {
+            matchingIndices.push(i);
+          }
+        }
+      }
     }
   }
 
@@ -1429,7 +1470,11 @@ export function createHabitId(name: string): string {
     .trim()
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return slug || 'habit';
+  if (!slug) {
+    const hash = computeLineHash(name).slice(0, 8);
+    return `habit-${hash}`;
+  }
+  return slug;
 }
 
 export type HabitFrequencyType = 'daily' | 'weekly' | 'specific_days';
@@ -1869,6 +1914,8 @@ export function syncBlocksToMarkdown(
     title: string;
     completed?: boolean;
     linkedNote?: string;
+    subject?: string;
+    color?: string;
   }>,
   customHeader?: string
 ): string {

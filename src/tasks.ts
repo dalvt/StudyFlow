@@ -11,24 +11,24 @@ import {
   parseTaskDeadline,
   parseTaskPomodoroEstimate,
   parseTaskPriority,
-  PendingTaskItem,
+  type PendingTaskItem,
   extractTagsFromText,
-  TaskPriority,
-} from './utils';
+  type TaskPriority,
+} from './utils.ts';
 
 import {
-  SubtaskItem,
-  TaskRecord,
-  TaskLocator,
-  TaskMutationAction,
-  TaskMutationOptions,
-  TaskMutationResult,
+  type SubtaskItem,
+  type TaskRecord,
+  type TaskLocator,
+  type TaskMutationAction,
+  type TaskMutationOptions,
+  type TaskMutationResult,
   compareTasksByPriority,
   extractAllTasksFromContent,
   computeLineHash,
   locateTaskLineIndex,
   mutateTaskLineInContent,
-} from './markdown-utils';
+} from './markdown-utils.ts';
 
 export type {
   SubtaskItem,

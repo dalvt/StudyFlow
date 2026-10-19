@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { TFile } from 'obsidian';
 import {
   DEFAULT_POMODORO_PRESETS,
 } from '../src/settings-utils.ts';
@@ -9,10 +10,13 @@ import {
 } from '../src/pomodoro-state.ts';
 import {
   appendClosingNoteToDailyContent,
+  locateTaskLineIndex,
+  mutateTaskLineInContent,
 } from '../src/markdown-utils.ts';
 import {
   parseProtocolAction,
 } from '../src/protocol-utils.ts';
+import { PomodoroManager as Pomodoro } from '../src/pomodoro.ts';
 
 // 1. Presets Logic Tests
 test('Pomodoro presets: DEFAULT_POMODORO_PRESETS contains 25/5, 50/10, and 90/20 defaults', () => {
@@ -205,4 +209,122 @@ test('Protocol parsing: parses open action with tab parameter', () => {
   const resAlias = parseProtocolAction({ cmd: 'hub', tab: 'habits' });
   assert.strictEqual(resAlias.action, 'open');
   assert.strictEqual(resAlias.tab, 'habits');
+});
+
+// 5. Pomodoro Task Completion & Task Locating Tests
+test('Pomodoro completeActiveTask: task with wikilink completes as a task and not a time block', async () => {
+  const filePath = 'StudyFlow/Daily/2026-10-19.md';
+  const dailyFile = new TFile(filePath);
+  dailyFile.content = `# 2026-10-19\n\n## Tareas\n- [ ] Leer [[Capítulo 1]]\n`;
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === filePath ? dailyFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
+      getName: () => 'vault-test',
+    },
+  };
+
+  const plugin = {
+    app,
+    settings: {
+      dailyNotesFolder: 'StudyFlow/Daily',
+      habitsFilePath: 'StudyFlow/Habits.md',
+    },
+    focusSessions: [],
+    saveSettings: async () => {},
+  };
+
+  const pomodoro = new Pomodoro(plugin);
+  await pomodoro.setActiveTask({
+    id: 'task-wikilink-1',
+    text: 'Leer [[Capítulo 1]]',
+    sourceFile: filePath,
+  });
+
+  assert.ok(pomodoro.getActiveTask(), 'Task should be active');
+  await pomodoro.completeActiveTask();
+
+  // Must be marked as completed task in the markdown file
+  assert.ok(dailyFile.content.includes('- [x] Leer [[Capítulo 1]]'), 'Task with wikilink should complete cleanly in markdown');
+  assert.strictEqual(pomodoro.getActiveTask(), null, 'Active task should be cleared after completion');
+});
+
+test('locateTaskLineIndex: falls back to locator.text when locator.originalLine is unindented but markdown line is indented', () => {
+  const lines = [
+    '# 2026-10-19',
+    '',
+    '## Tareas',
+    '- [ ] Tarea padre',
+    '  - [ ] Subtarea anidada',
+    '    - [ ] Nivel 3 anidado',
+  ];
+
+  // Locator provides unindented originalLine (e.g. from standard task item formatting)
+  const locator = {
+    sourceFile: 'Daily/2026-10-19.md',
+    originalLine: '- [ ] Subtarea anidada',
+    text: 'Subtarea anidada',
+  };
+
+  const res = locateTaskLineIndex(lines, locator);
+  assert.strictEqual(res.status, 'unique_match');
+  assert.strictEqual(res.index, 4);
+
+  // Deeply indented task
+  const resDeep = locateTaskLineIndex(lines, {
+    sourceFile: 'Daily/2026-10-19.md',
+    originalLine: '- [ ] Nivel 3 anidado',
+    text: 'Nivel 3 anidado',
+  });
+  assert.strictEqual(resDeep.status, 'unique_match');
+  assert.strictEqual(resDeep.index, 5);
+});
+
+test('Pomodoro completeActiveTask: indented subtask completes cleanly preserving indentation', async () => {
+  const filePath = 'StudyFlow/Daily/2026-10-19.md';
+  const dailyFile = new TFile(filePath);
+  dailyFile.content = `# 2026-10-19\n\n## Tareas\n- [ ] Tarea padre\n  - [ ] Subtarea de prueba [[Apuntes]]\n`;
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === filePath ? dailyFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
+      getName: () => 'vault-test',
+    },
+  };
+
+  const plugin = {
+    app,
+    settings: {
+      dailyNotesFolder: 'StudyFlow/Daily',
+      habitsFilePath: 'StudyFlow/Habits.md',
+    },
+    focusSessions: [],
+    saveSettings: async () => {},
+  };
+
+  const pomodoro = new Pomodoro(plugin);
+  await pomodoro.setActiveTask({
+    id: 'task-sub-1',
+    text: 'Subtarea de prueba [[Apuntes]]',
+    originalLine: '- [ ] Subtarea de prueba [[Apuntes]]',
+    sourceFile: filePath,
+  });
+
+  await pomodoro.completeActiveTask();
+
+  assert.ok(
+    dailyFile.content.includes('  - [x] Subtarea de prueba [[Apuntes]]'),
+    'Indented subtask must be checked while preserving leading 2-space indentation'
+  );
+  assert.strictEqual(pomodoro.getActiveTask(), null);
 });

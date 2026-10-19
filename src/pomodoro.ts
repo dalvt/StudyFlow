@@ -1,18 +1,18 @@
 import { App, Menu, Modal, Notice, setTooltip } from 'obsidian';
-import type StudyFlowPlugin from './main';
-import { playPomodoroSound, playPomodoroChime } from './audio';
-import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils';
-import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, TaskRecord } from './tasks';
-import { toggleTimeBlockCompletion } from './calendar';
-import { extractTagsFromText, FocusSessionRecord } from './analytics';
-import { appendFocusSessionToFile, loadFocusSessionsFromFile } from './storage-migration';
-import { PomodoroClosingReviewModal, PomodoroTaskCheckModal } from './pomodoro-task-check-modal';
+import type StudyFlowPlugin from './main.ts';
+import { playPomodoroSound, playPomodoroChime } from './audio.ts';
+import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils.ts';
+import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, type TaskRecord } from './tasks.ts';
+import { toggleTimeBlockCompletion } from './calendar.ts';
+import { extractTagsFromText, type FocusSessionRecord } from './analytics.ts';
+import { appendFocusSessionToFile, loadFocusSessionsFromFile } from './storage-migration.ts';
+import { PomodoroClosingReviewModal, PomodoroTaskCheckModal } from './pomodoro-task-check-modal.ts';
 import { t } from './i18n/index.ts';
 import { formatPomodoroLogLine } from './conventions.ts';
-import type { Subject, PomodoroPreset } from './settings-utils';
-import { SubjectSelectModal } from './subject-modal';
-import { normalizeTag } from './subject-analytics';
-import { toggleHabitStatus } from './habits';
+import type { Subject, PomodoroPreset } from './settings-utils.ts';
+import { SubjectSelectModal } from './subject-modal.ts';
+import { normalizeTag } from './subject-analytics.ts';
+import { toggleHabitStatus } from './habits.ts';
 import {
   countCompletedSessionsToday,
   shouldTriggerLongBreak,
@@ -23,12 +23,12 @@ import {
   formatStatusBarDisplay,
   getPreviousCycleState,
   getNextCycleState,
-  PomodoroState,
-  PomodoroMode,
-  ActivePomodoroTask,
-  PersistedPomodoroState,
-  PomodoroMachineConfig,
-} from './pomodoro-state';
+  type PomodoroState,
+  type PomodoroMode,
+  type ActivePomodoroTask,
+  type PersistedPomodoroState,
+  type PomodoroMachineConfig,
+} from './pomodoro-state.ts';
 
 export type { PomodoroState, PomodoroMode, ActivePomodoroTask, PersistedPomodoroState };
 
@@ -291,13 +291,14 @@ export class PomodoroManager {
         return;
       }
 
-      if (
-        activeTask.id &&
-        (activeTask.id.startsWith('block-') ||
-          activeTask.id.startsWith('virtual-') ||
-          activeTask.text.includes('['))
-      ) {
-        const blockId = activeTask.id.replace(/^block-/, '');
+      const isTimeBlock =
+        activeTask.isTimeBlock === true ||
+        (Boolean(activeTask.id) &&
+          (activeTask.id.startsWith('block-') || activeTask.id.startsWith('virtual-'))) ||
+        /\[\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\]$/.test(activeTask.text);
+
+      if (isTimeBlock) {
+        const blockId = (activeTask.id || '').replace(/^block-/, '');
         const dateMatch = srcFile.match(/(\d{4}-\d{2}-\d{2})/);
         const dateStr = dateMatch ? dateMatch[1] : getLocalDateString(new Date());
         await toggleTimeBlockCompletion(this.plugin, dateStr, blockId, true);
@@ -308,11 +309,12 @@ export class PomodoroManager {
         return;
       }
 
-
       const { priority } = parseTaskPriority(activeTask.text);
       const taskRecord: TaskRecord = {
         id: activeTask.id,
-        originalLine: `- [ ] ${activeTask.text}`,
+        originalLine: activeTask.originalLine ?? `- [ ] ${activeTask.text}`,
+        lineNumber: activeTask.lineNumber,
+        lineHash: activeTask.lineHash,
         text: activeTask.text,
         sourceFile: srcFile,
         completed: false,

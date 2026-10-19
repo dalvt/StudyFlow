@@ -9,6 +9,10 @@ export interface ActivePomodoroTask {
   id: string;
   text: string;
   sourceFile: string;
+  isTimeBlock?: boolean;
+  originalLine?: string;
+  lineNumber?: number;
+  lineHash?: string;
 }
 
 export interface PersistedPomodoroState {

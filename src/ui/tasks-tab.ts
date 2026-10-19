@@ -903,6 +903,9 @@ export class TasksTab implements TabComponent {
           id: task.id,
           text: task.text,
           sourceFile: task.sourceFile,
+          originalLine: task.originalLine,
+          lineNumber: task.lineNumber,
+          lineHash: task.lineHash,
         });
         this.onSwitchTab('pomodoro');
       });

@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TFile } from 'obsidian';
-import { updateHabitInFile } from '../src/habits.ts';
+import { toggleHabitStatus, updateHabitInFile } from '../src/habits.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
+  createHabitId,
   formatHabitLine,
   getIsoWeekRange,
   parseHabitLine,
@@ -467,5 +468,65 @@ test('updateHabitInFile with specific_days custom daysOfWeek serializes and roun
   assert.deepStrictEqual(updatedHabits[0].frequency, { type: 'specific_days', daysOfWeek: [1, 3, 5] });
   assert.ok(habitsFile.content.includes('freq: specific_days'));
   assert.ok(habitsFile.content.includes('days: 1,3,5'));
+});
+
+test('createHabitId: emoji-only habits produce distinct, deterministic IDs without colliding', () => {
+  const idBook = createHabitId('📚');
+  const idWater = createHabitId('💧');
+  const idMeditate = createHabitId('🧘');
+  const idRun = createHabitId('🏃‍♂️');
+
+  assert.ok(idBook.startsWith('habit-'), 'Emoji-only habit ID starts with habit- prefix');
+  assert.ok(idWater.startsWith('habit-'), 'Emoji-only habit ID starts with habit- prefix');
+  assert.ok(idMeditate.startsWith('habit-'), 'Emoji-only habit ID starts with habit- prefix');
+  assert.ok(idRun.startsWith('habit-'), 'Emoji-only habit ID starts with habit- prefix');
+
+  // Verify uniqueness (no collision)
+  const ids = new Set([idBook, idWater, idMeditate, idRun]);
+  assert.strictEqual(ids.size, 4, 'All emoji-only habit IDs must be distinct');
+
+  // Verify determinism
+  assert.strictEqual(createHabitId('📚'), idBook);
+  assert.strictEqual(createHabitId('💧'), idWater);
+
+  // Normal habit names still produce standard slugs
+  assert.strictEqual(createHabitId('📚 Lectura 20 min'), 'lectura-20-min');
+});
+
+test('toggleHabitStatus: atomic updates inside vault.process preserve concurrent mutations', async () => {
+  const habitsFile = new TFile('Habits.md');
+  habitsFile.content = `# Registro de Hábitos
+
+- [ ] 📚 Lectura <!-- streak: 0 | last:  -->
+- [ ] 💧 Agua <!-- streak: 0 | last:  -->
+`;
+
+  // Serialized process queue simulating Obsidian vault.process queue
+  let processQueue = Promise.resolve();
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'Habits.md' ? habitsFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        const next = processQueue.then(async () => {
+          f.content = fn(f.content);
+          return f.content;
+        });
+        processQueue = next.catch(() => {});
+        return next;
+      },
+      create: async (p, content) => {
+        habitsFile.content = content;
+        return habitsFile;
+      },
+    },
+  };
+
+  const p1 = toggleHabitStatus(app, 'Habits.md', 'lectura', true);
+  const p2 = toggleHabitStatus(app, 'Habits.md', 'agua', true);
+  await Promise.all([p1, p2]);
+
+  assert.ok(habitsFile.content.includes('- [x] 📚 Lectura'), 'Habit 1 must be toggled');
+  assert.ok(habitsFile.content.includes('- [x] 💧 Agua'), 'Habit 2 must be toggled without being overwritten');
 });
 

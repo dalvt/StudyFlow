@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
-import type StudyFlowPlugin from './main';
-import type { Subject } from './settings-utils';
-import { normalizeTag } from './subject-analytics';
+import type StudyFlowPlugin from './main.ts';
+import type { Subject } from './settings-utils.ts';
+import { normalizeTag } from './subject-analytics.ts';
 import { t } from './i18n/index.ts';
 
 const PRESET_COLORS = [

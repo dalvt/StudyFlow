@@ -38,7 +38,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Verification: `npm run check-types && node --test tests/i18n.test.mjs tests/utils.test.mjs`
   - Evidence: Verified clean type check (`tsc --noEmit`), 12/12 i18n tests passed, 232/232 full test suite passed without regressions.
 
-- [ ] **Task 3: Pomodoro task completion, calendar block persistence, and habit ID collisions**
+- [x] **Task 3: Pomodoro task completion, calendar block persistence, and habit ID collisions**
   - Route: Delegated / Writer trigger (`src/pomodoro.ts`, `src/pomodoro-state.ts`, `src/markdown-utils.ts`, `src/habits.ts`).
   - In `completeActiveTask()` (`src/pomodoro.ts`), replace `.includes('[')` with time block regex matching and allow fallback to `locator.text` for indented tasks.
   - In `syncBlocksToMarkdown` (`src/markdown-utils.ts`), preserve `[subject:: ...]` and `[color:: ...]` metadata when writing time blocks back to markdown.
@@ -46,7 +46,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Ensure habit updates run atomically inside `vault.process`.
   - Acceptance Criteria: Tasks with wikilinks or indentation complete cleanly from Pomodoro; time blocks preserve subject and color; emoji-only habits don't overwrite each other.
   - Verification: `npm run check-types && node --test tests/focus-flow.test.mjs tests/calendar-blocks.test.mjs tests/habits-streak.test.mjs`
-  - Evidence: Pending
+  - Evidence: Verified clean type check (`tsc --noEmit`), 47/47 target tests passed, and full test suite passed (238/238 tests passing).
 
 - [ ] **Task 4: Metrics accuracy, week start day, settings reactivity, and scoped CSS**
   - Route: Delegated / Writer trigger (`src/analytics.ts`, `src/subject-analytics.ts`, `src/habits.ts`, `src/settings.ts`, `src/ui/calendar-grid.ts`, `styles.css`).

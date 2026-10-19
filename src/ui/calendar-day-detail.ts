@@ -455,6 +455,7 @@ export async function renderTimeBlocksColumn(
           id: block.id,
           text: `${block.title} [${block.startTime} - ${block.endTime}]`,
           sourceFile: getDailyNotePath(plugin.settings, state.selectedCalendarDate),
+          isTimeBlock: true,
         });
         callbacks.onSwitchTab('pomodoro');
       });
@@ -767,6 +768,9 @@ export async function renderDeadlinesColumn(
           id: item.id,
           text: item.text,
           sourceFile: item.sourceFile,
+          originalLine: item.originalLine,
+          lineNumber: item.lineNumber,
+          lineHash: item.lineHash,
         });
         callbacks.onSwitchTab('pomodoro');
       });

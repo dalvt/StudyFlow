@@ -417,6 +417,7 @@ export class CalendarGridComponent {
         id: block.id,
         text: `${block.title} [${block.startTime} - ${block.endTime}]`,
         sourceFile: getDailyNotePath(this.plugin.settings, block.date),
+        isTimeBlock: true,
       });
       this.callbacks.onSwitchTab('pomodoro');
     });
