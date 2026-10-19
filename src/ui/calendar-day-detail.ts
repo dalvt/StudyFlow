@@ -1,4 +1,4 @@
-import { App, Notice, setIcon, TFile } from 'obsidian';
+import { App, Notice, setIcon, TFile, normalizePath } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab } from './types.ts';
 import {
@@ -664,7 +664,7 @@ export async function renderDeadlinesColumn(
     );
     if (ok) {
       if (plugin.taskIndex) {
-        const inboxPath = plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+        const inboxPath = normalizePath(plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md');
         const file = app.vault.getAbstractFileByPath(inboxPath);
         if (file instanceof TFile) {
           await plugin.taskIndex.indexFile(file);

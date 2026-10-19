@@ -11,6 +11,7 @@ import {
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
 import { parseTimeBlocksFromMarkdown } from '../src/calendar-utils.ts';
 import { migratePluginFilesToDedicatedFolder } from '../src/utils.ts';
+import { TFile } from 'obsidian';
 import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from '../src/storage-migration.ts';
 
 test('parseSessionsFromJsonl parses JSON lines and skips blank lines and malformed entries', () => {
@@ -191,15 +192,13 @@ test('migratePluginFilesToDedicatedFolder moves root Daily folder to StudyFlow/D
   assert.equal(renamed[0].to, 'StudyFlow/Daily');
 });
 
-test('loadFocusSessionsFromFile falls back to adapter.read when getAbstractFileByPath returns null', async () => {
+test('loadFocusSessionsFromFile reads sessions from TFile and returns empty array when file does not exist', async () => {
   const jsonl = '{"id":"s1","timestamp":1792254338421,"date":"2026-10-17","durationMinutes":50,"taskText":"Physics","tags":[]}\n';
+  const file = Object.assign(new TFile(), { path: SESSIONS_FILE_PATH });
   const app = {
     vault: {
-      getAbstractFileByPath: () => null,
-      adapter: {
-        exists: async (p) => p === SESSIONS_FILE_PATH,
-        read: async (p) => (p === SESSIONS_FILE_PATH ? jsonl : ''),
-      },
+      getAbstractFileByPath: (p) => (p === SESSIONS_FILE_PATH ? file : null),
+      read: async () => jsonl,
     },
   };
 
@@ -208,6 +207,14 @@ test('loadFocusSessionsFromFile falls back to adapter.read when getAbstractFileB
   assert.equal(sessions[0].id, 's1');
   assert.equal(sessions[0].date, '2026-10-17');
   assert.equal(sessions[0].durationMinutes, 50);
+
+  const emptyApp = {
+    vault: {
+      getAbstractFileByPath: () => null,
+    },
+  };
+  const emptySessions = await loadFocusSessionsFromFile(emptyApp);
+  assert.deepEqual(emptySessions, []);
 });
 
 test('syncHistoricalSessionsFromVault populates plugin.focusSessions with existing and imported sessions', async () => {
@@ -222,7 +229,7 @@ test('syncHistoricalSessionsFromVault populates plugin.focusSessions with existi
   ];
 
   let storedJsonl = jsonl;
-  const dummyFile = { path: SESSIONS_FILE_PATH };
+  const dummyFile = Object.assign(new TFile(), { path: SESSIONS_FILE_PATH });
   const app = {
     vault: {
       getAbstractFileByPath: (p) => (p === SESSIONS_FILE_PATH ? dummyFile : null),
@@ -233,7 +240,7 @@ test('syncHistoricalSessionsFromVault populates plugin.focusSessions with existi
       createFolder: async () => {},
       create: async () => dummyFile,
       getMarkdownFiles: () => files,
-      read: async () => dailyNoteContent,
+      read: async (f) => (f === dummyFile ? storedJsonl : dailyNoteContent),
       process: async (file, fn) => {
         storedJsonl = fn(storedJsonl);
       },

@@ -37,16 +37,6 @@ export async function loadFocusSessionsFromFile(
     }
   }
 
-  // Fallback to adapter in case vault index is not yet loaded (e.g. during startup)
-  try {
-    if (app.vault.adapter && (await app.vault.adapter.exists(normalized))) {
-      const content = await app.vault.adapter.read(normalized);
-      return parseSessionsFromJsonl(content);
-    }
-  } catch (err) {
-    console.error('Study Flow: Error leyendo sesiones via adapter desde Sessions.jsonl', err);
-  }
-
   return [];
 }
 

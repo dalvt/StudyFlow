@@ -1,4 +1,4 @@
-import { type App, TFile } from 'obsidian';
+import { type App, TFile, normalizePath } from 'obsidian';
 import type { CalendarTimeBlock } from './calendar-utils.ts';
 import type { Subject } from './settings-utils.ts';
 
@@ -218,11 +218,12 @@ export async function loadScheduleItems(
   app: App,
   schedulePath: string = 'StudyFlow/Schedule.md'
 ): Promise<ScheduleItem[]> {
+  const normalizedPath = normalizePath(schedulePath);
   try {
-    const file = app.vault.getAbstractFileByPath(schedulePath);
+    const file = app.vault.getAbstractFileByPath(normalizedPath);
     if (!file || !(file instanceof TFile || 'extension' in file)) {
       const files = typeof app.vault.getFiles === 'function' ? app.vault.getFiles() : [];
-      const tfile = files.find((f) => f.path === schedulePath);
+      const tfile = files.find((f) => f.path === normalizedPath);
       if (!tfile) return [];
       const content = await app.vault.read(tfile);
       return parseScheduleMarkdown(content);
@@ -230,7 +231,7 @@ export async function loadScheduleItems(
     const content = await app.vault.read(file as TFile);
     return parseScheduleMarkdown(content);
   } catch (err) {
-    console.error(`Study Flow: Error cargando horario recurrente desde ${schedulePath}`, err);
+    console.error(`Study Flow: Error cargando horario recurrente desde ${normalizedPath}`, err);
     return [];
   }
 }

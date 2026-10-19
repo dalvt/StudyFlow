@@ -1,4 +1,4 @@
-import { App, Notice, TFile } from 'obsidian';
+import { App, Notice, TFile, normalizePath } from 'obsidian';
 import type StudyFlowPlugin from './main.ts';
 import type { CalendarTimeBlock, StudyFlowSettings } from './settings.ts';
 import { t } from './i18n/index.ts';
@@ -218,14 +218,15 @@ export async function loadAllDeadlines(
   const filesToScan: TFile[] = [];
 
   // 1. Inbox file
-  const inboxPath = settings.inboxFilePath || 'StudyFlow/Inbox.md';
+  const inboxPath = normalizePath(settings.inboxFilePath || 'StudyFlow/Inbox.md');
   const inboxFile = app.vault.getAbstractFileByPath(inboxPath);
   if (inboxFile instanceof TFile) {
     filesToScan.push(inboxFile);
   }
 
   // 2. Daily notes folder files (recent/today)
-  const dailyFolder = app.vault.getAbstractFileByPath(settings.dailyNotesFolder || 'StudyFlow/Daily');
+  const dailyFolderPath = normalizePath(settings.dailyNotesFolder || 'StudyFlow/Daily');
+  const dailyFolder = app.vault.getAbstractFileByPath(dailyFolderPath);
   if (dailyFolder && 'children' in dailyFolder && Array.isArray((dailyFolder as any).children)) {
     const children = (dailyFolder as any).children as any[];
     children.forEach((child) => {
@@ -301,7 +302,7 @@ export async function createDeadlineTask(
   pomodoros?: number
 ): Promise<boolean> {
   try {
-    const inboxPath = settings.inboxFilePath || 'StudyFlow/Inbox.md';
+    const inboxPath = normalizePath(settings.inboxFilePath || 'StudyFlow/Inbox.md');
     const tasksH = settings.tasksSectionHeader || '## Tareas';
     const iceboxH = settings.iceboxSectionHeader || '## Icebox';
     const file = await getOrCreateFile(app, inboxPath, `# Inbox\n\n${tasksH}\n\n${iceboxH}\n\n`);

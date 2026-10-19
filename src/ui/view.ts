@@ -1,4 +1,4 @@
-import { ItemView, Platform, setIcon, setTooltip, ViewStateResult, WorkspaceLeaf } from 'obsidian';
+import { ItemView, normalizePath, Platform, setIcon, setTooltip, ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
 import { TodayTab } from './today-tab';
@@ -113,7 +113,7 @@ export class StudyFlowView extends ItemView {
 
     this.registerEvent(
       this.app.vault.on('modify', async (file) => {
-        const habitsPath = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
+        const habitsPath = normalizePath(this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md');
         if (file.path === habitsPath) {
           await this.habitsTab.onHabitsModified();
           await this.todayTab.onHabitsChanged();

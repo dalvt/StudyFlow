@@ -93,11 +93,11 @@ export function getDailyNotePath(
   }
 
 
-  const folder = settings.dailyNotesFolder.trim();
+  const folder = settings.dailyNotesFolder.trim().replace(/\/+$/, '');
   if (!folder) {
-    return fileName;
+    return normalizePath(fileName);
   }
-  return `${folder}/${fileName}`;
+  return normalizePath(`${folder}/${fileName}`);
 }
 
 /**

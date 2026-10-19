@@ -21,15 +21,14 @@ export default class StudyFlowPlugin extends Plugin {
   focusSessions: FocusSessionRecord[] = [];
 
   async onload(): Promise<void> {
-    await this.loadSettings();
     setObsidianLanguageResolver(getLanguage);
+    await this.loadSettings();
     setLanguage(this.settings.language || 'auto');
 
-    await migratePluginFilesToDedicatedFolder(this.app, this.settings);
-    await runStartupMigration(this);
-    await this.saveSettings();
-
     this.app.workspace.onLayoutReady(async () => {
+      await migratePluginFilesToDedicatedFolder(this.app, this.settings);
+      await runStartupMigration(this);
+      await this.saveSettings();
       this.focusSessions = await loadFocusSessionsFromFile(this.app);
     });
 
@@ -60,7 +59,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     // Commands (Obsidian convention: no plugin prefix)
     this.addCommand({
-      id: 'open-study-flow-hub',
+      id: 'open-hub',
       name: t('commands.openHub'),
       callback: () => {
         this.activateView(true);
@@ -68,7 +67,7 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'open-study-flow-calendar',
+      id: 'open-calendar',
       name: t('commands.openCalendar'),
       callback: () => {
         this.activateView(true, 'calendar');
@@ -76,7 +75,7 @@ export default class StudyFlowPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'open-study-flow-hub-sidebar',
+      id: 'open-hub-sidebar',
       name: t('commands.openSidebar'),
       callback: () => {
         this.activateView(false);

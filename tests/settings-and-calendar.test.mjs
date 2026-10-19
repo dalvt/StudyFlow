@@ -9,6 +9,7 @@ import {
   formatMonthYearHeader,
   formatLongDate,
 } from '../src/calendar-utils.ts';
+import { getDailyNotePath } from '../src/utils.ts';
 
 test('validateSettingNumber validates required numbers and boundaries accurately', () => {
   // Empty, null, undefined
@@ -154,4 +155,30 @@ test('formatMonthYearHeader and formatLongDate format dates in Spanish and Engli
   // English
   assert.equal(formatMonthYearHeader(2026, 9, 'en'), 'October 2026');
   assert.equal(formatLongDate('2026-10-12', 'en'), 'Monday, October 12, 2026');
+});
+
+test('getDailyNotePath normalizes paths with and without trailing slashes in dailyNotesFolder', () => {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    dailyNotesFolder: 'StudyFlow/Daily/',
+    dailyNoteDateFormat: 'YYYY-MM-DD',
+  };
+  const path = getDailyNotePath(settings, '2026-10-19');
+  assert.equal(path, 'StudyFlow/Daily/2026-10-19.md');
+
+  const settingsNoSlash = {
+    ...DEFAULT_SETTINGS,
+    dailyNotesFolder: 'StudyFlow/Daily',
+    dailyNoteDateFormat: 'YYYY-MM-DD',
+  };
+  const pathNoSlash = getDailyNotePath(settingsNoSlash, '2026-10-19');
+  assert.equal(pathNoSlash, 'StudyFlow/Daily/2026-10-19.md');
+
+  const settingsEmptyFolder = {
+    ...DEFAULT_SETTINGS,
+    dailyNotesFolder: '   ',
+    dailyNoteDateFormat: 'YYYY-MM-DD',
+  };
+  const pathEmpty = getDailyNotePath(settingsEmptyFolder, '2026-10-19');
+  assert.equal(pathEmpty, '2026-10-19.md');
 });

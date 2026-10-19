@@ -119,3 +119,13 @@ test('A11y and Context Menu i18n keys are present and localized in both language
     assert.ok(valEn && valEn.length > 0, `en missing key ${k}`);
   }
 });
+
+test('Command IDs: no plugin ID prefix (open-hub, open-calendar, open-hub-sidebar)', () => {
+  const mainContent = fs.readFileSync('src/main.ts', 'utf8');
+  assert.ok(!mainContent.includes("'open-study-flow-hub'"), 'Should not have open-study-flow-hub');
+  assert.ok(!mainContent.includes("'open-study-flow-calendar'"), 'Should not have open-study-flow-calendar');
+  assert.ok(!mainContent.includes("'open-study-flow-hub-sidebar'"), 'Should not have open-study-flow-hub-sidebar');
+  assert.ok(mainContent.includes("id: 'open-hub'"), 'Must have open-hub');
+  assert.ok(mainContent.includes("id: 'open-calendar'"), 'Must have open-calendar');
+  assert.ok(mainContent.includes("id: 'open-hub-sidebar'"), 'Must have open-hub-sidebar');
+});
