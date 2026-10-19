@@ -3,8 +3,8 @@
   "name": "Study Flow Assistant",
   "version": "1.0.1",
   "minAppVersion": "1.8.7",
-  "description": "Pomodoro timer, tasks, habits tracker, calendar, metrics, and zen mode for Obsidian. / Temporizador Pomodoro, tareas, hábitos, calendario, métricas y modo zen para Obsidian.",
+  "description": "Comprehensive academic study assistant: customizable Pomodoro timer, task and habit tracker, time blocking calendar, metrics, and distraction-free Zen mode.",
   "author": "dalt",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/dalt-builds",
   "isDesktopOnly": false
 }
