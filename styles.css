@@ -3240,6 +3240,29 @@ body.is-study-flow-zen .workspace-split {
   gap: 8px;
 }
 
+.study-flow-day-detail-title-wrap.is-clickable {
+  cursor: pointer;
+  position: relative;
+  border-radius: var(--radius-s);
+  padding: 3px 6px;
+  margin: -3px -6px;
+  transition: background-color var(--anim-fast);
+}
+
+.study-flow-day-detail-title-wrap.is-clickable:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.study-flow-header-date-input.is-hidden-picker {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: none;
+  pointer-events: none;
+}
+
 .study-flow-day-detail-title {
   margin: 0;
   font-size: var(--font-ui-medium);
@@ -3415,6 +3438,27 @@ body.is-study-flow-zen .workspace-split {
 
 .study-flow-input-with-icon.is-note-input {
   flex: 1 1 140px;
+}
+
+.study-flow-input-with-icon.is-date-input {
+  flex: 0 0 auto;
+  width: 142px;
+}
+
+.study-flow-input-with-icon.is-date-input input[type="date"] {
+  padding-left: 28px;
+  padding-right: 6px;
+  cursor: pointer;
+}
+
+.study-flow-input-with-icon.is-date-input input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity var(--anim-fast);
+}
+
+.study-flow-input-with-icon.is-date-input input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .study-flow-select-wrapper {

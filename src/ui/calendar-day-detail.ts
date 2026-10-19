@@ -88,12 +88,36 @@ export function renderDayDetailHeader(
   callbacks: DayDetailCallbacks
 ): HTMLElement {
   const detailHeader = container.createDiv({ cls: 'study-flow-day-detail-header' });
-  const titleWrap = detailHeader.createDiv({ cls: 'study-flow-day-detail-title-wrap' });
+  const titleWrap = detailHeader.createDiv({ cls: 'study-flow-day-detail-title-wrap is-clickable' });
+  titleWrap.setAttribute('title', t('calendar.changeDateTooltip'));
   const calIcon = titleWrap.createSpan({ cls: 'study-flow-section-icon' });
   setIcon(calIcon, 'calendar');
   titleWrap.createEl('h3', {
     text: formatLongDate(state.selectedCalendarDate, getEffectiveLanguage()),
     cls: 'study-flow-day-detail-title',
+  });
+
+  const headerDateInput = titleWrap.createEl('input', {
+    type: 'date',
+    cls: 'study-flow-header-date-input is-hidden-picker',
+    value: state.selectedCalendarDate,
+    attr: { 'aria-label': t('calendar.changeDateTooltip') },
+  });
+
+  titleWrap.addEventListener('click', (e) => {
+    if (e.target !== headerDateInput) {
+      try {
+        (headerDateInput as any).showPicker?.();
+      } catch {
+        headerDateInput.focus();
+      }
+    }
+  });
+
+  headerDateInput.addEventListener('change', async () => {
+    if (headerDateInput.value && callbacks.onDateChange) {
+      await callbacks.onDateChange(headerDateInput.value);
+    }
   });
 
   const headerActions = detailHeader.createDiv({ cls: 'study-flow-day-header-actions' });
@@ -200,8 +224,30 @@ export async function renderTimeBlocksColumn(
     },
   });
 
-  // Row 2: Time range and Linked Note
+  // Row 2: Date, Time range and Linked Note
   const formRow2 = formWrapper.createDiv({ cls: 'study-flow-form-row is-split-row' });
+
+  // Date input (default selectedCalendarDate / today)
+  const dateWrap = formRow2.createDiv({
+    cls: 'study-flow-input-with-icon is-date-input',
+    attr: { title: t('calendar.datePickerTooltip') },
+  });
+  const dateIcon = dateWrap.createSpan({ cls: 'study-flow-input-icon' });
+  setIcon(dateIcon, 'calendar');
+  const dateInput = dateWrap.createEl('input', {
+    type: 'date',
+    cls: 'study-flow-date-input',
+    value: state.selectedCalendarDate,
+    attr: { 'aria-label': t('calendar.datePickerAria') },
+  });
+  dateInput.addEventListener('click', () => {
+    try {
+      (dateInput as any).showPicker?.();
+    } catch {
+      // fallback
+    }
+  });
+
   const timeGroup = formRow2.createDiv({
     cls: 'study-flow-time-range-group',
     attr: { title: 'Horario (HH:MM)' },
@@ -250,6 +296,7 @@ export async function renderTimeBlocksColumn(
       state.editingBlockId = null;
       saveBlockBtn.setText(t('common.save'));
       titleInput.value = '';
+      dateInput.value = state.selectedCalendarDate;
       noteInput.value = '';
       startInput.value = '09:00';
       endInput.value = '10:30';
@@ -264,6 +311,7 @@ export async function renderTimeBlocksColumn(
     const title = titleInput.value.trim();
     let startTime = startInput.value.trim();
     let endTime = endInput.value.trim();
+    const targetDate = dateInput.value.trim() || state.selectedCalendarDate;
     if (!title || !startTime || !endTime) {
       new Notice(t('calendar.completeTimeFieldsNotice'));
       return;
@@ -273,9 +321,15 @@ export async function renderTimeBlocksColumn(
 
     const blockId = state.editingBlockId || String(Date.now());
     const existing = blocks.find((b) => b.id === state.editingBlockId);
+
+    // If rescheduled to a different date while editing, delete from previous date's note
+    if (state.editingBlockId && existing && existing.date && existing.date !== targetDate) {
+      await deleteTimeBlock(plugin, existing.date, state.editingBlockId);
+    }
+
     const newBlock: CalendarTimeBlock = {
       id: blockId,
-      date: state.selectedCalendarDate,
+      date: targetDate,
       startTime,
       endTime,
       title,
@@ -291,7 +345,12 @@ export async function renderTimeBlocksColumn(
     addBlockBtn.removeClass('is-active');
     saveBlockBtn.setText(t('common.save'));
     new Notice(t('calendar.blockSavedNotice', { title }));
-    await callbacks.onRefresh();
+
+    if (callbacks.onDateChange && targetDate !== state.selectedCalendarDate) {
+      await callbacks.onDateChange(targetDate);
+    } else {
+      await callbacks.onRefresh();
+    }
   };
 
   const handleCancelBlock = () => {
@@ -410,6 +469,7 @@ export async function renderTimeBlocksColumn(
         state.editingBlockId = block.id;
         state.isAddingTimeBlock = true;
         addBlockBtn.addClass('is-active');
+        dateInput.value = block.date || state.selectedCalendarDate;
         startInput.value = block.startTime;
         endInput.value = block.endTime;
         titleInput.value = block.title;
@@ -477,8 +537,29 @@ export async function renderDeadlinesColumn(
     },
   });
 
-  // Row 2: Due time, Priority select, Pomodoro estimate
+  // Row 2: Date, Due time, Priority select, Pomodoro estimate
   const dlRow2 = dlFormWrapper.createDiv({ cls: 'study-flow-form-row is-options-row' });
+
+  // Date picker (default selectedCalendarDate / today)
+  const dlDateWrap = dlRow2.createDiv({
+    cls: 'study-flow-input-with-icon is-date-input',
+    attr: { title: t('calendar.datePickerTooltip') },
+  });
+  const dlCalIcon = dlDateWrap.createSpan({ cls: 'study-flow-input-icon' });
+  setIcon(dlCalIcon, 'calendar');
+  const dlDateInput = dlDateWrap.createEl('input', {
+    type: 'date',
+    cls: 'study-flow-date-input',
+    value: state.selectedCalendarDate,
+    attr: { 'aria-label': t('calendar.datePickerAria') },
+  });
+  dlDateInput.addEventListener('click', () => {
+    try {
+      (dlDateInput as any).showPicker?.();
+    } catch {
+      // fallback
+    }
+  });
 
   // Time with clock icon
   const dlTimeWrap = dlRow2.createDiv({
@@ -551,6 +632,7 @@ export async function renderDeadlinesColumn(
     dlFormWrapper.toggleClass('is-hidden', !state.isAddingDeadline);
     if (state.isAddingDeadline) {
       dlTitleInput.value = '';
+      dlDateInput.value = state.selectedCalendarDate;
       dlTimeInput.value = '';
       pomoInput.value = '';
       setTimeout(() => dlTitleInput.focus(), 50);
@@ -563,6 +645,7 @@ export async function renderDeadlinesColumn(
       new Notice(t('calendar.enterDeadlineTitleNotice'));
       return;
     }
+    const targetDate = dlDateInput.value.trim() || state.selectedCalendarDate;
     let timeVal = dlTimeInput.value.trim() || undefined;
     if (timeVal && timeVal.length === 4 && timeVal[1] === ':') {
       timeVal = '0' + timeVal;
@@ -574,7 +657,7 @@ export async function renderDeadlinesColumn(
       app,
       plugin.settings,
       tVal,
-      state.selectedCalendarDate,
+      targetDate,
       timeVal,
       prioVal,
       pomoVal
@@ -589,8 +672,13 @@ export async function renderDeadlinesColumn(
       }
       state.isAddingDeadline = false;
       addDlBtn.removeClass('is-active');
-      new Notice(t('calendar.deadlineCreatedNotice', { date: state.selectedCalendarDate }));
-      await callbacks.onRefresh();
+      new Notice(t('calendar.deadlineCreatedNotice', { date: targetDate }));
+
+      if (callbacks.onDateChange && targetDate !== state.selectedCalendarDate) {
+        await callbacks.onDateChange(targetDate);
+      } else {
+        await callbacks.onRefresh();
+      }
     }
   };
 
