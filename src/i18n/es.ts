@@ -30,13 +30,15 @@ export const es: TranslationDict = {
   'priority.high': 'Alta',
   'priority.highUrgent': 'Alta (Urgente / Impacto)',
 
-  // Tabs
+  // Tabs & View
   'tabs.today': 'Hoy',
   'tabs.pomodoro': 'Pomodoro',
   'tabs.tasks': 'Tareas',
   'tabs.habits': 'Hábitos',
   'tabs.calendar': 'Calendario',
   'tabs.analytics': 'Métricas',
+  'view.title': 'Study Flow Hub',
+  'view.navigationAria': 'Navegación de Study Flow',
 
   // Ribbon
   'ribbon.openView': 'Abrir vista principal',
@@ -179,6 +181,7 @@ export const es: TranslationDict = {
   'pomodoroCheck.closingNoteName': 'Nota de cierre (opcional)',
   'pomodoroCheck.closingNoteDesc': 'Agrega una reflexión o nota de progreso a tu nota diaria.',
   'pomodoroCheck.closingNotePlaceholder': 'Ej. Avancé hasta la página 50, quedaron 2 ejercicios pendientes...',
+  'pomodoroCheck.distractionsCount': '{count} distracción(es)',
   'pomodoroCheck.skip': 'Omitir',
   'pomodoroReview.title': 'Cierre de sesión de enfoque',
   'pomodoroReview.taskCompleted': 'Marcar tarea como completada',
@@ -395,6 +398,11 @@ export const es: TranslationDict = {
   'calendar.editBlockTooltip': 'Editar bloque',
   'calendar.deleteBlockTooltip': 'Eliminar bloque',
   'calendar.blockDeletedNotice': 'Bloque eliminado',
+  'calendar.timeScheduleTitle': 'Horario (HH:MM)',
+  'calendar.startTimeLabel': 'Hora de inicio',
+  'calendar.endTimeLabel': 'Hora de fin',
+  'calendar.resizeStartLabel': 'Redimensionar hora de inicio',
+  'calendar.resizeEndLabel': 'Redimensionar hora de fin',
   'calendar.datePickerTooltip': 'Fecha del bloque o entrega (por defecto hoy)',
   'calendar.datePickerAria': 'Fecha',
   'calendar.changeDateTooltip': 'Haz clic para seleccionar o cambiar de fecha',

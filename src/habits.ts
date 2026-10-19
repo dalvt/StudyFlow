@@ -13,7 +13,7 @@ import {
   parseHabitLine,
   syncHabitsToMarkdown,
 } from './markdown-utils.ts';
-import { t } from './i18n/index.ts';
+import { getEffectiveLanguage, t } from './i18n/index.ts';
 
 export {
   calculateHabitStreak,
@@ -35,6 +35,25 @@ export interface HabitItem extends HabitItemData {
   isRestDayToday?: boolean;
 }
 
+export function getDefaultHabitsContent(lang: 'es' | 'en' = 'es'): string {
+  if (lang === 'en') {
+    return `# Habit Tracker
+
+- [ ] 📚 Read for 20 min <!-- streak: 0 | last:  -->
+- [ ] 💧 Drink 2L of water <!-- streak: 0 | last:  -->
+- [ ] 🏃‍♂️ Exercise / Stretching <!-- streak: 0 | last:  -->
+- [ ] 🧘 Meditation or Unplug <!-- streak: 0 | last:  -->
+`;
+  }
+  return `# Registro de Hábitos
+
+- [ ] 📚 Lectura 20 min <!-- streak: 0 | last:  -->
+- [ ] 💧 Tomar 2L de agua <!-- streak: 0 | last:  -->
+- [ ] 🏃‍♂️ Ejercicio / Estiramiento <!-- streak: 0 | last:  -->
+- [ ] 🧘 Meditación o Desconexión <!-- streak: 0 | last:  -->
+`;
+}
+
 function getTodayString(): string {
   return getLocalDateString();
 }
@@ -43,13 +62,7 @@ function getTodayString(): string {
  * Loads habits from Habits.md file. If file does not exist, initializes it.
  */
 export async function loadHabitsFromFile(app: App, filePath: string): Promise<HabitItem[]> {
-  const defaultHabitsContent = `# Registro de Hábitos
-
-- [ ] 📚 Lectura 20 min <!-- streak: 0 | last:  -->
-- [ ] 💧 Tomar 2L de agua <!-- streak: 0 | last:  -->
-- [ ] 🏃‍♂️ Ejercicio / Estiramiento <!-- streak: 0 | last:  -->
-- [ ] 🧘 Meditación o Desconexión <!-- streak: 0 | last:  -->
-`;
+  const defaultHabitsContent = getDefaultHabitsContent(getEffectiveLanguage());
 
   const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHabitsContent);
   const content = await app.vault.read(file);
@@ -73,7 +86,8 @@ export async function loadHabitsFromFile(app: App, filePath: string): Promise<Ha
  * and preserving any other content in the file.
  */
 export async function saveHabitsToFile(app: App, filePath: string, habits: HabitItem[]): Promise<void> {
-  const file = await getOrCreateFile(app, filePath || 'Habits.md', '# Registro de Hábitos\n\n');
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
   await app.vault.process(file, (content) => {
     return syncHabitsToMarkdown(content, habits);
   });
@@ -299,7 +313,7 @@ export function computeHabitHeatmapYear(
 
   const MONTH_NAMES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   const MONTH_NAMES_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const isSpanish = t('habits.heatmapLess') === 'Menos';
+  const isSpanish = getEffectiveLanguage() === 'es';
   const monthNames = isSpanish ? MONTH_NAMES_ES : MONTH_NAMES_EN;
 
   const weeks: HeatmapYearWeek[] = [];

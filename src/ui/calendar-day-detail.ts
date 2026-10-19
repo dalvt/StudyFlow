@@ -250,20 +250,20 @@ export async function renderTimeBlocksColumn(
 
   const timeGroup = formRow2.createDiv({
     cls: 'study-flow-time-range-group',
-    attr: { title: 'Horario (HH:MM)' },
+    attr: { title: t('calendar.timeScheduleTitle') },
   });
   const startInput = timeGroup.createEl('input', {
     type: 'text',
     cls: 'study-flow-time-input',
     value: '09:00',
-    attr: { placeholder: '09:00', maxlength: '5', 'aria-label': 'Hora de inicio' },
+    attr: { placeholder: '09:00', maxlength: '5', 'aria-label': t('calendar.startTimeLabel') },
   });
   timeGroup.createSpan({ text: '—', cls: 'study-flow-time-sep' });
   const endInput = timeGroup.createEl('input', {
     type: 'text',
     cls: 'study-flow-time-input',
     value: '10:30',
-    attr: { placeholder: '10:30', maxlength: '5', 'aria-label': 'Hora de fin' },
+    attr: { placeholder: '10:30', maxlength: '5', 'aria-label': t('calendar.endTimeLabel') },
   });
 
   const noteWrap = formRow2.createDiv({ cls: 'study-flow-input-with-icon is-note-input' });

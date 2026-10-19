@@ -355,7 +355,7 @@ export class CalendarGridComponent {
     // Top Resize Handle
     const topHandle = blockEl.createDiv({
       cls: 'study-flow-grid-resize-handle study-flow-grid-resize-top',
-      attr: { 'aria-label': 'Resize start time' },
+      attr: { 'aria-label': t('calendar.resizeStartLabel') },
     });
 
     // Content container
@@ -461,7 +461,7 @@ export class CalendarGridComponent {
     // Bottom Resize Handle
     const bottomHandle = blockEl.createDiv({
       cls: 'study-flow-grid-resize-handle study-flow-grid-resize-bottom',
-      attr: { 'aria-label': 'Resize end time' },
+      attr: { 'aria-label': t('calendar.resizeEndLabel') },
     });
 
     // Setup Drag-To-Move and Resizing with PointerEvents

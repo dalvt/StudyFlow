@@ -28,13 +28,15 @@ export const en = {
   'priority.high': 'High',
   'priority.highUrgent': 'High (Urgent / Impact)',
 
-  // Tabs
+  // Tabs & View
   'tabs.today': 'Today',
   'tabs.pomodoro': 'Pomodoro',
   'tabs.tasks': 'Tasks',
   'tabs.habits': 'Habits',
   'tabs.calendar': 'Calendar',
   'tabs.analytics': 'Analytics',
+  'view.title': 'Study Flow Hub',
+  'view.navigationAria': 'Study Flow Navigation',
 
   // Ribbon
   'ribbon.openView': 'Open main view',
@@ -177,6 +179,7 @@ export const en = {
   'pomodoroCheck.closingNoteName': 'Closing note (optional)',
   'pomodoroCheck.closingNoteDesc': 'Add a thought or progress note to your daily note.',
   'pomodoroCheck.closingNotePlaceholder': 'E.g. Reached page 50, 2 exercises remaining...',
+  'pomodoroCheck.distractionsCount': '{count} distraction(s)',
   'pomodoroCheck.skip': 'Skip',
   'pomodoroReview.title': 'Focus session review',
   'pomodoroReview.taskCompleted': 'Mark task as completed',
@@ -393,6 +396,11 @@ export const en = {
   'calendar.editBlockTooltip': 'Edit block',
   'calendar.deleteBlockTooltip': 'Delete block',
   'calendar.blockDeletedNotice': 'Block deleted',
+  'calendar.timeScheduleTitle': 'Schedule (HH:MM)',
+  'calendar.startTimeLabel': 'Start time',
+  'calendar.endTimeLabel': 'End time',
+  'calendar.resizeStartLabel': 'Resize start time',
+  'calendar.resizeEndLabel': 'Resize end time',
   'calendar.datePickerTooltip': 'Block or deadline date (default today)',
   'calendar.datePickerAria': 'Date',
   'calendar.changeDateTooltip': 'Click to select or change date',

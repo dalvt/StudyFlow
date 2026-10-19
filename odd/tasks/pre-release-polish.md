@@ -47,14 +47,14 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
   - Verification: `tests/habits-streak.test.mjs`, `npm test`.
   - Evidence: Commit ID
 
-- [ ] **Task 6: Complete i18n & Zero Hardcoded Strings**
+- [x] **Task 6: Complete i18n & Zero Hardcoded Strings**
   - Localize initial `Habits.md` creation based on active language in `src/habits.ts`.
   - Localize distractions count in `src/pomodoro-task-check-modal.ts`.
   - Localize calendar accessibility titles/labels in `src/ui/calendar-day-detail.ts` and `src/ui/calendar-grid.ts`.
   - Fix settings empty fallbacks to use `getDefaultConventions(lang)` in `src/settings.ts`.
   - Replace fragile string check in `src/habits.ts` with `getEffectiveLanguage()`.
   - Verification: `tests/i18n.test.mjs`, `npm test`.
-  - Evidence: Commit ID
+  - Evidence: Pending commit
 
 - [ ] **Task 7: Dead Code Pruning & Documentation Update**
   - Remove dead `.ics`, weekly review, and pomodoro log migration code and orphan translation keys.

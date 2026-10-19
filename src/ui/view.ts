@@ -65,7 +65,7 @@ export class StudyFlowView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Study Flow Hub';
+    return t('view.title');
   }
 
   getIcon(): string {
@@ -221,7 +221,7 @@ export class StudyFlowView extends ItemView {
       cls: 'study-flow-segmented-nav',
       attr: {
         role: 'tablist',
-        'aria-label': 'Study Flow Navigation',
+        'aria-label': t('view.navigationAria'),
       },
     });
 

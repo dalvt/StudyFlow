@@ -6,7 +6,7 @@ import type { FocusSessionRecord } from './analytics';
 import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, cloneDefaultSettings, validateSettingNumber, type PomodoroSoundType } from './settings-utils';
 export * from './settings-utils';
 import { t, setLanguage, getEffectiveLanguage } from './i18n/index.ts';
-import { getDefaultWeeklyReviewTemplate } from './conventions.ts';
+import { getDefaultWeeklyReviewTemplate, getDefaultConventions } from './conventions.ts';
 import { SubjectEditModal } from './subject-modal.ts';
 
 export class StudyFlowSettingTab extends PluginSettingTab {
@@ -201,10 +201,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.tasksHeaderDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('## Tareas')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).tasksSectionHeader)
           .setValue(this.plugin.settings.tasksSectionHeader)
           .onChange(async (value) => {
-            this.plugin.settings.tasksSectionHeader = value.trim() || '## Tareas';
+            this.plugin.settings.tasksSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).tasksSectionHeader;
             await this.plugin.saveSettings();
           })
       );
@@ -214,10 +214,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.iceboxHeaderDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('## Icebox')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).iceboxSectionHeader)
           .setValue(this.plugin.settings.iceboxSectionHeader)
           .onChange(async (value) => {
-            this.plugin.settings.iceboxSectionHeader = value.trim() || '## Icebox';
+            this.plugin.settings.iceboxSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).iceboxSectionHeader;
             await this.plugin.saveSettings();
           })
       );
@@ -227,10 +227,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.timeBlocksHeaderDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('## Bloques de Tiempo')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader)
           .setValue(this.plugin.settings.timeBlocksSectionHeader)
           .onChange(async (value) => {
-            this.plugin.settings.timeBlocksSectionHeader = value.trim() || '## Bloques de Tiempo';
+            this.plugin.settings.timeBlocksSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
             await this.plugin.saveSettings();
           })
       );
@@ -500,10 +500,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.spacedTagDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('#repasar')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).spacedRepetitionTag)
           .setValue(this.plugin.settings.spacedRepetitionTag)
           .onChange(async (value) => {
-            this.plugin.settings.spacedRepetitionTag = value.trim() || '#repasar';
+            this.plugin.settings.spacedRepetitionTag = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionTag;
             await this.plugin.saveSettings();
           })
       );
@@ -513,10 +513,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.spacedNextKeyDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('repasar_siguiente')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).spacedRepetitionNextKey)
           .setValue(this.plugin.settings.spacedRepetitionNextKey)
           .onChange(async (value) => {
-            this.plugin.settings.spacedRepetitionNextKey = value.trim() || 'repasar_siguiente';
+            this.plugin.settings.spacedRepetitionNextKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionNextKey;
             await this.plugin.saveSettings();
           })
       );
@@ -526,10 +526,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.spacedIntervalKeyDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('repasar_intervalo')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).spacedRepetitionIntervalKey)
           .setValue(this.plugin.settings.spacedRepetitionIntervalKey)
           .onChange(async (value) => {
-            this.plugin.settings.spacedRepetitionIntervalKey = value.trim() || 'repasar_intervalo';
+            this.plugin.settings.spacedRepetitionIntervalKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionIntervalKey;
             await this.plugin.saveSettings();
           })
       );
@@ -539,10 +539,10 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .setDesc(t('settings.spacedReviewedKeyDesc'))
       .addText((text) =>
         text
-          .setPlaceholder('repasar_revisado')
+          .setPlaceholder(getDefaultConventions(getEffectiveLanguage()).spacedRepetitionReviewedKey)
           .setValue(this.plugin.settings.spacedRepetitionReviewedKey)
           .onChange(async (value) => {
-            this.plugin.settings.spacedRepetitionReviewedKey = value.trim() || 'repasar_revisado';
+            this.plugin.settings.spacedRepetitionReviewedKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionReviewedKey;
             await this.plugin.saveSettings();
           })
       );

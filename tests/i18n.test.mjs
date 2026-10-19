@@ -106,3 +106,27 @@ test('language setting handles auto mode with Obsidian language resolver', () =>
   // Reset resolver and set back to auto
   setObsidianLanguageResolver(null);
 });
+
+test('getDefaultHabitsContent returns correct localized content', async () => {
+  const { getDefaultHabitsContent } = await import('../src/habits.ts');
+  const esHabits = getDefaultHabitsContent('es');
+  assert.ok(esHabits.includes('# Registro de Hábitos'));
+  assert.ok(esHabits.includes('Tomar 2L de agua'));
+
+  const enHabits = getDefaultHabitsContent('en');
+  assert.ok(enHabits.includes('# Habit Tracker'));
+  assert.ok(enHabits.includes('Drink 2L of water'));
+});
+
+test('getDefaultConventions returns localized section headers and tags', async () => {
+  const { getDefaultConventions } = await import('../src/conventions.ts');
+  const esConv = getDefaultConventions('es');
+  assert.equal(esConv.tasksSectionHeader, '## Tareas');
+  assert.equal(esConv.timeBlocksSectionHeader, '## Bloques de Tiempo');
+  assert.equal(esConv.spacedRepetitionTag, '#repasar');
+
+  const enConv = getDefaultConventions('en');
+  assert.equal(enConv.tasksSectionHeader, '## Tasks');
+  assert.equal(enConv.timeBlocksSectionHeader, '## Time Blocks');
+  assert.equal(enConv.spacedRepetitionTag, '#review');
+});

@@ -53,10 +53,7 @@ export function getEffectiveLanguage(): SupportedLanguage {
 
   if (!detected && typeof window !== 'undefined') {
     try {
-      detected =
-        window.localStorage?.getItem('language') ||
-        window.navigator?.language ||
-        '';
+      detected = window.navigator?.language || '';
     } catch {
       // ignore
     }

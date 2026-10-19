@@ -157,7 +157,7 @@ export class PomodoroClosingReviewModal extends Modal {
       // Append to daily note if enabled
       if (this.plugin.settings.logPomodoroToDailyNote && (trimmedNote || hasDistractions)) {
         const notePart = trimmedNote;
-        const distPart = hasDistractions ? `${this.distractions} distracción(es)` : '';
+        const distPart = hasDistractions ? t('pomodoroCheck.distractionsCount', { count: this.distractions }) : '';
         const combined = notePart && distPart ? `${notePart} · ${distPart}` : notePart || distPart;
 
         const now = new Date();
