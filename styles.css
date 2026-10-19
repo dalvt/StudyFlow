@@ -5924,6 +5924,28 @@ body.is-study-flow-zen .workspace-split {
   margin-top: 8px;
 }
 
+.study-flow-days-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.study-flow-day-picker-btn {
+  padding: 4px 10px;
+  font-size: var(--font-ui-smaller);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.study-flow-day-picker-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
 
 
 

@@ -148,9 +148,11 @@ export class HabitsTab implements TabComponent {
 
         cb.addEventListener('change', async () => {
           this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
+          const updated = this.habits.find((h) => h.id === habit.id);
+          const currentStreak = updated ? updated.streak : habit.streak;
           new Notice(
             cb.checked
-              ? t('habits.streakIncreasedNotice', { streak: String(habit.streak + 1) })
+              ? t('habits.streakIncreasedNotice', { streak: String(currentStreak) })
               : t('habits.habitUnmarkedNotice')
           );
           if (this.container) await this.render(this.container);

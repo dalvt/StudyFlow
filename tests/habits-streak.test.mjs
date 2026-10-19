@@ -441,3 +441,31 @@ test('computeHabitHeatmapYear generates 52 full weeks aligned Mon-Sun with corre
   assert.strictEqual(res.totalCompletedInYear, 3);
 });
 
+test('updateHabitInFile with specific_days custom daysOfWeek serializes and roundtrips', async () => {
+  const initialContent = `# Registro de Hábitos\n\n- [ ] 🏋️ Gym <!-- id:gym --> <!-- freq: daily -->\n`;
+  const habitsFile = new TFile('Habits.md');
+  habitsFile.content = initialContent;
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'Habits.md' ? habitsFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
+    },
+  };
+
+  const updatedHabits = await updateHabitInFile(app, 'Habits.md', 'gym', {
+    name: '🏋️ Gym (Mon, Wed, Fri)',
+    frequency: { type: 'specific_days', daysOfWeek: [1, 3, 5] },
+  });
+
+  assert.strictEqual(updatedHabits.length, 1);
+  assert.strictEqual(updatedHabits[0].name, '🏋️ Gym (Mon, Wed, Fri)');
+  assert.deepStrictEqual(updatedHabits[0].frequency, { type: 'specific_days', daysOfWeek: [1, 3, 5] });
+  assert.ok(habitsFile.content.includes('freq: specific_days'));
+  assert.ok(habitsFile.content.includes('days: 1,3,5'));
+});
+

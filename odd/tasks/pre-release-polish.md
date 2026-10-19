@@ -41,7 +41,7 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
   - Verification: `npm test`, `npm run check-types`.
   - Evidence: Commit ID
 
-- [ ] **Task 5: Habits Streak Recalculation & Specific Days Selector**
+- [x] **Task 5: Habits Streak Recalculation & Specific Days Selector**
   - Fix off-by-one / stale streak notice in `src/ui/habits-tab.ts` and `src/ui/today-tab.ts`.
   - Add day checkboxes (Mon-Sun) for `specific_days` in `src/habit-edit-modal.ts` and `src/ui/habits-tab.ts`.
   - Verification: `tests/habits-streak.test.mjs`, `npm test`.

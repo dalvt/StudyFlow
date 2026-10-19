@@ -379,8 +379,10 @@ export class TodayTab implements TabComponent {
       });
       check.checked = false;
       check.addEventListener('change', async () => {
-        await toggleHabitStatus(this.app, this.plugin.settings.habitsFilePath, habit.id, true);
-        new Notice(t('habits.habitFulfilledNotice', { streak: habit.streak + 1 }));
+        const updatedHabits = await toggleHabitStatus(this.app, this.plugin.settings.habitsFilePath, habit.id, true);
+        const updated = updatedHabits.find((h) => h.id === habit.id);
+        const currentStreak = updated ? updated.streak : habit.streak;
+        new Notice(t('habits.habitFulfilledNotice', { streak: currentStreak }));
         await this.renderHabitsSection();
       });
 

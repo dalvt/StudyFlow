@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import type { HabitFrequency, HabitFrequencyType, HabitItem } from './habits.ts';
-import { t } from './i18n/index.ts';
+import { getEffectiveLanguage, t } from './i18n/index.ts';
 
 export class HabitEditModal extends Modal {
   private plugin: StudyFlowPlugin;
@@ -11,6 +11,7 @@ export class HabitEditModal extends Modal {
   private name: string = '';
   private freqType: HabitFrequencyType = 'daily';
   private weeklyTarget: number = 3;
+  private daysOfWeek: number[] = [1, 2, 3, 4, 5];
   private previousActiveElement: HTMLElement | null = null;
 
   constructor(
@@ -28,6 +29,11 @@ export class HabitEditModal extends Modal {
     const freq = habit.frequency || { type: 'daily' };
     this.freqType = freq.type || 'daily';
     this.weeklyTarget = freq.weeklyTarget || 3;
+    if (freq.type === 'specific_days' && Array.isArray(freq.daysOfWeek) && freq.daysOfWeek.length > 0) {
+      this.daysOfWeek = [...freq.daysOfWeek];
+    } else {
+      this.daysOfWeek = [1, 2, 3, 4, 5];
+    }
   }
 
   onOpen(): void {
@@ -58,6 +64,7 @@ export class HabitEditModal extends Modal {
 
     // Frequency setting
     let targetSetting: Setting | null = null;
+    let specificDaysSetting: Setting | null = null;
     new Setting(contentEl)
       .setName(t('habits.frequencyLabel'))
       .setDesc(t('habits.frequencyDesc'))
@@ -71,6 +78,9 @@ export class HabitEditModal extends Modal {
             this.freqType = val as HabitFrequencyType;
             if (targetSetting) {
               targetSetting.settingEl.toggleClass('is-hidden', this.freqType !== 'weekly');
+            }
+            if (specificDaysSetting) {
+              specificDaysSetting.settingEl.toggleClass('is-hidden', this.freqType !== 'specific_days');
             }
           });
       });
@@ -98,6 +108,44 @@ export class HabitEditModal extends Modal {
       targetSetting.settingEl.addClass('is-hidden');
     }
 
+    // Specific days picker setting
+    const isEn = getEffectiveLanguage() === 'en';
+    specificDaysSetting = new Setting(contentEl)
+      .setName(t('habits.freqWeekdaysOption'))
+      .setDesc(isEn ? 'Select active days of the week' : 'Selecciona los días activos de la semana');
+
+    const pillsContainer = specificDaysSetting.controlEl.createDiv({ cls: 'study-flow-days-picker' });
+    const daysConfig = [
+      { day: 1, label: isEn ? 'Mon' : 'Lun' },
+      { day: 2, label: isEn ? 'Tue' : 'Mar' },
+      { day: 3, label: isEn ? 'Wed' : 'Mié' },
+      { day: 4, label: isEn ? 'Thu' : 'Jue' },
+      { day: 5, label: isEn ? 'Fri' : 'Vie' },
+      { day: 6, label: isEn ? 'Sat' : 'Sáb' },
+      { day: 0, label: isEn ? 'Sun' : 'Dom' },
+    ];
+
+    daysConfig.forEach(({ day, label }) => {
+      const btn = pillsContainer.createEl('button', {
+        text: label,
+        cls: `study-flow-day-picker-btn ${this.daysOfWeek.includes(day) ? 'mod-cta' : ''}`,
+      });
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        if (this.daysOfWeek.includes(day)) {
+          this.daysOfWeek = this.daysOfWeek.filter((d) => d !== day);
+          btn.removeClass('mod-cta');
+        } else {
+          this.daysOfWeek.push(day);
+          btn.addClass('mod-cta');
+        }
+      });
+    });
+
+    if (this.freqType !== 'specific_days') {
+      specificDaysSetting.settingEl.addClass('is-hidden');
+    }
+
     // Modal buttons
     const btnContainer = contentEl.createDiv({ cls: 'study-flow-modal-footer study-flow-modal-buttons' });
     const cancelBtn = btnContainer.createEl('button', { text: t('common.cancel') });
@@ -121,9 +169,10 @@ export class HabitEditModal extends Modal {
           weeklyTarget: Math.max(1, Math.min(7, this.weeklyTarget || 3)),
         };
       } else if (this.freqType === 'specific_days') {
+        const sorted = Array.from(new Set(this.daysOfWeek)).sort((a, b) => a - b);
         frequency = {
           type: 'specific_days',
-          daysOfWeek: [1, 2, 3, 4, 5],
+          daysOfWeek: sorted.length > 0 ? sorted : [1, 2, 3, 4, 5],
         };
       }
 
