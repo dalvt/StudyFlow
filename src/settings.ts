@@ -3,10 +3,10 @@ import type StudyFlowPlugin from './main';
 import { playPomodoroSound } from './audio';
 import type { FocusSessionRecord } from './analytics';
 
-import { DEFAULT_SETTINGS, DEFAULT_WEEKLY_REVIEW_TEMPLATE, cloneDefaultSettings, validateSettingNumber, type PomodoroSoundType } from './settings-utils';
+import { DEFAULT_SETTINGS, cloneDefaultSettings, validateSettingNumber, type PomodoroSoundType } from './settings-utils';
 export * from './settings-utils';
 import { t, setLanguage, getEffectiveLanguage } from './i18n/index.ts';
-import { getDefaultWeeklyReviewTemplate, getDefaultConventions } from './conventions.ts';
+import { getDefaultConventions } from './conventions.ts';
 import { SubjectEditModal } from './subject-modal.ts';
 
 export class StudyFlowSettingTab extends PluginSettingTab {

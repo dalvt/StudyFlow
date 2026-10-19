@@ -634,37 +634,6 @@ export const en = {
   'analytics.subjectStreak': '🔥 Goal streak: {count} consecutive weeks',
   'analytics.subjectStreakNone': 'Streak: 0 weeks',
 
-  // Weekly Review
-  'commands.generateWeeklyReview': 'Generate weekly review',
-  'settings.weeklyReviewHeading': 'Weekly Review',
-  'settings.weeklyReviewFolderLabel': 'Weekly reviews folder',
-  'settings.weeklyReviewFolderDesc': 'Location where weekly review notes will be created (e.g. StudyFlow/Reviews).',
-  'settings.weeklyReviewTemplateLabel': 'Weekly review template',
-  'settings.weeklyReviewTemplateDesc': 'Markdown template with placeholders: {{week}}, {{startDate}}, {{endDate}}, {{subjectsSummary}}, {{sessionsSummary}}, {{habitsSummary}}, {{tasksCompletedSummary}}, {{tasksOverdueSummary}}.',
-  'settings.resetTemplateBtn': 'Reset template',
-  'settings.resetTemplateTooltip': 'Restore weekly review template to default format',
-  'settings.templateResetNotice': 'Weekly review template restored.',
-  'weeklyReview.createdNotice': '✓ Weekly review created: {path}',
-  'weeklyReview.openedNotice': 'Weekly review opened: {path}',
-  'weeklyReview.errorNotice': 'Error generating weekly review.',
-  'weeklyReview.noSubjects': 'No subjects configured in Settings.',
-  'weeklyReview.goalLabel': 'Goal',
-  'weeklyReview.goalMetBadge': 'Goal met!',
-  'weeklyReview.noSessions': 'No study sessions recorded this week.',
-  'weeklyReview.totalSessionsLabel': 'Total sessions',
-  'weeklyReview.totalTimeLabel': 'Total focused time',
-  'weeklyReview.completedSessionsLabel': 'Completed sessions',
-  'weeklyReview.interruptedSessionsLabel': 'Interrupted sessions',
-  'weeklyReview.noHabits': 'No active habits recorded.',
-  'weeklyReview.habitStreak': 'Streak: {days} days',
-  'weeklyReview.noActiveStreak': 'No active streak',
-  'weeklyReview.noCompletedTasks': 'No completed tasks recorded.',
-  'weeklyReview.moreTasksCompleted': '...and {count} more completed tasks.',
-  'weeklyReview.noOverdueTasks': 'No overdue tasks! Everything up to date.',
-  'weeklyReview.overdueOn': 'Overdue: {date}',
-  'weeklyReview.pastDueDate': 'past due date',
-  'weeklyReview.moreTasksOverdue': '...and {count} more overdue tasks.',
-
   // Spaced Repetition
   'commands.initSpacedRepetition': 'Start spaced repetition on active note',
   'settings.headingSpacedRepetition': 'Spaced Repetition',
@@ -691,23 +660,8 @@ export const en = {
   'spaced.reviewedEasyNotice': 'Reviewed (Easy): {title} rescheduled for {next}',
   'spaced.initializedNotice': 'Spaced repetition initialized in {title}',
 
-  // Maintenance & Migration
-  'commands.migratePomodoroLogs': 'Migrate Pomodoro logs to new format',
-  'settings.headingMaintenance': 'Maintenance & Migration',
-  'settings.migratePomodoroLogsName': 'Migrate Pomodoro logs',
-  'settings.migratePomodoroLogsDesc': 'Converts legacy Pomodoro logs in daily notes (- [x] Pomodoro completed...) to the new bullet format (- 🍅 HH:mm · task).',
-  'settings.migratePomodoroLogsBtn': 'Scan & migrate',
-  'migration.modalTitle': 'Pomodoro Logs Migration',
-  'migration.noLogsToMigrate': 'No notes with legacy Pomodoro logs found. Your vault is already up to date.',
-  'migration.modalDesc': 'Found {changes} legacy logs across {files} notes. Review changes before applying:',
-  'migration.applyBtn': 'Apply migration',
-  'migration.successNotice': '✓ Successfully migrated {count} Pomodoro logs.',
-  'migration.errorNotice': 'An error occurred while migrating Pomodoro logs.',
-
-  // ICS Export
-  'commands.exportCalendarIcs': 'Export blocks and deadlines to .ics',
-  'ics.exportedNotice': '✓ Calendar exported to: {path}',
-  'ics.exportErrorNotice': 'Error exporting .ics file',
+  // Maintenance
+  'settings.headingMaintenance': 'Maintenance & Sync',
 
   // Protocol Handler
   'protocol.timerStartedNotice': '🍅 Pomodoro started',

@@ -52,15 +52,6 @@ const DAY_NAMES_MAP: Record<string, number> = {
   sat: 6,
 };
 
-export const RRULE_BY_DAY: string[] = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-
-/**
- * Returns RFC 5545 RRULE BYDAY identifier for a day of week (0=Sunday -> SU).
- */
-export function rruleByDayFromDayOfWeek(dayOfWeek: number): string {
-  return RRULE_BY_DAY[dayOfWeek % 7] || 'MO';
-}
-
 /**
  * Parses markdown content of StudyFlow/Schedule.md into recurring schedule items.
  *

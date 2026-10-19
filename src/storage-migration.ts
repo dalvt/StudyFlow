@@ -15,8 +15,6 @@ import {
 import {
   parsePomodoroLogLine,
   formatPomodoroLogLine,
-  migratePomodoroLogsInContent,
-  type PomodoroLogMigrationChange,
 } from './conventions.ts';
 
 export * from './migration-utils.ts';
@@ -245,65 +243,4 @@ export async function syncHistoricalSessionsFromVault(
   }
 
   return addedCount;
-}
-
-export {
-  migratePomodoroLogsInContent,
-  type PomodoroLogMigrationChange,
-};
-
-export interface FilePomodoroMigrationPreview {
-  file: TFile;
-  path: string;
-  changes: import('./conventions.ts').PomodoroLogMigrationChange[];
-}
-
-/**
- * Scans markdown files in the vault looking for files with old Pomodoro logs to migrate.
- */
-export async function scanVaultForPomodoroLogMigrations(
-  app: App
-): Promise<FilePomodoroMigrationPreview[]> {
-  const files = app.vault.getMarkdownFiles();
-  const previews: FilePomodoroMigrationPreview[] = [];
-
-  for (const file of files) {
-    try {
-      const content = await app.vault.read(file);
-      if (/pomodoro\s+(?:completado|completed)/i.test(content)) {
-        const { changes } = migratePomodoroLogsInContent(content);
-        if (changes.length > 0) {
-          previews.push({
-            file,
-            path: file.path,
-            changes,
-          });
-        }
-      }
-    } catch (e) {
-      console.error(`Error reading ${file.path} for Pomodoro log migration`, e);
-    }
-  }
-
-  return previews;
-}
-
-/**
- * Applies the Pomodoro log migration using app.vault.process for each affected file.
- */
-export async function applyPomodoroLogMigrations(
-  app: App,
-  previews: FilePomodoroMigrationPreview[]
-): Promise<number> {
-  let totalChanges = 0;
-
-  for (const item of previews) {
-    await app.vault.process(item.file, (content) => {
-      const { newContent, changes } = migratePomodoroLogsInContent(content);
-      totalChanges += changes.length;
-      return newContent;
-    });
-  }
-
-  return totalChanges;
 }

@@ -78,8 +78,6 @@ export interface StudyFlowSettings {
   weekStartDay: 'monday' | 'sunday';
   language: 'es' | 'en' | 'auto';
   subjects: Subject[];
-  weeklyReviewsFolder: string;
-  weeklyReviewTemplate: string;
   todaySections?: TodayTabSectionsConfig;
   calendarStartHour: number;
   calendarEndHour: number;
@@ -99,12 +97,9 @@ import {
   DEFAULT_SPACED_NEXT_KEY_ES,
   DEFAULT_SPACED_INTERVAL_KEY_ES,
   DEFAULT_SPACED_REVIEWED_KEY_ES,
-  DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
   getDefaultConventions,
   type SupportedConventionLanguage,
 } from './conventions.ts';
-
-export const DEFAULT_WEEKLY_REVIEW_TEMPLATE = DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES;
 
 export const DEFAULT_SETTINGS: StudyFlowSettings = {
   schemaVersion: 2,
@@ -140,8 +135,6 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
   weekStartDay: 'monday',
   language: 'auto',
   subjects: [],
-  weeklyReviewsFolder: 'StudyFlow/Reviews',
-  weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
   calendarStartHour: 7,
   calendarEndHour: 22,
   todaySections: {

@@ -636,37 +636,6 @@ export const es: TranslationDict = {
   'analytics.subjectStreak': '🔥 Racha de metas: {count} semanas consecutivas',
   'analytics.subjectStreakNone': 'Racha: 0 semanas',
 
-  // Weekly Review
-  'commands.generateWeeklyReview': 'Generar revisión semanal',
-  'settings.weeklyReviewHeading': 'Revisión Semanal',
-  'settings.weeklyReviewFolderLabel': 'Carpeta de revisiones semanales',
-  'settings.weeklyReviewFolderDesc': 'Ubicación donde se crearán las notas de revisión semanal (ej. StudyFlow/Reviews).',
-  'settings.weeklyReviewTemplateLabel': 'Plantilla de revisión semanal',
-  'settings.weeklyReviewTemplateDesc': 'Plantilla Markdown con marcadores: {{week}}, {{startDate}}, {{endDate}}, {{subjectsSummary}}, {{sessionsSummary}}, {{habitsSummary}}, {{tasksCompletedSummary}}, {{tasksOverdueSummary}}.',
-  'settings.resetTemplateBtn': 'Restablecer plantilla',
-  'settings.resetTemplateTooltip': 'Restaura la plantilla de revisión semanal a su formato predeterminado',
-  'settings.templateResetNotice': 'Plantilla de revisión semanal restablecida.',
-  'weeklyReview.createdNotice': '✓ Revisión semanal creada: {path}',
-  'weeklyReview.openedNotice': 'Revisión semanal abierta: {path}',
-  'weeklyReview.errorNotice': 'Error al generar la revisión semanal.',
-  'weeklyReview.noSubjects': 'Sin materias configuradas en Ajustes.',
-  'weeklyReview.goalLabel': 'Meta',
-  'weeklyReview.goalMetBadge': '¡Meta cumplida!',
-  'weeklyReview.noSessions': 'Sin sesiones de estudio registradas esta semana.',
-  'weeklyReview.totalSessionsLabel': 'Total sesiones',
-  'weeklyReview.totalTimeLabel': 'Tiempo total enfocado',
-  'weeklyReview.completedSessionsLabel': 'Sesiones completadas',
-  'weeklyReview.interruptedSessionsLabel': 'Sesiones interrumpidas',
-  'weeklyReview.noHabits': 'Sin hábitos activos registrados.',
-  'weeklyReview.habitStreak': 'Racha: {days} días',
-  'weeklyReview.noActiveStreak': 'Sin racha activa',
-  'weeklyReview.noCompletedTasks': 'No se registraron tareas completadas.',
-  'weeklyReview.moreTasksCompleted': '...y {count} tareas más completadas.',
-  'weeklyReview.noOverdueTasks': '¡Sin tareas vencidas! Todo al día.',
-  'weeklyReview.overdueOn': 'Venció: {date}',
-  'weeklyReview.pastDueDate': 'fecha límite pasada',
-  'weeklyReview.moreTasksOverdue': '...y {count} tareas más vencidas.',
-
   // Spaced Repetition
   'commands.initSpacedRepetition': 'Iniciar repaso espaciado en la nota activa',
   'settings.headingSpacedRepetition': 'Repaso Espaciado',
@@ -693,23 +662,8 @@ export const es: TranslationDict = {
   'spaced.reviewedEasyNotice': 'Repasado (Fácil): {title} reprogramado para {next}',
   'spaced.initializedNotice': 'Repaso espaciado configurado en {title}',
 
-  // Maintenance & Migration
-  'commands.migratePomodoroLogs': 'Migrar registros de Pomodoro al nuevo formato',
-  'settings.headingMaintenance': 'Mantenimiento y Migración',
-  'settings.migratePomodoroLogsName': 'Migrar registros de Pomodoro',
-  'settings.migratePomodoroLogsDesc': 'Convierte los registros antiguos de Pomodoro en notas diarias (- [x] Pomodoro completado...) al nuevo formato de viñeta (- 🍅 HH:mm · tarea).',
-  'settings.migratePomodoroLogsBtn': 'Escanear y migrar',
-  'migration.modalTitle': 'Migración de Registros de Pomodoro',
-  'migration.noLogsToMigrate': 'No se encontraron notas con registros antiguos de Pomodoro. Tu vault ya está actualizado.',
-  'migration.modalDesc': 'Se encontraron {changes} registros antiguos en {files} notas. Revisa los cambios antes de aplicar:',
-  'migration.applyBtn': 'Aplicar migración',
-  'migration.successNotice': '✓ Se migraron con éxito {count} registros de Pomodoro.',
-  'migration.errorNotice': 'Ocurrió un error al migrar los registros de Pomodoro.',
-
-  // ICS Export
-  'commands.exportCalendarIcs': 'Exportar bloques y deadlines a .ics',
-  'ics.exportedNotice': '✓ Calendario exportado a: {path}',
-  'ics.exportErrorNotice': 'Error al exportar el archivo .ics',
+  // Maintenance
+  'settings.headingMaintenance': 'Mantenimiento y Sincronización',
 
   // Protocol Handler
   'protocol.timerStartedNotice': '🍅 Pomodoro iniciado',

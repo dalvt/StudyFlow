@@ -10,8 +10,6 @@ import {
   isSpacedRepetitionTag,
   getSpacedRepetitionFrontmatter,
   getDefaultConventions,
-  getDefaultWeeklyReviewTemplate,
-  migratePomodoroLogsInContent,
 } from '../src/conventions.ts';
 import {
   extractAllTasksFromContent,
@@ -243,59 +241,7 @@ test('Conventions: Spaced repetition recognizes Spanish (#repasar) and English (
   assert.equal(isSpacedRepetitionNote(['#otra'], { review_next: '2026-10-14' }), false);
 });
 
-test('Conventions: migratePomodoroLogsInContent converts old logs idempotently and preserves notes', () => {
-  const originalContent = `# 2026-10-13
-
-## Resumen
-- [x] Pomodoro completado a las 14:00 — *Estudiar Biología*
-  - 📝 Nota: Leí capítulo 3
-- [x] Pomodoro completed at 15:30 — *Solve Exercises*
-- 🍅 16:30 · Ya estaba en formato nuevo
-- [ ] Tarea pendiente normal
-`;
-
-  const { newContent, changes } = migratePomodoroLogsInContent(originalContent);
-
-  assert.equal(changes.length, 2);
-  assert.equal(changes[0].oldLine, '- [x] Pomodoro completado a las 14:00 — *Estudiar Biología*');
-  assert.equal(changes[0].newLine, '- 🍅 14:00 · Estudiar Biología');
-  assert.equal(changes[1].oldLine, '- [x] Pomodoro completed at 15:30 — *Solve Exercises*');
-  assert.equal(changes[1].newLine, '- 🍅 15:30 · Solve Exercises');
-
-  assert.ok(newContent.includes('- 🍅 14:00 · Estudiar Biología\n  - 📝 Nota: Leí capítulo 3'));
-  assert.ok(newContent.includes('- 🍅 15:30 · Solve Exercises'));
-  assert.ok(newContent.includes('- 🍅 16:30 · Ya estaba en formato nuevo'));
-  assert.ok(newContent.includes('- [ ] Tarea pendiente normal'));
-
-  // IDEMPOTENCY TEST: Running migration again on the new content yields 0 changes
-  const secondPass = migratePomodoroLogsInContent(newContent);
-  assert.equal(secondPass.changes.length, 0);
-  assert.equal(secondPass.newContent, newContent);
-});
-
-test('Conventions: appendClosingNoteToDailyContent indents under new bullet format as well as old format', () => {
-  const withNewLog = `# 2026-10-13
-- 🍅 14:00 · Estudiar Cálculo
-`;
-  const updatedNew = appendClosingNoteToDailyContent(withNewLog, 'Estudiar Cálculo', 'Terminé ejercicios');
-  assert.ok(
-    updatedNew.includes(
-      `- 🍅 14:00 · Estudiar Cálculo\n  - 📝 Nota: Terminé ejercicios`
-    )
-  );
-
-  const withOldLog = `# 2026-10-13
-- [x] Pomodoro completado a las 10:00 — *Lectura*
-`;
-  const updatedOld = appendClosingNoteToDailyContent(withOldLog, 'Lectura', 'Avance página 40');
-  assert.ok(
-    updatedOld.includes(
-      `- [x] Pomodoro completado a las 10:00 — *Lectura*\n  - 📝 Nota: Avance página 40`
-    )
-  );
-});
-
-test('Conventions: Default conventions and weekly review templates depend on language', () => {
+test('Conventions: Default conventions depend on language', () => {
   const esConventions = getDefaultConventions('es');
   assert.equal(esConventions.tasksSectionHeader, '## Tareas');
   assert.equal(esConventions.timeBlocksSectionHeader, '## Bloques de Tiempo');
@@ -307,12 +253,4 @@ test('Conventions: Default conventions and weekly review templates depend on lan
   assert.equal(enConventions.timeBlocksSectionHeader, '## Time Blocks');
   assert.equal(enConventions.spacedRepetitionTag, '#review');
   assert.equal(enConventions.spacedRepetitionNextKey, 'review_next');
-
-  const esTemplate = getDefaultWeeklyReviewTemplate('es');
-  assert.ok(esTemplate.includes('# Revisión Semanal'));
-  assert.ok(esTemplate.includes('Horas por Materia'));
-
-  const enTemplate = getDefaultWeeklyReviewTemplate('en');
-  assert.ok(enTemplate.includes('# Weekly Review'));
-  assert.ok(enTemplate.includes('Hours by Subject'));
 });

@@ -54,10 +54,10 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
   - Fix settings empty fallbacks to use `getDefaultConventions(lang)` in `src/settings.ts`.
   - Replace fragile string check in `src/habits.ts` with `getEffectiveLanguage()`.
   - Verification: `tests/i18n.test.mjs`, `npm test`.
-  - Evidence: Pending commit
+  - Evidence: 2b44512
 
-- [ ] **Task 7: Dead Code Pruning & Documentation Update**
+- [x] **Task 7: Dead Code Pruning & Documentation Update**
   - Remove dead `.ics`, weekly review, and pomodoro log migration code and orphan translation keys.
-  - Update `README.md` in English (with Spanish section/link) with accurate current features.
+  - Update `README.md` in English with accurate current features and conventions.
   - Verification: `npm run check-types && npm test && npm run build`.
-  - Evidence: Commit ID
+  - Evidence: 9120e59

@@ -21,68 +21,6 @@ export const DEFAULT_SPACED_INTERVAL_KEY_EN = 'review_interval';
 export const DEFAULT_SPACED_REVIEWED_KEY_ES = 'repasar_revisado';
 export const DEFAULT_SPACED_REVIEWED_KEY_EN = 'review_last';
 
-export const DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES = `# Revisión Semanal {{week}} ({{startDate}} al {{endDate}})
-
-## 📚 Horas por Materia
-{{subjectsSummary}}
-
-## ⏱️ Sesiones de Enfoque
-{{sessionsSummary}}
-
-## 🎯 Hábitos Cumplidos
-{{habitsSummary}}
-
-## ✅ Tareas
-### Completadas
-{{tasksCompletedSummary}}
-
-### Vencidas
-{{tasksOverdueSummary}}
-
-## 💭 Reflexión
-### ¿Qué funcionó?
-- 
-
-### ¿Qué ajustar?
-- 
-
-### Foco de la próxima semana
-- 
-`;
-
-export const DEFAULT_WEEKLY_REVIEW_TEMPLATE_EN = `# Weekly Review {{week}} ({{startDate}} to {{endDate}})
-
-## 📚 Hours by Subject
-{{subjectsSummary}}
-
-## ⏱️ Focus Sessions
-{{sessionsSummary}}
-
-## 🎯 Completed Habits
-{{habitsSummary}}
-
-## ✅ Tasks
-### Completed
-{{tasksCompletedSummary}}
-
-### Overdue
-{{tasksOverdueSummary}}
-
-## 💭 Reflection
-### What worked?
-- 
-
-### What to adjust?
-- 
-
-### Next week's focus
-- 
-`;
-
-export function getDefaultWeeklyReviewTemplate(lang: SupportedConventionLanguage = 'es'): string {
-  return lang === 'en' ? DEFAULT_WEEKLY_REVIEW_TEMPLATE_EN : DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES;
-}
-
 export interface ConventionsConfig {
   tasksSectionHeader: string;
   iceboxSectionHeader: string;
@@ -91,7 +29,6 @@ export interface ConventionsConfig {
   spacedRepetitionNextKey: string;
   spacedRepetitionIntervalKey: string;
   spacedRepetitionReviewedKey: string;
-  weeklyReviewTemplate: string;
 }
 
 export function getDefaultConventions(lang: SupportedConventionLanguage = 'es'): ConventionsConfig {
@@ -104,7 +41,6 @@ export function getDefaultConventions(lang: SupportedConventionLanguage = 'es'):
       spacedRepetitionNextKey: DEFAULT_SPACED_NEXT_KEY_EN,
       spacedRepetitionIntervalKey: DEFAULT_SPACED_INTERVAL_KEY_EN,
       spacedRepetitionReviewedKey: DEFAULT_SPACED_REVIEWED_KEY_EN,
-      weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_EN,
     };
   }
 
@@ -116,7 +52,6 @@ export function getDefaultConventions(lang: SupportedConventionLanguage = 'es'):
     spacedRepetitionNextKey: DEFAULT_SPACED_NEXT_KEY_ES,
     spacedRepetitionIntervalKey: DEFAULT_SPACED_INTERVAL_KEY_ES,
     spacedRepetitionReviewedKey: DEFAULT_SPACED_REVIEWED_KEY_ES,
-    weeklyReviewTemplate: DEFAULT_WEEKLY_REVIEW_TEMPLATE_ES,
   };
 }
 
@@ -367,45 +302,5 @@ export function getSpacedRepetitionFrontmatter(
   }
 
   return { nextReviewDate, interval, lastReviewedDate };
-}
-
-export interface PomodoroLogMigrationChange {
-  lineNumber: number;
-  oldLine: string;
-  newLine: string;
-}
-
-/**
- * Pure function: Migrates old pomodoro log lines (- [x] Pomodoro completado/completed...)
- * to the new bullet format (- 🍅 HH:mm · task).
- * Idempotent: lines already in new format are untouched.
- */
-export function migratePomodoroLogsInContent(content: string): {
-  newContent: string;
-  changes: PomodoroLogMigrationChange[];
-} {
-  const lines = content.split(/\r?\n/);
-  const changes: PomodoroLogMigrationChange[] = [];
-  let modified = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const parsed = parsePomodoroLogLine(line);
-    if (parsed && parsed.isOldFormat) {
-      const newLine = formatPomodoroLogLine(parsed.time, parsed.taskText);
-      changes.push({
-        lineNumber: i + 1,
-        oldLine: line,
-        newLine,
-      });
-      lines[i] = newLine;
-      modified = true;
-    }
-  }
-
-  return {
-    newContent: modified ? lines.join('\n') : content,
-    changes,
-  };
 }
 

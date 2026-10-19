@@ -335,12 +335,6 @@ export default class StudyFlowPlugin extends Plugin {
       this.settings.subjects = [];
     }
 
-    if (!this.settings.weeklyReviewsFolder) {
-      this.settings.weeklyReviewsFolder = defaults.weeklyReviewsFolder;
-    }
-    if (!this.settings.weeklyReviewTemplate) {
-      this.settings.weeklyReviewTemplate = defaults.weeklyReviewTemplate;
-    }
     if (this.settings.calendarStartHour === undefined) {
       this.settings.calendarStartHour = defaults.calendarStartHour;
     }
