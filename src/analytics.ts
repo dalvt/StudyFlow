@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import type { HabitItem } from './habits';
 import type { TaskRecord } from './tasks';
 import type { Subject } from './settings-utils.ts';
+import { getEffectiveLanguage } from './i18n/index.ts';
 import { matchesSubjectTag, normalizeTag } from './subject-analytics.ts';
 export * from './subject-analytics.ts';
 
@@ -104,6 +105,7 @@ export function formatMinutesHuman(totalMinutes: number): string {
 }
 
 const DAY_NAMES_ES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DAY_NAMES_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
  * Computes daily focus time over the last N days (default 7).
@@ -115,6 +117,7 @@ export function computeWeeklyFocusTrend(
 ): DayFocusStat[] {
   const result: DayFocusStat[] = [];
   const todayStr = getLocalDateString(referenceDate);
+  const dayNames = getEffectiveLanguage() === 'en' ? DAY_NAMES_EN : DAY_NAMES_ES;
 
   // Group minutes and counts by YYYY-MM-DD
   const minutesByDate: Record<string, { minutes: number; count: number }> = {};
@@ -132,7 +135,7 @@ export function computeWeeklyFocusTrend(
     d.setDate(d.getDate() - i);
     const dateStr = getLocalDateString(d);
     const dayOfWeek = d.getDay();
-    const shortDay = DAY_NAMES_ES[dayOfWeek] || '';
+    const shortDay = dayNames[dayOfWeek] || '';
     const dayLabel = `${shortDay} ${String(d.getDate()).padStart(2, '0')}`;
 
     const entry = minutesByDate[dateStr] || { minutes: 0, count: 0 };

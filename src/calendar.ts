@@ -1,7 +1,8 @@
 import { App, Notice, TFile, normalizePath } from 'obsidian';
 import type StudyFlowPlugin from './main.ts';
 import type { CalendarTimeBlock, StudyFlowSettings } from './settings.ts';
-import { t } from './i18n/index.ts';
+import { t, getEffectiveLanguage } from './i18n/index.ts';
+import { getDefaultConventions } from './conventions.ts';
 export type { CalendarTimeBlock, StudyFlowSettings };
 import {
   appendTaskToMarkdownSection,
@@ -45,7 +46,7 @@ export async function getTimeBlocksForDate(
 ): Promise<CalendarTimeBlock[]> {
   const dailyPath = getDailyNotePath(settings, dateStr);
   const file = app.vault.getAbstractFileByPath(dailyPath);
-  const sectionHeader = settings.timeBlocksSectionHeader;
+  const sectionHeader = settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
   let dailyBlocks: CalendarTimeBlock[] = [];
   if (file instanceof TFile) {
     try {
@@ -93,7 +94,7 @@ export async function saveTimeBlock(
   };
   const dailyPath = getDailyNotePath(plugin.settings, block.date);
   const targetFile = await getOrCreateFile(plugin.app, dailyPath, `# ${block.date}\n\n`);
-  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
 
   await plugin.app.vault.process(targetFile, (content) => {
     const existing = parseTimeBlocksFromMarkdown(content, block.date, sectionHeader);
@@ -127,7 +128,7 @@ export async function deleteTimeBlock(
   const dailyPath = getDailyNotePath(plugin.settings, dateStr);
   const file = plugin.app.vault.getAbstractFileByPath(dailyPath);
   if (!(file instanceof TFile)) return;
-  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
 
   await plugin.app.vault.process(file, (content) => {
     const existing = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
@@ -147,7 +148,7 @@ export async function toggleTimeBlockCompletion(
   completed: boolean
 ): Promise<void> {
   const dailyPath = getDailyNotePath(plugin.settings, dateStr);
-  const sectionHeader = plugin.settings.timeBlocksSectionHeader;
+  const sectionHeader = plugin.settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
   const allBlocksForDate = await getTimeBlocksForDate(plugin.app, plugin.settings, dateStr, true);
   const virtualCandidate = allBlocksForDate.find(
     (b) => b.isVirtual && (b.id === blockId || `block-${b.id}` === blockId || b.id === `block-${blockId}`)
@@ -189,7 +190,7 @@ export async function syncTimeBlocksToDailyNote(
   try {
     const dailyPath = getDailyNotePath(settings, dateStr);
     const targetFile = await getOrCreateFile(app, dailyPath, `# ${dateStr}\n\n`);
-    const sectionHeader = settings.timeBlocksSectionHeader;
+    const sectionHeader = settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
 
     await app.vault.process(targetFile, (content) => {
       return syncBlocksToMarkdown(content, blocks, sectionHeader);
@@ -303,8 +304,9 @@ export async function createDeadlineTask(
 ): Promise<boolean> {
   try {
     const inboxPath = normalizePath(settings.inboxFilePath || 'StudyFlow/Inbox.md');
-    const tasksH = settings.tasksSectionHeader || '## Tareas';
-    const iceboxH = settings.iceboxSectionHeader || '## Icebox';
+    const conventions = getDefaultConventions(getEffectiveLanguage());
+    const tasksH = settings.tasksSectionHeader || conventions.tasksSectionHeader;
+    const iceboxH = settings.iceboxSectionHeader || conventions.iceboxSectionHeader;
     const file = await getOrCreateFile(app, inboxPath, `# Inbox\n\n${tasksH}\n\n${iceboxH}\n\n`);
     let formatted = priority !== 'none' ? formatTaskWithPriority(taskTitle, priority) : taskTitle;
     if (pomodoros && pomodoros > 0) {

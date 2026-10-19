@@ -27,7 +27,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Verification: `npm run check-types && node --test tests/migration.test.mjs tests/settings-and-calendar.test.mjs`
   - Evidence: Verified clean type check (`tsc --noEmit`), 15/15 target tests passed, and full test suite passed (227/227 tests passing).
 
-- [ ] **Task 2: Sentence case in English and eliminate hardcoded Spanish strings**
+- [x] **Task 2: Sentence case in English and eliminate hardcoded Spanish strings**
   - Route: Delegated / Writer trigger (`src/i18n/en.ts`, `src/i18n/es.ts`, `src/analytics.ts`, `src/markdown-utils.ts`, `src/tasks.ts`, `src/calendar.ts`).
   - Fix English settings, headings, and buttons to use sentence case (per Obsidian UI review bot).
   - Localize day abbreviations in `computeWeeklyFocusTrend` in `src/analytics.ts`.
@@ -36,7 +36,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Support both `# Hábitos` and `# Habit Tracker` in `syncHabitsToMarkdown` in `src/markdown-utils.ts`.
   - Acceptance Criteria: All English strings pass sentence case requirements; no Spanish fragments leak into English mode.
   - Verification: `npm run check-types && node --test tests/i18n.test.mjs tests/utils.test.mjs`
-  - Evidence: Pending
+  - Evidence: Verified clean type check (`tsc --noEmit`), 12/12 i18n tests passed, 232/232 full test suite passed without regressions.
 
 - [ ] **Task 3: Pomodoro task completion, calendar block persistence, and habit ID collisions**
   - Route: Delegated / Writer trigger (`src/pomodoro.ts`, `src/pomodoro-state.ts`, `src/markdown-utils.ts`, `src/habits.ts`).

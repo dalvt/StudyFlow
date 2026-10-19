@@ -130,3 +130,97 @@ test('getDefaultConventions returns localized section headers and tags', async (
   assert.equal(enConv.timeBlocksSectionHeader, '## Time Blocks');
   assert.equal(enConv.spacedRepetitionTag, '#review');
 });
+
+test('i18n English dictionary: key settings and actions adhere to sentence case', () => {
+  assert.equal(en['settings.logDailyNoteName'], 'Log Pomodoro in daily note');
+  assert.equal(en['settings.dailyNotesFolderName'], 'Daily notes folder');
+  assert.equal(en['settings.dailyNoteFormatName'], 'Daily note date format');
+  assert.equal(en['settings.headingAppearance'], 'Appearance and calendar');
+  assert.equal(en['settings.autoZenName'], 'Automatic Zen mode when studying');
+  assert.equal(en['settings.syncHistoryName'], 'Sync history with daily notes');
+  assert.equal(en['settings.headingSpacedRepetition'], 'Spaced repetition');
+  assert.equal(en['settings.headingMaintenance'], 'Maintenance and sync');
+  assert.equal(en['settings.headingTodayTab'], 'Today tab');
+  assert.equal(en['pomodoro.customTimesTitle'], 'Adjust focus and break times');
+  assert.equal(en['pomodoro.applyTimes'], 'Apply times');
+  assert.equal(en['tasks.cloudModalTitle'], 'New academic task');
+  assert.equal(en['tasks.estimateLabel'], ' Pomodoro estimate');
+  assert.equal(en['tasks.addTaskBtn'], 'Add task');
+  assert.equal(en['calendar.timeBlocksTitle'], 'Time blocks');
+  assert.equal(en['analytics.title'], 'Analytics & study performance');
+  assert.equal(en['habits.editModalTitle'], 'Edit habit');
+  assert.equal(en['habits.nameLabel'], 'Habit name');
+});
+
+test('computeWeeklyFocusTrend formats day names according to effective language', async () => {
+  const { computeWeeklyFocusTrend } = await import('../src/analytics.ts');
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-12', durationMinutes: 25, tags: [] },
+  ];
+  const refDate = new Date('2026-10-12T12:00:00Z'); // Monday
+
+  setLanguage('en');
+  const enTrend = computeWeeklyFocusTrend(sessions, refDate, 1);
+  assert.equal(enTrend[0].shortDay, 'Mon');
+  assert.equal(enTrend[0].dayLabel, 'Mon 12');
+
+  setLanguage('es');
+  const esTrend = computeWeeklyFocusTrend(sessions, refDate, 1);
+  assert.equal(esTrend[0].shortDay, 'Lun');
+  assert.equal(esTrend[0].dayLabel, 'Lun 12');
+
+  setLanguage('auto');
+});
+
+test('appendClosingNoteToDailyContent localizes note prefixes based on language', async () => {
+  const { appendClosingNoteToDailyContent } = await import('../src/markdown-utils.ts');
+  const dailyContentWithPomo = `# 2026-10-12\n\n- 🍅 15:30 · Reading · #book\n`;
+  const dailyContentEmpty = `# 2026-10-12\n`;
+
+  // English
+  setLanguage('en');
+  const enWithPomo = appendClosingNoteToDailyContent(dailyContentWithPomo, 'Reading', 'Completed chapter 1');
+  assert.ok(enWithPomo.includes('  - 📝 Note: Completed chapter 1'));
+
+  const enFallback = appendClosingNoteToDailyContent(dailyContentEmpty, 'Reading', 'Completed chapter 1');
+  assert.ok(enFallback.includes('- 📝 Pomodoro note (*Reading*): Completed chapter 1'));
+
+  // Spanish
+  setLanguage('es');
+  const esWithPomo = appendClosingNoteToDailyContent(dailyContentWithPomo, 'Reading', 'Capítulo 1 terminado');
+  assert.ok(esWithPomo.includes('  - 📝 Nota: Capítulo 1 terminado'));
+
+  const esFallback = appendClosingNoteToDailyContent(dailyContentEmpty, 'Reading', 'Capítulo 1 terminado');
+  assert.ok(esFallback.includes('- 📝 Nota Pomodoro (*Reading*): Capítulo 1 terminado'));
+
+  setLanguage('auto');
+});
+
+test('syncHabitsToMarkdown matches English # Habit Tracker header when inserting new habits', async () => {
+  const { syncHabitsToMarkdown } = await import('../src/markdown-utils.ts');
+  const initial = `# Habit Tracker\n\nSome intro text.\n`;
+  const habits = [
+    { name: 'Meditation', completedToday: false, streak: 3, history: [] },
+  ];
+
+  const updated = syncHabitsToMarkdown(initial, habits);
+  assert.ok(updated.includes('# Habit Tracker'));
+  assert.ok(updated.includes('- [ ] Meditation'));
+});
+
+test('mutateTaskLineInContent localizes error messages', async () => {
+  const { mutateTaskLineInContent } = await import('../src/markdown-utils.ts');
+  const content = `# Notes\n\nSome text\n`;
+
+  setLanguage('en');
+  const enRes = mutateTaskLineInContent(content, { sourceFile: 'Notes.md', text: 'Nonexistent' }, { action: 'toggle' });
+  assert.equal(enRes.success, false);
+  assert.equal(enRes.errorMessage, 'Specified task not found in file.');
+
+  setLanguage('es');
+  const esRes = mutateTaskLineInContent(content, { sourceFile: 'Notes.md', text: 'Nonexistent' }, { action: 'toggle' });
+  assert.equal(esRes.success, false);
+  assert.equal(esRes.errorMessage, 'No se encontró la tarea especificada en el archivo.');
+
+  setLanguage('auto');
+});

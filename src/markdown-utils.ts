@@ -1,10 +1,11 @@
-import { t } from './i18n/index.ts';
+import { t, getEffectiveLanguage, type SupportedLanguage } from './i18n/index.ts';
 import {
   isPomodoroLogLine,
   isTasksSection,
   isIceboxSectionHeader,
   isTimeBlocksSection,
   normalizeHeaderTitle,
+  getDefaultConventions,
 } from './conventions.ts';
 
 /**
@@ -518,13 +519,14 @@ export function formatTaskWithPriority(text: string, priority: TaskPriority): st
 export function appendTaskToMarkdownSection(
   fileContent: string,
   taskText: string,
-  sectionHeader: string = '## Tareas'
+  sectionHeader?: string
 ): string {
+  const targetHeader = sectionHeader || getDefaultConventions(getEffectiveLanguage()).tasksSectionHeader;
   const taskLine = `- [ ] ${taskText.trim()}`;
   const lines = fileContent.split(/\r?\n/);
 
   // Find target section header (case-insensitive search for header title)
-  const headerClean = sectionHeader.replace(/^#+\s*/, '').trim().toLowerCase();
+  const headerClean = targetHeader.replace(/^#+\s*/, '').trim().toLowerCase();
   let headerIndex = -1;
   let headerLevel = 2;
 
@@ -1062,12 +1064,16 @@ export function mutateTaskLineInContent(
   const lines = content.split(/\r?\n/);
   const locateRes = locateTaskLineIndex(lines, locator);
 
+  const isEn = getEffectiveLanguage() === 'en';
+
   if (locateRes.status === 'ambiguous') {
     return {
       updatedContent: content,
       success: false,
       error: 'ambiguous',
-      errorMessage: `Ambigüedad: se encontraron ${locateRes.matchingIndices.length} tareas idénticas y la línea cambió.`,
+      errorMessage: isEn
+        ? `Ambiguity: found ${locateRes.matchingIndices.length} identical tasks and the line changed.`
+        : `Ambigüedad: se encontraron ${locateRes.matchingIndices.length} tareas idénticas y la línea cambió.`,
     };
   }
 
@@ -1076,7 +1082,9 @@ export function mutateTaskLineInContent(
       updatedContent: content,
       success: false,
       error: 'not_found',
-      errorMessage: 'No se encontró la tarea especificada en el archivo.',
+      errorMessage: isEn
+        ? 'Specified task not found in file.'
+        : 'No se encontró la tarea especificada en el archivo.',
     };
   }
 
@@ -1161,7 +1169,12 @@ export function mutateTaskLineInContent(
         lines[targetIndex] = `${bulletMatch[1]}[${newChar}] ${itemBody}`;
         return { updatedContent: lines.join('\n'), success: true };
       }
-      return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'La línea no es un elemento de lista.' };
+      return {
+        updatedContent: content,
+        success: false,
+        error: 'no_op',
+        errorMessage: isEn ? 'Line is not a list item.' : 'La línea no es un elemento de lista.',
+      };
     }
 
     case 'update': {
@@ -1171,7 +1184,12 @@ export function mutateTaskLineInContent(
         lines[targetIndex] = `${match[1]}${newText}`;
         return { updatedContent: lines.join('\n'), success: true, updatedText: newText };
       }
-      return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'No se pudo actualizar el texto de la línea.' };
+      return {
+        updatedContent: content,
+        success: false,
+        error: 'no_op',
+        errorMessage: isEn ? 'Could not update line text.' : 'No se pudo actualizar el texto de la línea.',
+      };
     }
 
     case 'delete': {
@@ -1202,7 +1220,12 @@ export function mutateTaskLineInContent(
       const oldText = match[2].trim();
       const { estimated, completed } = parseTaskPomodoroEstimate(oldText);
       if (!completed || completed <= 0) {
-        return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'No hay pomodoros para decrementar.' };
+        return {
+          updatedContent: content,
+          success: false,
+          error: 'no_op',
+          errorMessage: isEn ? 'No pomodoros to decrement.' : 'No hay pomodoros para decrementar.',
+        };
       }
       const newCompleted = Math.max(0, completed - 1);
       const newText = formatTaskWithPomodoroEstimate(oldText, estimated, newCompleted);
@@ -1231,7 +1254,12 @@ export function mutateTaskLineInContent(
             lines[foundSub] = `${m[1]}${targetChar}${m[3]}${m[4]}`;
             return { updatedContent: lines.join('\n'), success: true };
           }
-          return { updatedContent: content, success: false, error: 'not_found', errorMessage: 'Subtarea no encontrada.' };
+          return {
+            updatedContent: content,
+            success: false,
+            error: 'not_found',
+            errorMessage: isEn ? 'Subtask not found.' : 'Subtarea no encontrada.',
+          };
         } else {
           // Target line itself is subtask
           const m = targetLine.match(/^(\s+-\s+\[)(.)(\]\s+)(.*)$/);
@@ -1248,7 +1276,12 @@ export function mutateTaskLineInContent(
       // Default subtask action is add
       const subText = (options.subtaskText || '').trim();
       if (!subText) {
-        return { updatedContent: content, success: false, error: 'no_op', errorMessage: 'Subtarea vacía.' };
+        return {
+          updatedContent: content,
+          success: false,
+          error: 'no_op',
+          errorMessage: isEn ? 'Empty subtask.' : 'Subtarea vacía.',
+        };
       }
       let insertAt = targetIndex + 1;
       while (insertAt < lines.length && /^(\s{2,}|\t+)-\s+\[.\]/.test(lines[insertAt])) {
@@ -1266,7 +1299,7 @@ export function mutateTaskLineInContent(
 
       let cleanTitle = itemText.replace(/#(?:ideas?|icebox)\b/gi, '').replace(/^[💡🧊]\s*/u, '').trim();
       cleanTitle = formatTaskWithPriority(cleanTitle, options.priority !== 'none' && options.priority ? options.priority : 'none');
-      const targetSection = options.tasksSectionHeader || '## Tareas';
+      const targetSection = options.tasksSectionHeader || getDefaultConventions(getEffectiveLanguage()).tasksSectionHeader;
       const updatedContent = appendTaskToMarkdownSection(withoutIdea, cleanTitle, targetSection);
       return { updatedContent, success: true, updatedText: cleanTitle };
     }
@@ -1790,7 +1823,7 @@ export function syncHabitsToMarkdown(
       updatedLines.splice(lastHabitLineIndex + 1, 0, ...newLines);
     } else {
       // No prior habit lines found; find header matching habits
-      const headerIdx = updatedLines.findIndex((l) => /^#+\s+.*h[aá]bito/i.test(l));
+      const headerIdx = updatedLines.findIndex((l) => /^#+\s+.*(h[aá]bito|habit)/i.test(l));
       if (headerIdx !== -1) {
         updatedLines.splice(headerIdx + 1, 0, '', ...newLines);
       } else {
@@ -1904,14 +1937,17 @@ export function shouldZenIgnoreEscape(
 export function appendClosingNoteToDailyContent(
   content: string,
   taskText: string,
-  closingNote: string
+  closingNote: string,
+  lang?: SupportedLanguage
 ): string {
   const noteTrimmed = closingNote.trim();
   if (!noteTrimmed) return content;
 
+  const effectiveLang = lang || getEffectiveLanguage();
+  const isEn = effectiveLang === 'en';
   const lines = content.split('\n');
   const cleanTask = taskText.trim();
-  const noteBullet = `  - 📝 Nota: ${noteTrimmed}`;
+  const noteBullet = isEn ? `  - 📝 Note: ${noteTrimmed}` : `  - 📝 Nota: ${noteTrimmed}`;
 
   // Find the last pomodoro log line that references this task
   let lastMatchingIndex = -1;
@@ -1930,9 +1966,9 @@ export function appendClosingNoteToDailyContent(
   }
 
   // If no matching pomodoro log line found, append at end of file
-  const fallbackBullet = cleanTask
-    ? `- 📝 Nota Pomodoro (*${cleanTask}*): ${noteTrimmed}`
-    : `- 📝 Nota Pomodoro: ${noteTrimmed}`;
+  const fallbackBullet = isEn
+    ? (cleanTask ? `- 📝 Pomodoro note (*${cleanTask}*): ${noteTrimmed}` : `- 📝 Pomodoro note: ${noteTrimmed}`)
+    : (cleanTask ? `- 📝 Nota Pomodoro (*${cleanTask}*): ${noteTrimmed}` : `- 📝 Nota Pomodoro: ${noteTrimmed}`);
 
   const trimmedEnd = content.trimEnd();
   return trimmedEnd.length === 0 ? `${fallbackBullet}\n` : `${trimmedEnd}\n${fallbackBullet}\n`;
