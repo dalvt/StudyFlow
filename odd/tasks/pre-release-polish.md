@@ -14,15 +14,15 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
 
 ## Task List
 
-- [ ] **Task 1: Packaging & Obsidian Store Metadata Compliance**
+- [x] **Task 1: Packaging & Obsidian Store Metadata Compliance**
   - Add `LICENSE` (MIT) and `versions.json`.
   - Fix `manifest.json` (`description` < 250 chars without "Obsidian", fix `authorUrl`).
   - Untrack `main.js` and `odd/` from git; update `.gitignore`.
   - Clean local paths in `package.json` `"deploy"` script.
   - Verification: `npm run check-types && npm test`
-  - Evidence: Commit ID
+  - Evidence: a620986
 
-- [ ] **Task 2: GitHub Actions Release Workflow**
+- [x] **Task 2: GitHub Actions Release Workflow**
   - Create `.github/workflows/release.yml` to build and attach `main.js`, `manifest.json`, and `styles.css` on tag push.
   - Verification: YAML validation and lint check.
   - Evidence: Commit ID
