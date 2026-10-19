@@ -27,7 +27,6 @@ export default class StudyFlowPlugin extends Plugin {
 
     await migratePluginFilesToDedicatedFolder(this.app, this.settings);
     await runStartupMigration(this);
-    this.focusSessions = await loadFocusSessionsFromFile(this.app);
     await this.saveSettings();
 
     this.app.workspace.onLayoutReady(async () => {

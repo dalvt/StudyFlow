@@ -27,7 +27,7 @@ Leave Study Flow Assistant 100% compliant with Obsidian Community Plugin submiss
   - Verification: YAML validation and lint check.
   - Evidence: Commit ID
 
-- [ ] **Task 3: Safe Storage & Vault Startup Lifecycle**
+- [x] **Task 3: Safe Storage & Vault Startup Lifecycle**
   - Stop unprompted migration/renaming of root `Inbox.md`, `Habits.md`, and `Daily` in `src/utils.ts`.
   - Remove redundant early `loadFocusSessionsFromFile` call before `onLayoutReady` in `src/main.ts`.
   - Avoid raw `vault.adapter` on `StudyFlow/Sessions.jsonl` in `src/storage-migration.ts`.

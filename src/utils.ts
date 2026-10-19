@@ -112,7 +112,7 @@ export async function migratePluginFilesToDedicatedFolder(
     const rootInbox = app.vault.getAbstractFileByPath('Inbox.md');
     const targetInboxPath = settings.inboxFilePath || 'StudyFlow/Inbox.md';
 
-    if (rootInbox instanceof TFile && (targetInboxPath === 'Inbox.md' || targetInboxPath === 'StudyFlow/Inbox.md')) {
+    if (rootInbox instanceof TFile && targetInboxPath === 'Inbox.md') {
       await ensureFolderExists(app, 'StudyFlow');
       const newPath = 'StudyFlow/Inbox.md';
       const existingInTarget = app.vault.getAbstractFileByPath(newPath);
@@ -125,7 +125,7 @@ export async function migratePluginFilesToDedicatedFolder(
     const rootHabits = app.vault.getAbstractFileByPath('Habits.md');
     const targetHabitsPath = settings.habitsFilePath || 'StudyFlow/Habits.md';
 
-    if (rootHabits instanceof TFile && (targetHabitsPath === 'Habits.md' || targetHabitsPath === 'StudyFlow/Habits.md')) {
+    if (rootHabits instanceof TFile && targetHabitsPath === 'Habits.md') {
       await ensureFolderExists(app, 'StudyFlow');
       const newPath = 'StudyFlow/Habits.md';
       const existingInTarget = app.vault.getAbstractFileByPath(newPath);
@@ -142,7 +142,7 @@ export async function migratePluginFilesToDedicatedFolder(
       settings.habitsFilePath = 'StudyFlow/Habits.md';
     }
 
-    // 3. Migrate root Daily folder to StudyFlow/Daily
+    // 3. Migrate root Daily folder to StudyFlow/Daily only if settings explicitly target 'Daily'
     const rootDaily = app.vault.getAbstractFileByPath('Daily');
     const targetDailyPath = settings.dailyNotesFolder || 'StudyFlow/Daily';
 
@@ -150,7 +150,7 @@ export async function migratePluginFilesToDedicatedFolder(
       rootDaily &&
       !(rootDaily instanceof TFile) &&
       'children' in (rootDaily as any) &&
-      (targetDailyPath === 'Daily' || targetDailyPath === 'StudyFlow/Daily')
+      targetDailyPath === 'Daily'
     ) {
       await ensureFolderExists(app, 'StudyFlow');
       const newFolderPath = 'StudyFlow/Daily';
