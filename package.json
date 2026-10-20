@@ -4,6 +4,7 @@
   "description": "Comprehensive academic study assistant: customizable Pomodoro timer, task and habit tracker, time blocking calendar, metrics, and distraction-free Zen mode.",
   "main": "main.js",
   "scripts": {
+    "prepare": "node scripts/mock-obsidian.cjs",
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "check-types": "tsc --noEmit",

@@ -114,23 +114,23 @@ YourVault/
 
 Search for `Study Flow` in the Obsidian Command Palette (`Ctrl + P` / `Cmd + P`):
 
-- `Open main interface (Center tab)`
+- `Open full interface (main tab)`
 - `Open in sidebar`
-- `Open Calendar and Time Blocks`
+- `Open calendar and time blocks`
 - `Open task manager & Inbox`
-- `Open habit tracker`
-- `Open analytics and study performance`
-- `Open Pomodoro timer modal`
+- `Open daily habits tracker`
+- `Open study analytics & performance`
+- `Open Pomodoro timer`
 - `Quick capture task`
-- `Plan tomorrow`
-- `Zen mode: Toggle distraction-free focus`
+- `Plan next day`
+- `Toggle Zen mode`
 - `Start spaced repetition on active note`
-- `Pomodoro: Start / Pause`
-- `Pomodoro: Reset`
-- `Pomodoro: Switch between work and break`
-- `Pomodoro: Skip cycle`
-- `Pomodoro: Previous cycle`
-- `Pomodoro: Complete current active task`
+- `Start / pause Pomodoro`
+- `Reset Pomodoro`
+- `Switch between work and break`
+- `Return to previous phase`
+- `Skip to next phase`
+- `Complete active Pomodoro task`
 
 ---
 
