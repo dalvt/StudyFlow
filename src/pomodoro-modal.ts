@@ -1,6 +1,5 @@
-import { App, Modal, Notice, setIcon } from 'obsidian';
+import { App, Modal, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { PomodoroStatus } from './pomodoro';
 import type { PendingTaskItem } from './utils';
 import { SubjectSelectModal } from './subject-modal';
 import { HabitSelectModal } from './habit-select-modal';
@@ -92,9 +91,11 @@ export class PomodoroModal extends Modal {
         attr: { 'aria-label': t('pomodoro.completeTask') },
       });
       setIcon(completeBtn, 'check');
-      completeBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.completeActiveTask();
-        this.renderUI();
+      completeBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.completeActiveTask();
+          this.renderUI();
+        })();
       });
 
       const unlinkBtn = taskContainer.createEl('button', {
@@ -103,7 +104,7 @@ export class PomodoroModal extends Modal {
       });
       setIcon(unlinkBtn, 'x');
       unlinkBtn.addEventListener('click', () => {
-        this.plugin.pomodoro.setActiveTask(null);
+        void this.plugin.pomodoro.setActiveTask(null);
         this.renderUI();
       });
     } else if (status.activeSubject) {
@@ -124,9 +125,11 @@ export class PomodoroModal extends Modal {
         attr: { 'aria-label': t('subjects.unlinkSubjectTooltip') },
       });
       setIcon(unlinkBtn, 'x');
-      unlinkBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.setActiveSubject(null);
-        this.renderUI();
+      unlinkBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.setActiveSubject(null);
+          this.renderUI();
+        })();
       });
     } else if (this.isSelectingTask) {
       this.loadPendingTasks();
@@ -142,7 +145,7 @@ export class PomodoroModal extends Modal {
         select.addEventListener('change', () => {
           const chosen = this.pendingTasks.find((t) => t.id === select.value);
           if (chosen) {
-            this.plugin.pomodoro.setActiveTask({
+            void this.plugin.pomodoro.setActiveTask({
               id: chosen.id,
               text: chosen.text,
               sourceFile: chosen.sourceFile,
@@ -181,7 +184,7 @@ export class PomodoroModal extends Modal {
               sourceFile: this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md',
             });
           } else {
-            this.plugin.pomodoro.setActiveTask(null);
+            await this.plugin.pomodoro.setActiveTask(null);
           }
           this.renderUI();
         }).open();
@@ -231,9 +234,9 @@ export class PomodoroModal extends Modal {
     });
     setIcon(playBtn, isRunning ? 'pause' : 'play');
     playBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.toggleStartPause();
+      void this.plugin.pomodoro.toggleStartPause();
     });
-    setTimeout(() => playBtn.focus(), 20);
+    window.setTimeout(() => playBtn.focus(), 20);
 
     if (status.isCountUp) {
       if (status.state === 'running' || status.state === 'paused') {
@@ -242,9 +245,11 @@ export class PomodoroModal extends Modal {
           cls: 'study-flow-btn-subtle',
           attr: { 'aria-label': t('pomodoro.finishSession') },
         });
-        finishBtn.addEventListener('click', async () => {
-          await this.plugin.pomodoro.finishCountUpSession();
-          this.renderUI();
+        finishBtn.addEventListener('click', () => {
+          void (async () => {
+            await this.plugin.pomodoro.finishCountUpSession();
+            this.renderUI();
+          })();
         });
       }
     } else {
@@ -254,7 +259,7 @@ export class PomodoroModal extends Modal {
       });
       setIcon(skipBtn, 'skip-forward');
       skipBtn.addEventListener('click', () => {
-        this.plugin.pomodoro.skipCycle();
+        void this.plugin.pomodoro.skipCycle();
       });
 
       const add5Btn = controls.createEl('button', {
@@ -263,7 +268,7 @@ export class PomodoroModal extends Modal {
         attr: { 'aria-label': t('pomodoro.add5mTooltip') },
       });
       add5Btn.addEventListener('click', () => {
-        this.plugin.pomodoro.addMinutes(5);
+        void this.plugin.pomodoro.addMinutes(5);
       });
     }
 
@@ -306,7 +311,7 @@ export class PomodoroModal extends Modal {
     }
 
 
-    const progressFill = this.contentEl.querySelector('.study-flow-mini-timer-progress-fill') as HTMLElement | null;
+    const progressFill = this.contentEl.querySelector<HTMLElement>('.study-flow-mini-timer-progress-fill');
     if (progressFill) {
       progressFill.style.width = `${Math.min(100, Math.max(0, status.progressPercent))}%`;
       progressFill.className = `study-flow-mini-timer-progress-fill ${status.mode === 'work' ? 'is-work' : 'is-break'}`;

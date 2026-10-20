@@ -11,7 +11,7 @@ import {
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
 import { parseTimeBlocksFromMarkdown } from '../src/calendar-utils.ts';
 import { migratePluginFilesToDedicatedFolder } from '../src/utils.ts';
-import { TFile } from 'obsidian';
+import { TFile, TFolder } from 'obsidian';
 import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from '../src/storage-migration.ts';
 
 test('parseSessionsFromJsonl parses JSON lines and skips blank lines and malformed entries', () => {
@@ -147,13 +147,11 @@ test('migrated calendarBlocks sync to daily note markdown and round-trip parse a
 });
 
 test('migratePluginFilesToDedicatedFolder moves root Daily folder to StudyFlow/Daily and updates settings', async () => {
-  const rootDaily = {
-    name: 'Daily',
-    path: 'Daily',
+  const rootDaily = Object.assign(new TFolder('Daily'), {
     children: [
       { name: '2026-10-18.md', path: 'Daily/2026-10-18.md' },
     ],
-  };
+  });
 
   const filesMap = new Map();
   filesMap.set('Daily', rootDaily);

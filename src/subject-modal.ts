@@ -141,29 +141,31 @@ export class SubjectEditModal extends Modal {
     cancelBtn.addEventListener('click', () => this.close());
 
     const saveBtn = footer.createEl('button', { text: t('common.save'), cls: 'mod-cta' });
-    saveBtn.addEventListener('click', async () => {
-      const cleanName = this.name.trim();
-      if (!cleanName) {
-        new Notice(t('subjects.validationNameRequired'));
-        return;
-      }
-      const normTag = normalizeTag(this.tag);
-      if (!normTag || normTag === '#') {
-        new Notice(t('subjects.validationTagRequired'));
-        return;
-      }
+    saveBtn.addEventListener('click', () => {
+      void (async () => {
+        const cleanName = this.name.trim();
+        if (!cleanName) {
+          new Notice(t('subjects.validationNameRequired'));
+          return;
+        }
+        const normTag = normalizeTag(this.tag);
+        if (!normTag || normTag === '#') {
+          new Notice(t('subjects.validationTagRequired'));
+          return;
+        }
 
-      const id = this.subject ? this.subject.id : `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const savedSubject: Subject = {
-        id,
-        name: cleanName,
-        tag: normTag,
-        color: this.color || '#4f46e5',
-        weeklyGoalHours: Math.max(0, this.weeklyGoalHours || 0),
-      };
+        const id = this.subject ? this.subject.id : `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const savedSubject: Subject = {
+          id,
+          name: cleanName,
+          tag: normTag,
+          color: this.color || '#4f46e5',
+          weeklyGoalHours: Math.max(0, this.weeklyGoalHours || 0),
+        };
 
-      await this.onSave(savedSubject);
-      this.close();
+        await this.onSave(savedSubject);
+        this.close();
+      })();
     });
   }
 
@@ -231,9 +233,11 @@ export class SubjectSelectModal extends Modal {
         });
       }
 
-      itemBtn.addEventListener('click', async () => {
-        this.close();
-        await this.onSelect(sub);
+      itemBtn.addEventListener('click', () => {
+        void (async () => {
+          this.close();
+          await this.onSelect(sub);
+        })();
       });
     });
 
@@ -244,9 +248,11 @@ export class SubjectSelectModal extends Modal {
     const noIcon = noSubjectBtn.createSpan({ cls: 'study-flow-subject-color-dot is-none' });
     setIcon(noIcon, 'minus');
     noSubjectBtn.createSpan({ text: t('subjects.noSubjectOption'), cls: 'study-flow-subject-item-name' });
-    noSubjectBtn.addEventListener('click', async () => {
-      this.close();
-      await this.onSelect(null);
+    noSubjectBtn.addEventListener('click', () => {
+      void (async () => {
+        this.close();
+        await this.onSelect(null);
+      })();
     });
 
     // "+ Añadir materia" option

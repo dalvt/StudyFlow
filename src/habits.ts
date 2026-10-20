@@ -1,11 +1,9 @@
-import { App, Notice, setIcon, TFile } from 'obsidian';
-import type StudyFlowPlugin from './main';
+import { App, setIcon } from 'obsidian';
 import { getOrCreateFile, getLocalDateString } from './utils.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
   createHabitId,
-  formatHabitsToMarkdown,
   type HabitFrequency,
   type HabitFrequencyType,
   type HabitItemData,
@@ -538,7 +536,7 @@ export function renderHabitHeatmap(
   }
 
   // Auto-scroll to the end (today) so recent weeks are immediately visible
-  setTimeout(() => {
+  window.setTimeout(() => {
     scrollWrap.scrollLeft = scrollWrap.scrollWidth;
   }, 10);
 

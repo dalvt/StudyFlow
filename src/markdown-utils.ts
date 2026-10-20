@@ -1,10 +1,7 @@
 import { t, getEffectiveLanguage, type SupportedLanguage } from './i18n/index.ts';
 import {
   isPomodoroLogLine,
-  isTasksSection,
-  isIceboxSectionHeader,
   isTimeBlocksSection,
-  normalizeHeaderTitle,
   getDefaultConventions,
 } from './conventions.ts';
 
@@ -320,7 +317,7 @@ export function parseRecurrenceRule(ruleStr: string): ParsedRecurrence | null {
  * Parses recurrence rule from task text (🔁 every week or 🔁 daily).
  */
 export function parseTaskRecurrence(text: string): TaskRecurrence {
-  const match = text.match(/🔁\s*([a-zA-Z0-9_\-\u00C0-\u017F ]+?)(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/i);
+  const match = text.match(/🔁\s*([a-zA-Z0-9_\-\u00C0-\u017F ]+?)(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/iu);
   if (!match) {
     return { cleanTitle: text };
   }
@@ -473,7 +470,7 @@ export function getCleanTaskDisplayTitle(text: string): string {
   clean = clean.replace(/(?:⏳|#scheduled\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
   clean = clean.replace(/(?:🛫|#start\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
   clean = clean.replace(/(?:✅|#completed\/)\s*\d{4}-\d{2}-\d{2}/gi, '');
-  clean = clean.replace(/🔁\s*[a-zA-Z0-9_\-\u00C0-\u017F ]+?(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/gi, '');
+  clean = clean.replace(/🔁\s*[a-zA-Z0-9_\-\u00C0-\u017F ]+?(?=\s*(?:[📅⏳🛫✅🍅⏫🔼🔽#]|$))/giu, '');
   clean = clean.replace(/#[\w\u00C0-\u017F-]+/g, '');
   clean = clean.replace(/^(?:💡|🧊|#ideas?\b|#icebox\b)\s*/i, '');
   clean = clean.replace(/\s{2,}/g, ' ').trim();
@@ -820,10 +817,6 @@ export function extractAllTasksFromContent(
   const tasks: TaskRecord[] = [];
   const lines = content.split(/\r?\n/);
   let currentSection = '';
-
-  const iceboxHeaderClean = options?.iceboxSectionHeader
-    ? options.iceboxSectionHeader.replace(/^#+\s*/, '').trim().toLowerCase()
-    : 'icebox';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

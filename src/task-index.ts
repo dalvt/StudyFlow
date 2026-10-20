@@ -19,7 +19,7 @@ export class TaskIndex {
   private allTasksCache: TaskRecord[] | null = null;
   private allDeadlinesCache: DeadlineItem[] | null = null;
   private dirtyFiles: Set<string> = new Set();
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private debounceTimer: number | null = null;
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
   private isProcessing: boolean = false;
@@ -71,7 +71,7 @@ export class TaskIndex {
 
       // Yield event loop every 50 files
       if ((i + 1) % 50 === 0 && i + 1 < files.length) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
       }
     }
 
@@ -211,19 +211,21 @@ export class TaskIndex {
 
   private triggerDebouncedProcessing(): void {
     if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
+      window.clearTimeout(this.debounceTimer);
     }
-    this.debounceTimer = setTimeout(async () => {
-      this.debounceTimer = null;
-      await this.processDirtyFiles();
+    this.debounceTimer = window.setTimeout(() => {
+      void (async () => {
+        this.debounceTimer = null;
+        await this.processDirtyFiles();
+      })();
     }, 300);
   }
 
   private triggerDebouncedNotify(): void {
     if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
+      window.clearTimeout(this.debounceTimer);
     }
-    this.debounceTimer = setTimeout(() => {
+    this.debounceTimer = window.setTimeout(() => {
       this.debounceTimer = null;
       this.emitChange();
     }, 300);
@@ -347,7 +349,7 @@ export class TaskIndex {
    */
   destroy(): void {
     if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
+      window.clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
     this.isProcessing = false;

@@ -1,7 +1,6 @@
 import type { App, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main.ts';
 import { getLocalDateString } from './markdown-utils.ts';
-import { normalizeTag } from './subject-analytics.ts';
 import {
   isSpacedRepetitionTag,
   getSpacedRepetitionFrontmatter,
@@ -38,7 +37,7 @@ export function getNextSpacedInterval(
     return 30;
   }
 
-  const idx = SPACED_REPETITION_INTERVALS.indexOf(currentInterval as any);
+  const idx = (SPACED_REPETITION_INTERVALS as readonly number[]).indexOf(currentInterval);
   if (idx >= 0 && idx < SPACED_REPETITION_INTERVALS.length - 1) {
     return SPACED_REPETITION_INTERVALS[idx + 1];
   }
@@ -80,7 +79,7 @@ export function calculateNextRepetition(
  */
 export function hasRepasarTag(
   tags?: string[],
-  frontmatter?: Record<string, any> | null,
+  frontmatter?: Record<string, unknown> | null,
   customTag?: string
 ): boolean {
   if (tags && tags.length > 0) {
@@ -120,7 +119,7 @@ export function hasRepasarTag(
  */
 export function isSpacedRepetitionNote(
   tags?: string[],
-  frontmatter?: Record<string, any> | null,
+  frontmatter?: Record<string, unknown> | null,
   userConfig?: {
     tag?: string;
     nextKey?: string;
@@ -261,7 +260,13 @@ export async function reviewSpacedNote(
   const reviewedKey = plugin?.settings?.spacedRepetitionReviewedKey || 'repasar_revisado';
   const tagToEnsure = (plugin?.settings?.spacedRepetitionTag || '#repasar').replace(/^#+/, '');
 
-  await app.fileManager.processFrontMatter(file, (fm) => {
+  interface FrontmatterRecord {
+    [key: string]: unknown;
+    tags?: unknown;
+    tag?: unknown;
+  }
+
+  await app.fileManager.processFrontMatter(file, (fm: FrontmatterRecord) => {
     fm[nextKey] = nextState.nextReviewDate;
     fm[intervalKey] = nextState.nextInterval;
     fm[reviewedKey] = nextState.lastReviewedDate;
@@ -271,7 +276,7 @@ export async function reviewSpacedNote(
     if (!tags) {
       fm.tags = [tagToEnsure];
     } else if (Array.isArray(tags)) {
-      if (!tags.some((t: string) => isSpacedRepetitionTag(t, plugin?.settings?.spacedRepetitionTag))) {
+      if (!tags.some((t: unknown) => typeof t === 'string' && isSpacedRepetitionTag(t, plugin?.settings?.spacedRepetitionTag))) {
         tags.push(tagToEnsure);
       }
     } else if (typeof tags === 'string') {
@@ -297,7 +302,13 @@ export async function initSpacedRepetitionForFile(
   const intervalKey = plugin?.settings?.spacedRepetitionIntervalKey || 'repasar_intervalo';
   const tagToEnsure = (plugin?.settings?.spacedRepetitionTag || '#repasar').replace(/^#+/, '');
 
-  await app.fileManager.processFrontMatter(file, (fm) => {
+  interface FrontmatterRecord {
+    [key: string]: unknown;
+    tags?: unknown;
+    tag?: unknown;
+  }
+
+  await app.fileManager.processFrontMatter(file, (fm: FrontmatterRecord) => {
     fm[nextKey] = initialDateStr;
     fm[intervalKey] = 1;
 
@@ -305,7 +316,7 @@ export async function initSpacedRepetitionForFile(
     if (!tags) {
       fm.tags = [tagToEnsure];
     } else if (Array.isArray(tags)) {
-      if (!tags.some((t: string) => isSpacedRepetitionTag(t, plugin?.settings?.spacedRepetitionTag))) {
+      if (!tags.some((t: unknown) => typeof t === 'string' && isSpacedRepetitionTag(t, plugin?.settings?.spacedRepetitionTag))) {
         tags.push(tagToEnsure);
       }
     } else if (typeof tags === 'string') {

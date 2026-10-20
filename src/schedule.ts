@@ -136,7 +136,7 @@ export function parseScheduleMarkdown(content: string): ScheduleItem[] {
     const pipeIdx = cleanRest.indexOf('|');
     if (pipeIdx !== -1) {
       const notePart = cleanRest.substring(pipeIdx + 1).trim();
-      if (notePart) linkedNote = notePart.replace(/[\[\]]/g, '').trim();
+      if (notePart) linkedNote = notePart.replace(/[[\]]/g, '').trim();
       cleanRest = cleanRest.substring(0, pipeIdx).trim();
     } else {
       const linkMatch = cleanRest.match(/^(.*?)\s*\[\[([^\]]+)\]\]\s*$/);
@@ -221,15 +221,11 @@ export async function loadScheduleItems(
   const normalizedPath = normalizePath(schedulePath);
   try {
     const file = app.vault.getAbstractFileByPath(normalizedPath);
-    if (!file || !(file instanceof TFile || 'extension' in file)) {
-      const files = typeof app.vault.getFiles === 'function' ? app.vault.getFiles() : [];
-      const tfile = files.find((f) => f.path === normalizedPath);
-      if (!tfile) return [];
-      const content = await app.vault.read(tfile);
+    if (file instanceof TFile) {
+      const content = await app.vault.read(file);
       return parseScheduleMarkdown(content);
     }
-    const content = await app.vault.read(file as TFile);
-    return parseScheduleMarkdown(content);
+    return [];
   } catch (err) {
     console.error(`Study Flow: Error cargando horario recurrente desde ${normalizedPath}`, err);
     return [];

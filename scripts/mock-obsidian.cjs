@@ -7,6 +7,10 @@ if (!fs.existsSync(obsidianDir)) {
 }
 
 const mockContent = `// Mock implementation of Obsidian API for Node test environment
+if (typeof globalThis.window === 'undefined') {
+  globalThis.window = globalThis;
+}
+
 export class App {
   constructor() {
     this.vault = {

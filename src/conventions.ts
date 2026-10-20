@@ -229,7 +229,7 @@ export function isSpacedRepetitionTag(tag: string, userConfiguredTag?: string): 
  * property names first and falling back to standard ES/EN conventions.
  */
 export function getSpacedRepetitionFrontmatter(
-  frontmatter: Record<string, any> | null | undefined,
+  frontmatter: Record<string, unknown> | null | undefined,
   userConfig?: {
     nextKey?: string;
     intervalKey?: string;

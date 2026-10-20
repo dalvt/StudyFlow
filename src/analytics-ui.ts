@@ -105,16 +105,18 @@ export async function renderAnalyticsDashboard(
   const syncIcon = syncBtn.createSpan();
   setIcon(syncIcon, 'refresh-cw');
   syncBtn.createSpan({ text: t('analytics.sync') });
-  syncBtn.addEventListener('click', async () => {
-    syncBtn.addClass('is-loading');
-    const added = await syncHistoricalSessionsFromVault(app, plugin.settings, plugin);
-    syncBtn.removeClass('is-loading');
-    new Notice(t('analytics.syncCompleteNotice', { count: String(added) }));
-    if (onRefresh) {
-      await onRefresh();
-    } else {
-      await renderAnalyticsDashboard(container, app, plugin, onRefresh);
-    }
+  syncBtn.addEventListener('click', () => {
+    void (async () => {
+      syncBtn.addClass('is-loading');
+      const added = await syncHistoricalSessionsFromVault(app, plugin.settings, plugin);
+      syncBtn.removeClass('is-loading');
+      new Notice(t('analytics.syncCompleteNotice', { count: String(added) }));
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        await renderAnalyticsDashboard(container, app, plugin, onRefresh);
+      }
+    })();
   });
 
   // 3. KPI Highlights Cards (4 columns)

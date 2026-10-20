@@ -1,4 +1,4 @@
-import { App, Notice, TFile, normalizePath } from 'obsidian';
+import { App, Notice, TFile, TFolder, normalizePath } from 'obsidian';
 import type StudyFlowPlugin from './main.ts';
 import type { CalendarTimeBlock, StudyFlowSettings } from './settings.ts';
 import { t, getEffectiveLanguage } from './i18n/index.ts';
@@ -7,8 +7,6 @@ export type { CalendarTimeBlock, StudyFlowSettings };
 import {
   appendTaskToMarkdownSection,
   calculateDaysRemaining,
-  extractPendingTasksFromContent,
-  formatDeadlineHuman,
   formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
@@ -228,9 +226,8 @@ export async function loadAllDeadlines(
   // 2. Daily notes folder files (recent/today)
   const dailyFolderPath = normalizePath(settings.dailyNotesFolder || 'StudyFlow/Daily');
   const dailyFolder = app.vault.getAbstractFileByPath(dailyFolderPath);
-  if (dailyFolder && 'children' in dailyFolder && Array.isArray((dailyFolder as any).children)) {
-    const children = (dailyFolder as any).children as any[];
-    children.forEach((child) => {
+  if (dailyFolder instanceof TFolder) {
+    dailyFolder.children.forEach((child) => {
       if (child instanceof TFile && child.extension === 'md') {
         filesToScan.push(child);
       }
@@ -273,7 +270,7 @@ export async function loadAllDeadlines(
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Ignore read errors for inaccessible files
     }
   }

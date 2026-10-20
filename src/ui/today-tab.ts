@@ -1,13 +1,12 @@
-import { App, Notice, setIcon, setTooltip, TFile } from 'obsidian';
+import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main.ts';
 import type { ActiveTab, TabComponent } from './types.ts';
-import { getTimeBlocksForDate, type CalendarTimeBlock, type DeadlineItem } from '../calendar.ts';
-import { toggleTaskCompletionInFile, type TaskRecord } from '../tasks.ts';
-import { loadHabitsFromFile, toggleHabitStatus, type HabitItem } from '../habits.ts';
+import { getTimeBlocksForDate } from '../calendar.ts';
+import { toggleTaskCompletionInFile } from '../tasks.ts';
+import { loadHabitsFromFile, toggleHabitStatus } from '../habits.ts';
 import {
   getSpacedRepetitionQueue,
   reviewSpacedNote,
-  type SpacedRepetitionNoteItem,
 } from '../spaced-repetition.ts';
 import type { PomodoroStatus } from '../pomodoro.ts';
 import { extractTagsFromText, getLocalDateString, formatDeadlineHuman, getDailyNotePath } from '../utils.ts';
@@ -204,23 +203,25 @@ export class TodayTab implements TabComponent {
     setIcon(playIcon, 'play');
     startBtn.createSpan({ text: t('today.startFocusBtn') });
 
-    startBtn.addEventListener('click', async () => {
-      if (matchedSubject) {
-        await this.plugin.pomodoro.setActiveSubject(matchedSubject);
-      }
-      const dailyPath = getDailyNotePath(this.plugin.settings, todayDate);
-      const blockId = block.id.startsWith('block-') ? block.id : `block-${block.id}`;
-      await this.plugin.pomodoro.setActiveTask({
-        id: blockId,
-        text: block.title,
-        sourceFile: dailyPath,
-        isTimeBlock: true,
-      });
-      const status = this.plugin.pomodoro.getStatus();
-      if (status.state === 'idle' || status.state === 'paused') {
-        await this.plugin.pomodoro.start();
-      }
-      this.onSwitchTab('pomodoro');
+    startBtn.addEventListener('click', () => {
+      void (async () => {
+        if (matchedSubject) {
+          await this.plugin.pomodoro.setActiveSubject(matchedSubject);
+        }
+        const dailyPath = getDailyNotePath(this.plugin.settings, todayDate);
+        const blockId = block.id.startsWith('block-') ? block.id : `block-${block.id}`;
+        await this.plugin.pomodoro.setActiveTask({
+          id: blockId,
+          text: block.title,
+          sourceFile: dailyPath,
+          isTimeBlock: true,
+        });
+        const status = this.plugin.pomodoro.getStatus();
+        if (status.state === 'idle' || status.state === 'paused') {
+          await this.plugin.pomodoro.start();
+        }
+        this.onSwitchTab('pomodoro');
+      })();
     });
   }
 
@@ -277,12 +278,14 @@ export class TodayTab implements TabComponent {
         text: task.text,
       });
 
-      check.addEventListener('change', async () => {
-        titleEl.toggleClass('is-strikethrough', check.checked);
-        itemRow.toggleClass('is-done', check.checked);
-        task.completed = check.checked;
-        await toggleTaskCompletionInFile(this.app, task, check.checked);
-        new Notice(check.checked ? t('tasks.markedCompletedNotice') : t('tasks.unmarkedNotice'));
+      check.addEventListener('change', () => {
+        void (async () => {
+          titleEl.toggleClass('is-strikethrough', check.checked);
+          itemRow.toggleClass('is-done', check.checked);
+          task.completed = check.checked;
+          await toggleTaskCompletionInFile(this.app, task, check.checked);
+          new Notice(check.checked ? t('tasks.markedCompletedNotice') : t('tasks.unmarkedNotice'));
+        })();
       });
 
       titleEl.addEventListener('click', () => {
@@ -379,12 +382,14 @@ export class TodayTab implements TabComponent {
         cls: 'study-flow-task-checkbox',
       });
       check.checked = false;
-      check.addEventListener('change', async () => {
-        const updatedHabits = await toggleHabitStatus(this.app, this.plugin.settings.habitsFilePath, habit.id, true);
-        const updated = updatedHabits.find((h) => h.id === habit.id);
-        const currentStreak = updated ? updated.streak : habit.streak;
-        new Notice(t('habits.habitFulfilledNotice', { streak: currentStreak }));
-        await this.renderHabitsSection();
+      check.addEventListener('change', () => {
+        void (async () => {
+          const updatedHabits = await toggleHabitStatus(this.app, this.plugin.settings.habitsFilePath, habit.id, true);
+          const updated = updatedHabits.find((h) => h.id === habit.id);
+          const currentStreak = updated ? updated.streak : habit.streak;
+          new Notice(t('habits.habitFulfilledNotice', { streak: currentStreak }));
+          await this.renderHabitsSection();
+        })();
       });
 
       itemRow.createSpan({ cls: 'study-flow-today-item-title', text: habit.name });
@@ -443,10 +448,12 @@ export class TodayTab implements TabComponent {
         cls: 'study-flow-btn-mini is-easy',
         attr: { 'aria-label': t('today.reviewEasy') },
       });
-      easyBtn.addEventListener('click', async () => {
-        const nextState = await reviewSpacedNote(this.app, item.file, 'facil', new Date(), this.plugin);
-        new Notice(t('spaced.reviewedEasyNotice', { title: item.title, next: `${nextState.nextInterval}d` }));
-        await this.renderSpacedSection();
+      easyBtn.addEventListener('click', () => {
+        void (async () => {
+          const nextState = await reviewSpacedNote(this.app, item.file, 'facil', new Date(), this.plugin);
+          new Notice(t('spaced.reviewedEasyNotice', { title: item.title, next: `${nextState.nextInterval}d` }));
+          await this.renderSpacedSection();
+        })();
       });
 
       const hardBtn = actions.createEl('button', {
@@ -454,10 +461,12 @@ export class TodayTab implements TabComponent {
         cls: 'study-flow-btn-mini is-hard',
         attr: { 'aria-label': t('today.reviewHard') },
       });
-      hardBtn.addEventListener('click', async () => {
-        await reviewSpacedNote(this.app, item.file, 'dificil', new Date(), this.plugin);
-        new Notice(t('spaced.reviewedHardNotice', { title: item.title }));
-        await this.renderSpacedSection();
+      hardBtn.addEventListener('click', () => {
+        void (async () => {
+          await reviewSpacedNote(this.app, item.file, 'dificil', new Date(), this.plugin);
+          new Notice(t('spaced.reviewedHardNotice', { title: item.title }));
+          await this.renderSpacedSection();
+        })();
       });
     });
   }

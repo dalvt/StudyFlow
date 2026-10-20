@@ -250,7 +250,7 @@ export function formatTimeBlockLine(block: {
 }): string {
   const check = block.completed ? 'x' : ' ';
   const cleanTitle = block.title.trim();
-  const cleanNote = block.linkedNote ? block.linkedNote.replace(/[\[\]]/g, '').trim() : '';
+  const cleanNote = block.linkedNote ? block.linkedNote.replace(/[[\]]/g, '').trim() : '';
   let line = `- [${check}] ${block.startTime}—${block.endTime} ${cleanTitle}`;
   if (block.subject) {
     line += ` [subject:: ${block.subject.trim()}]`;
@@ -314,7 +314,7 @@ export function parseTimeBlockLine(
     title = inlineCleanRest.substring(0, pipeIndex).trim();
     const notePart = inlineCleanRest.substring(pipeIndex + 1).trim();
     if (notePart) {
-      linkedNote = notePart.replace(/[\[\]]/g, '').trim();
+      linkedNote = notePart.replace(/[[\]]/g, '').trim();
     }
   } else {
     // Check for trailing [[Note]]

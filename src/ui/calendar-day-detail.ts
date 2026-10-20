@@ -107,17 +107,19 @@ export function renderDayDetailHeader(
   titleWrap.addEventListener('click', (e) => {
     if (e.target !== headerDateInput) {
       try {
-        (headerDateInput as any).showPicker?.();
+        (headerDateInput as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
       } catch {
         headerDateInput.focus();
       }
     }
   });
 
-  headerDateInput.addEventListener('change', async () => {
-    if (headerDateInput.value && callbacks.onDateChange) {
-      await callbacks.onDateChange(headerDateInput.value);
-    }
+  headerDateInput.addEventListener('change', () => {
+    void (async () => {
+      if (headerDateInput.value && callbacks.onDateChange) {
+        await callbacks.onDateChange(headerDateInput.value);
+      }
+    })();
   });
 
   const headerActions = detailHeader.createDiv({ cls: 'study-flow-day-header-actions' });
@@ -132,9 +134,11 @@ export function renderDayDetailHeader(
   planPendingBtn.createSpan({
     text: state.isPendingSelectorOpen ? t('calendar.hidePending') : t('calendar.planPending'),
   });
-  planPendingBtn.addEventListener('click', async () => {
-    state.isPendingSelectorOpen = !state.isPendingSelectorOpen;
-    await callbacks.onRefresh();
+  planPendingBtn.addEventListener('click', () => {
+    void (async () => {
+      state.isPendingSelectorOpen = !state.isPendingSelectorOpen;
+      await callbacks.onRefresh();
+    })();
   });
 
   // Sync to Daily Note Button
@@ -145,24 +149,26 @@ export function renderDayDetailHeader(
   const syncIcon = syncDailyBtn.createSpan();
   setIcon(syncIcon, 'file-output');
   syncDailyBtn.createSpan({ text: t('calendar.syncDaily') });
-  syncDailyBtn.addEventListener('click', async () => {
-    const blocks = await getTimeBlocksForDate(app, plugin.settings, state.selectedCalendarDate);
-    if (blocks.length === 0) {
-      new Notice(t('calendar.noBlocksToSyncNotice'));
-      return;
-    }
-    const ok = await syncTimeBlocksToDailyNote(
-      app,
-      plugin.settings,
-      state.selectedCalendarDate,
-      blocks
-    );
-    if (ok) {
-      const dailyPath = getDailyNotePath(plugin.settings, state.selectedCalendarDate);
-      new Notice(t('calendar.blocksSyncedNotice', { path: dailyPath }));
-    } else {
-      new Notice(t('calendar.blocksSyncErrorNotice'));
-    }
+  syncDailyBtn.addEventListener('click', () => {
+    void (async () => {
+      const blocks = await getTimeBlocksForDate(app, plugin.settings, state.selectedCalendarDate);
+      if (blocks.length === 0) {
+        new Notice(t('calendar.noBlocksToSyncNotice'));
+        return;
+      }
+      const ok = await syncTimeBlocksToDailyNote(
+        app,
+        plugin.settings,
+        state.selectedCalendarDate,
+        blocks
+      );
+      if (ok) {
+        const dailyPath = getDailyNotePath(plugin.settings, state.selectedCalendarDate);
+        new Notice(t('calendar.blocksSyncedNotice', { path: dailyPath }));
+      } else {
+        new Notice(t('calendar.blocksSyncErrorNotice'));
+      }
+    })();
   });
 
   // Open Daily Note Button
@@ -171,10 +177,12 @@ export function renderDayDetailHeader(
     attr: { 'aria-label': t('calendar.openDailyTooltip') },
   });
   setIcon(openDailyBtn, 'file-text');
-  openDailyBtn.addEventListener('click', async () => {
-    const dailyPath = getDailyNotePath(plugin.settings, state.selectedCalendarDate);
-    const file = await getOrCreateFile(app, dailyPath, `# ${state.selectedCalendarDate}\n\n`);
-    await app.workspace.getLeaf(false).openFile(file);
+  openDailyBtn.addEventListener('click', () => {
+    void (async () => {
+      const dailyPath = getDailyNotePath(plugin.settings, state.selectedCalendarDate);
+      const file = await getOrCreateFile(app, dailyPath, `# ${state.selectedCalendarDate}\n\n`);
+      await app.workspace.getLeaf(false).openFile(file);
+    })();
   });
 
   return detailHeader;
@@ -242,7 +250,7 @@ export async function renderTimeBlocksColumn(
   });
   dateInput.addEventListener('click', () => {
     try {
-      (dateInput as any).showPicker?.();
+      (dateInput as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
     } catch {
       // fallback
     }
@@ -301,7 +309,7 @@ export async function renderTimeBlocksColumn(
       startInput.value = '09:00';
       endInput.value = '10:30';
       formWrapper.removeClass('is-hidden');
-      setTimeout(() => titleInput.focus(), 50);
+      window.setTimeout(() => titleInput.focus(), 50);
     } else {
       formWrapper.addClass('is-hidden');
     }
@@ -361,7 +369,9 @@ export async function renderTimeBlocksColumn(
     formWrapper.addClass('is-hidden');
   };
 
-  saveBlockBtn.addEventListener('click', handleSaveBlock);
+  saveBlockBtn.addEventListener('click', () => {
+    void handleSaveBlock();
+  });
   cancelBlockBtn.addEventListener('click', handleCancelBlock);
 
   formWrapper.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -395,9 +405,11 @@ export async function renderTimeBlocksColumn(
         cls: 'study-flow-timeblock-cb',
       });
       cb.checked = !!block.completed;
-      cb.addEventListener('change', async () => {
-        await toggleTimeBlockCompletion(plugin, state.selectedCalendarDate, block.id, cb.checked);
-        await callbacks.onRefresh();
+      cb.addEventListener('change', () => {
+        void (async () => {
+          await toggleTimeBlockCompletion(plugin, state.selectedCalendarDate, block.id, cb.checked);
+          await callbacks.onRefresh();
+        })();
       });
 
       // Time range badge
@@ -417,7 +429,7 @@ export async function renderTimeBlocksColumn(
       }
 
       // Title & Subject
-      const titleSpan = blockCard.createSpan({
+      blockCard.createSpan({
         text: block.title,
         cls: `study-flow-timeblock-title ${block.completed ? 'is-strikethrough' : ''}`,
       });
@@ -437,10 +449,10 @@ export async function renderTimeBlocksColumn(
         });
         const noteIcon = noteBtn.createSpan();
         setIcon(noteIcon, 'file-text');
-        noteBtn.createSpan({ text: block.linkedNote.replace(/[\[\]]/g, '').trim() });
+        noteBtn.createSpan({ text: block.linkedNote.replace(/[[\]]/g, '').trim() });
         noteBtn.addEventListener('click', () => {
-          const raw = block.linkedNote?.replace(/[\[\]]/g, '').trim();
-          if (raw) app.workspace.openLinkText(raw, '', false);
+          const raw = block.linkedNote?.replace(/[[\]]/g, '').trim();
+          if (raw) void app.workspace.openLinkText(raw, '', false);
         });
       }
 
@@ -450,14 +462,16 @@ export async function renderTimeBlocksColumn(
         attr: { 'aria-label': t('calendar.focusBlockTooltip') },
       });
       setIcon(pomoBtn, 'timer');
-      pomoBtn.addEventListener('click', async () => {
-        plugin.pomodoro.setActiveTask({
-          id: block.id,
-          text: `${block.title} [${block.startTime} - ${block.endTime}]`,
-          sourceFile: getDailyNotePath(plugin.settings, state.selectedCalendarDate),
-          isTimeBlock: true,
-        });
-        callbacks.onSwitchTab('pomodoro');
+      pomoBtn.addEventListener('click', () => {
+        void (async () => {
+          await plugin.pomodoro.setActiveTask({
+            id: block.id,
+            text: `${block.title} [${block.startTime} - ${block.endTime}]`,
+            sourceFile: getDailyNotePath(plugin.settings, state.selectedCalendarDate),
+            isTimeBlock: true,
+          });
+          callbacks.onSwitchTab('pomodoro');
+        })();
       });
 
       // Action: Edit Block
@@ -477,7 +491,7 @@ export async function renderTimeBlocksColumn(
         noteInput.value = block.linkedNote || '';
         saveBlockBtn.setText(t('common.update'));
         formWrapper.removeClass('is-hidden');
-        setTimeout(() => titleInput.focus(), 50);
+        window.setTimeout(() => titleInput.focus(), 50);
       });
 
       // Action: Delete Block
@@ -486,10 +500,12 @@ export async function renderTimeBlocksColumn(
         attr: { 'aria-label': t('calendar.deleteBlockTooltip') },
       });
       setIcon(delBtn, 'trash-2');
-      delBtn.addEventListener('click', async () => {
-        await deleteTimeBlock(plugin, state.selectedCalendarDate, block.id);
-        new Notice(t('calendar.blockDeletedNotice'));
-        await callbacks.onRefresh();
+      delBtn.addEventListener('click', () => {
+        void (async () => {
+          await deleteTimeBlock(plugin, state.selectedCalendarDate, block.id);
+          new Notice(t('calendar.blockDeletedNotice'));
+          await callbacks.onRefresh();
+        })();
       });
     });
   }
@@ -556,7 +572,7 @@ export async function renderDeadlinesColumn(
   });
   dlDateInput.addEventListener('click', () => {
     try {
-      (dlDateInput as any).showPicker?.();
+      (dlDateInput as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
     } catch {
       // fallback
     }
@@ -604,7 +620,7 @@ export async function renderDeadlinesColumn(
     cls: 'study-flow-input-with-icon is-pomo-input',
     attr: { title: t('calendar.pomodoroEstimateAria') },
   });
-  const pomoIcon = pomoWrap.createSpan({ cls: 'study-flow-input-icon pomo-icon', text: '🍅' });
+  pomoWrap.createSpan({ cls: 'study-flow-input-icon pomo-icon', text: '🍅' });
   const pomoInput = pomoWrap.createEl('input', {
     type: 'number',
     cls: 'study-flow-number-input',
@@ -636,7 +652,7 @@ export async function renderDeadlinesColumn(
       dlDateInput.value = state.selectedCalendarDate;
       dlTimeInput.value = '';
       pomoInput.value = '';
-      setTimeout(() => dlTitleInput.focus(), 50);
+      window.setTimeout(() => dlTitleInput.focus(), 50);
     }
   });
 
@@ -689,7 +705,9 @@ export async function renderDeadlinesColumn(
     dlFormWrapper.addClass('is-hidden');
   };
 
-  saveDlBtn.addEventListener('click', handleSaveDeadline);
+  saveDlBtn.addEventListener('click', () => {
+    void handleSaveDeadline();
+  });
   cancelDlBtn.addEventListener('click', handleCancelDeadline);
 
   dlFormWrapper.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -723,15 +741,17 @@ export async function renderDeadlinesColumn(
         cls: 'study-flow-task-cb',
       });
       cb.checked = item.completed;
-      cb.addEventListener('change', async () => {
-        await toggleTaskCompletionInFile(app, item, cb.checked);
-        if (plugin.taskIndex) {
-          const file = app.vault.getAbstractFileByPath(item.sourceFile);
-          if (file instanceof TFile) {
-            await plugin.taskIndex.indexFile(file);
+      cb.addEventListener('change', () => {
+        void (async () => {
+          await toggleTaskCompletionInFile(app, item, cb.checked);
+          if (plugin.taskIndex) {
+            const file = app.vault.getAbstractFileByPath(item.sourceFile);
+            if (file instanceof TFile) {
+              await plugin.taskIndex.indexFile(file);
+            }
           }
-        }
-        await callbacks.onRefresh();
+          await callbacks.onRefresh();
+        })();
       });
 
       const textSpan = itemCard.createSpan({
@@ -763,16 +783,18 @@ export async function renderDeadlinesColumn(
         attr: { 'aria-label': t('tasks.focusPomodoroTooltip') },
       });
       setIcon(pomoBtn, 'timer');
-      pomoBtn.addEventListener('click', async () => {
-        plugin.pomodoro.setActiveTask({
-          id: item.id,
-          text: item.text,
-          sourceFile: item.sourceFile,
-          originalLine: item.originalLine,
-          lineNumber: item.lineNumber,
-          lineHash: item.lineHash,
-        });
-        callbacks.onSwitchTab('pomodoro');
+      pomoBtn.addEventListener('click', () => {
+        void (async () => {
+          await plugin.pomodoro.setActiveTask({
+            id: item.id,
+            text: item.text,
+            sourceFile: item.sourceFile,
+            originalLine: item.originalLine,
+            lineNumber: item.lineNumber,
+            lineHash: item.lineHash,
+          });
+          callbacks.onSwitchTab('pomodoro');
+        })();
       });
 
       // Action: Delete
@@ -781,16 +803,18 @@ export async function renderDeadlinesColumn(
         attr: { 'aria-label': t('calendar.deleteDeadlineTooltip') },
       });
       setIcon(delBtn, 'trash-2');
-      delBtn.addEventListener('click', async () => {
-        await deleteTaskFromFile(app, item);
-        if (plugin.taskIndex) {
-          const file = app.vault.getAbstractFileByPath(item.sourceFile);
-          if (file instanceof TFile) {
-            await plugin.taskIndex.indexFile(file);
+      delBtn.addEventListener('click', () => {
+        void (async () => {
+          await deleteTaskFromFile(app, item);
+          if (plugin.taskIndex) {
+            const file = app.vault.getAbstractFileByPath(item.sourceFile);
+            if (file instanceof TFile) {
+              await plugin.taskIndex.indexFile(file);
+            }
           }
-        }
-        new Notice(t('calendar.deadlineDeletedNotice'));
-        await callbacks.onRefresh();
+          new Notice(t('calendar.deadlineDeletedNotice'));
+          await callbacks.onRefresh();
+        })();
       });
     });
   }
@@ -902,7 +926,7 @@ export function renderPendingTasksSelectorColumn(
         updateAddButtonLabel();
       });
 
-      const label = itemEl.createEl('span', { text: task.text, cls: 'study-flow-task-text' });
+      const label = itemEl.createSpan({ text: task.text, cls: 'study-flow-task-text' });
       label.addEventListener('click', () => {
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event('change'));
@@ -982,13 +1006,15 @@ export function renderPendingTasksSelectorColumn(
     );
   };
 
-  addSelectedBtn.addEventListener('click', async () => {
-    const selected = pendingTasks.filter((t) => state.selectedPendingTaskIds.has(t.id));
-    if (selected.length === 0) {
-      new Notice(t('calendar.selectAtLeastOneNotice'));
-      return;
-    }
-    await applySelectedTasksToDate(app, plugin, state, selected, callbacks);
+  addSelectedBtn.addEventListener('click', () => {
+    void (async () => {
+      const selected = pendingTasks.filter((t) => state.selectedPendingTaskIds.has(t.id));
+      if (selected.length === 0) {
+        new Notice(t('calendar.selectAtLeastOneNotice'));
+        return;
+      }
+      await applySelectedTasksToDate(app, plugin, state, selected, callbacks);
+    })();
   });
 
   return selectorCol;

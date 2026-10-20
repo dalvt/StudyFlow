@@ -183,12 +183,14 @@ export class HabitEditModal extends Modal {
       });
     };
 
-    saveBtn.addEventListener('click', handleSave);
+    saveBtn.addEventListener('click', () => {
+      void handleSave();
+    });
 
     contentEl.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        handleSave();
+        void handleSave();
       }
     });
   }

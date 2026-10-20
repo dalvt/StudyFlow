@@ -111,11 +111,13 @@ export class HabitsTab implements TabComponent {
       if (this.container) await this.render(this.container);
     };
 
-    addBtn.addEventListener('click', handleAdd);
+    addBtn.addEventListener('click', () => {
+      void handleAdd();
+    });
     addInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        handleAdd();
+        void handleAdd();
       }
     });
 
@@ -146,22 +148,24 @@ export class HabitsTab implements TabComponent {
         const cb = cbWrapper.createEl('input', { type: 'checkbox' });
         cb.checked = habit.completedToday;
 
-        cb.addEventListener('change', async () => {
-          this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
-          const updated = this.habits.find((h) => h.id === habit.id);
-          const currentStreak = updated ? updated.streak : habit.streak;
-          new Notice(
-            cb.checked
-              ? t('habits.streakIncreasedNotice', { streak: String(currentStreak) })
-              : t('habits.habitUnmarkedNotice')
-          );
-          if (this.container) await this.render(this.container);
+        cb.addEventListener('change', () => {
+          void (async () => {
+            this.habits = await toggleHabitStatus(this.app, path, habit.id, cb.checked);
+            const updated = this.habits.find((h) => h.id === habit.id);
+            const currentStreak = updated ? updated.streak : habit.streak;
+            new Notice(
+              cb.checked
+                ? t('habits.streakIncreasedNotice', { streak: String(currentStreak) })
+                : t('habits.habitUnmarkedNotice')
+            );
+            if (this.container) await this.render(this.container);
+          })();
         });
 
         const infoWrap = hCard.createDiv({ cls: 'study-flow-habit-info' });
 
         const titleRow = infoWrap.createDiv({ cls: 'study-flow-habit-title-row' });
-        const textSpan = titleRow.createEl('span', {
+        const textSpan = titleRow.createSpan({
           text: habit.name,
           cls: `study-flow-task-text ${habit.completedToday ? 'is-strikethrough' : ''}`,
         });
@@ -210,16 +214,18 @@ export class HabitsTab implements TabComponent {
           text: habit.isRestDayToday ? t('habits.restDayBadge') : t('habits.restDayBtn'),
           attr: { 'aria-label': t('habits.restDayBtn') },
         });
-        restBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          this.habits = await toggleHabitRestDay(this.app, path, habit.id);
-          const updated = this.habits.find((h) => h.id === habit.id);
-          if (updated?.isRestDayToday) {
-            new Notice(t('habits.restDayMarkedNotice', { name: habit.name }));
-          } else {
-            new Notice(t('habits.restDayUnmarkedNotice', { name: habit.name }));
-          }
-          if (this.container) await this.render(this.container);
+        restBtn.addEventListener('click', (e) => {
+          void (async () => {
+            e.stopPropagation();
+            this.habits = await toggleHabitRestDay(this.app, path, habit.id);
+            const updated = this.habits.find((h) => h.id === habit.id);
+            if (updated?.isRestDayToday) {
+              new Notice(t('habits.restDayMarkedNotice', { name: habit.name }));
+            } else {
+              new Notice(t('habits.restDayUnmarkedNotice', { name: habit.name }));
+            }
+            if (this.container) await this.render(this.container);
+          })();
         });
 
         // Flame Streak Badge
@@ -248,11 +254,13 @@ export class HabitsTab implements TabComponent {
           attr: { 'aria-label': t('habits.deleteTooltip') },
         });
         setIcon(delBtn, 'trash-2');
-        delBtn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          this.habits = await deleteHabitFromFile(this.app, path, habit.id);
-          new Notice(t('habits.habitDeletedNotice'));
-          if (this.container) await this.render(this.container);
+        delBtn.addEventListener('click', (e) => {
+          void (async () => {
+            e.stopPropagation();
+            this.habits = await deleteHabitFromFile(this.app, path, habit.id);
+            new Notice(t('habits.habitDeletedNotice'));
+            if (this.container) await this.render(this.container);
+          })();
         });
       });
     }

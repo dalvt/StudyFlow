@@ -1,4 +1,4 @@
-import { App, normalizePath, TFile, moment } from 'obsidian';
+import { App, normalizePath, TFile, TFolder } from 'obsidian';
 import type { StudyFlowSettings } from './settings.ts';
 import { formatDailyNoteFileName } from './markdown-utils.ts';
 
@@ -60,39 +60,7 @@ export function getDailyNotePath(
   settings: StudyFlowSettings,
   targetDateOrOffset: number | string | Date = 0
 ): string {
-  let fileName = '';
-
-  if (typeof moment === 'function') {
-    let formatted = '';
-    if (typeof targetDateOrOffset === 'number') {
-      const m = (moment as any)();
-      formatted =
-        targetDateOrOffset !== 0
-          ? m.add(targetDateOrOffset, 'days').format(settings.dailyNoteDateFormat)
-          : m.format(settings.dailyNoteDateFormat);
-    } else {
-      let targetDate: Date;
-      if (typeof targetDateOrOffset === 'string') {
-        const clean = targetDateOrOffset.replace(/\.md$/, '').trim();
-        const parts = clean.split('-').map(Number);
-        targetDate =
-          parts.length === 3 && !parts.some(isNaN)
-            ? new Date(parts[0], parts[1] - 1, parts[2])
-            : new Date(clean);
-      } else {
-        targetDate = targetDateOrOffset;
-      }
-      formatted = (moment as any)(targetDate).format(settings.dailyNoteDateFormat);
-    }
-    if (formatted) {
-      fileName = formatted.endsWith('.md') ? formatted : `${formatted}.md`;
-    }
-  }
-  if (!fileName) {
-    fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, targetDateOrOffset);
-  }
-
-
+  const fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, targetDateOrOffset);
   const folder = settings.dailyNotesFolder.trim().replace(/\/+$/, '');
   if (!folder) {
     return normalizePath(fileName);
@@ -146,31 +114,26 @@ export async function migratePluginFilesToDedicatedFolder(
     const rootDaily = app.vault.getAbstractFileByPath('Daily');
     const targetDailyPath = settings.dailyNotesFolder || 'StudyFlow/Daily';
 
-    if (
-      rootDaily &&
-      !(rootDaily instanceof TFile) &&
-      'children' in (rootDaily as any) &&
-      targetDailyPath === 'Daily'
-    ) {
+    if (rootDaily instanceof TFolder && targetDailyPath === 'Daily') {
       await ensureFolderExists(app, 'StudyFlow');
       const newFolderPath = 'StudyFlow/Daily';
       const existingInTarget = app.vault.getAbstractFileByPath(newFolderPath);
 
       if (!existingInTarget) {
-        if (app.fileManager && typeof app.fileManager.renameFile === 'function') {
-          await app.fileManager.renameFile(rootDaily as any, newFolderPath);
+        if (app.fileManager?.renameFile) {
+          await app.fileManager.renameFile(rootDaily, newFolderPath);
           settings.dailyNotesFolder = newFolderPath;
         }
-      } else if ('children' in (existingInTarget as any)) {
-        const children = [...(rootDaily as any).children];
+      } else if (existingInTarget instanceof TFolder) {
+        const children = [...rootDaily.children];
         for (const child of children) {
           const destPath = `${newFolderPath}/${child.name}`;
           if (!app.vault.getAbstractFileByPath(destPath) && app.fileManager?.renameFile) {
             await app.fileManager.renameFile(child, destPath);
           }
         }
-        if ((rootDaily as any).children.length === 0 && app.vault.delete) {
-          await app.vault.delete(rootDaily as any);
+        if (rootDaily.children.length === 0) {
+          await app.fileManager.trashFile(rootDaily);
         }
         settings.dailyNotesFolder = newFolderPath;
       }

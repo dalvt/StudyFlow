@@ -50,7 +50,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     // Ribbon Icons
     this.addRibbonIcon('clock', t('ribbon.openView'), () => {
-      this.activateView(true);
+      void this.activateView(true);
     });
 
     this.addRibbonIcon('plus-circle', t('ribbon.quickCapture'), () => {
@@ -62,7 +62,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-hub',
       name: t('commands.openHub'),
       callback: () => {
-        this.activateView(true);
+        void this.activateView(true);
       },
     });
 
@@ -70,7 +70,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-calendar',
       name: t('commands.openCalendar'),
       callback: () => {
-        this.activateView(true, 'calendar');
+        void this.activateView(true, 'calendar');
       },
     });
 
@@ -78,7 +78,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'open-hub-sidebar',
       name: t('commands.openSidebar'),
       callback: () => {
-        this.activateView(false);
+        void this.activateView(false);
       },
     });
 
@@ -142,7 +142,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'pomodoro-toggle',
       name: t('commands.pomodoroToggle'),
       callback: () => {
-        this.pomodoro.toggleStartPause();
+        void this.pomodoro.toggleStartPause();
       },
     });
 
@@ -158,7 +158,7 @@ export default class StudyFlowPlugin extends Plugin {
       id: 'pomodoro-switch-mode',
       name: t('commands.pomodoroSwitchMode'),
       callback: () => {
-        this.pomodoro.switchMode();
+        void this.pomodoro.switchMode();
       },
     });
 
@@ -209,7 +209,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     // Register Obsidian Protocol Handler: obsidian://study-flow?action=...
     this.registerObsidianProtocolHandler('study-flow', async (params) => {
-      await handleStudyFlowProtocol(this, params as Record<string, string>);
+      await handleStudyFlowProtocol(this, params);
     });
 
     // Add Settings Tab
@@ -273,7 +273,7 @@ export default class StudyFlowPlugin extends Plugin {
 
     if (targetLeaf) {
       workspace.setActiveLeaf(targetLeaf, { focus: true });
-      workspace.revealLeaf(targetLeaf);
+      void workspace.revealLeaf(targetLeaf);
       if (defaultTab && targetLeaf.view instanceof StudyFlowView) {
         await targetLeaf.view.setActiveTab(defaultTab);
       }
@@ -290,11 +290,11 @@ export default class StudyFlowPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const rawData = await this.loadData();
+    const rawData = (await this.loadData()) as Partial<StudyFlowSettings> | null;
     const isFirstInstall = !rawData || Object.keys(rawData).length === 0;
     const effectiveLang = getEffectiveLanguage();
     const defaults = cloneDefaultSettings(isFirstInstall ? effectiveLang : undefined);
-    const loadedData = rawData || {};
+    const loadedData: Partial<StudyFlowSettings> = rawData || {};
     this.settings = Object.assign({}, defaults, loadedData);
 
     const userLang = loadedData.language === 'en' ? 'en' : (loadedData.language === 'es' ? 'es' : effectiveLang);

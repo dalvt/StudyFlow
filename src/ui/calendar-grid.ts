@@ -3,7 +3,6 @@ import type StudyFlowPlugin from '../main';
 import {
   type BlockLayout,
   CalendarTimeBlock,
-  calculateBlockDurationMinutes,
   computeBlockLayouts,
   deleteTimeBlock,
   formatDateKey,
@@ -14,7 +13,6 @@ import {
   snapTo15Minutes,
   timeStringToMinutes,
   toggleTimeBlockCompletion,
-  doBlocksOverlap,
 } from '../calendar.ts';
 import { getDailyNotePath } from '../utils.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
@@ -99,10 +97,12 @@ export class CalendarGridComponent {
         dayHeaderEl.createSpan({ text: t('common.today'), cls: 'study-flow-grid-today-badge' });
       }
 
-      dayHeaderEl.addEventListener('click', async () => {
-        if (day.dateStr !== selectedDateStr) {
-          await this.callbacks.onSelectDate(day.dateStr);
-        }
+      dayHeaderEl.addEventListener('click', () => {
+        void (async () => {
+          if (day.dateStr !== selectedDateStr) {
+            await this.callbacks.onSelectDate(day.dateStr);
+          }
+        })();
       });
     });
 
@@ -187,48 +187,52 @@ export class CalendarGridComponent {
       col.removeClass('is-drag-over');
     });
 
-    col.addEventListener('drop', async (e: DragEvent) => {
-      e.preventDefault();
-      col.removeClass('is-drag-over');
+    col.addEventListener('drop', (e: DragEvent) => {
+      void (async () => {
+        e.preventDefault();
+        col.removeClass('is-drag-over');
 
-      let taskData: { text?: string; cleanTitle?: string; estimatedPomodoros?: number } | null = null;
-      try {
-        const json = e.dataTransfer?.getData('application/json');
-        if (json) taskData = JSON.parse(json);
-      } catch {
-        taskData = null;
-      }
+        let taskData: { text?: string; cleanTitle?: string; estimatedPomodoros?: number } | null = null;
+        try {
+          const json = e.dataTransfer?.getData('application/json');
+          if (json) {
+            taskData = JSON.parse(json) as { text?: string; cleanTitle?: string; estimatedPomodoros?: number };
+          }
+        } catch {
+          taskData = null;
+        }
 
-      const text = taskData?.cleanTitle || taskData?.text || e.dataTransfer?.getData('text/plain');
-      if (!text) return;
+        const text = taskData?.cleanTitle || taskData?.text || e.dataTransfer?.getData('text/plain');
+        if (!text) return;
 
-      const rect = col.getBoundingClientRect();
-      const relativeY = Math.max(0, e.clientY - rect.top);
-      const clickedMins = startHour * 60 + (relativeY / this.hourHeight) * 60;
-      const startMin = snapTo15Minutes(clickedMins);
+        const rect = col.getBoundingClientRect();
+        const relativeY = Math.max(0, e.clientY - rect.top);
+        const clickedMins = startHour * 60 + (relativeY / this.hourHeight) * 60;
+        const startMin = snapTo15Minutes(clickedMins);
 
-      const pomos = taskData?.estimatedPomodoros && taskData.estimatedPomodoros > 0 ? taskData.estimatedPomodoros : 1;
-      const pomoDuration = this.plugin.settings.pomodoroWorkDuration || 25;
-      const durationMins = Math.max(15, pomos * pomoDuration);
-      const endMin = startMin + durationMins;
+        const pomos = taskData?.estimatedPomodoros && taskData.estimatedPomodoros > 0 ? taskData.estimatedPomodoros : 1;
+        const pomoDuration = this.plugin.settings.pomodoroWorkDuration || 25;
+        const durationMins = Math.max(15, pomos * pomoDuration);
+        const endMin = startMin + durationMins;
 
-      const newBlock: CalendarTimeBlock = {
-        id: String(Date.now()),
-        date: dateStr,
-        startTime: minutesToTimeString(startMin),
-        endTime: minutesToTimeString(endMin),
-        title: text.trim(),
-        completed: false,
-      };
+        const newBlock: CalendarTimeBlock = {
+          id: String(Date.now()),
+          date: dateStr,
+          startTime: minutesToTimeString(startMin),
+          endTime: minutesToTimeString(endMin),
+          title: text.trim(),
+          completed: false,
+        };
 
-      await saveTimeBlock(this.plugin, newBlock);
-      new Notice(
-        t('calendar.blockCreatedNotice', {
-          title: newBlock.title,
-          time: `${newBlock.startTime}—${newBlock.endTime}`,
-        }) || `Bloque creado: ${newBlock.title} (${newBlock.startTime} - ${newBlock.endTime})`
-      );
-      await this.callbacks.onRefresh();
+        await saveTimeBlock(this.plugin, newBlock);
+        new Notice(
+          t('calendar.blockCreatedNotice', {
+            title: newBlock.title,
+            time: `${newBlock.startTime}—${newBlock.endTime}`,
+          }) || `Bloque creado: ${newBlock.title} (${newBlock.startTime} - ${newBlock.endTime})`
+        );
+        await this.callbacks.onRefresh();
+      })();
     });
 
     // Click/Drag on empty slot to create a new block
@@ -281,7 +285,7 @@ export class CalendarGridComponent {
         cleanupDrag();
       };
 
-      const onPointerUp = async () => {
+      const onPointerUp = () => {
         cleanupDrag();
 
         const startTime = minutesToTimeString(startMins);
@@ -291,25 +295,27 @@ export class CalendarGridComponent {
           this.app,
           t('calendar.newBlock') || 'Nuevo bloque de estudio',
           t('calendar.defaultBlockTitle') || 'Estudio',
-          async (blockTitle) => {
-            const title = blockTitle.trim() || t('calendar.defaultBlockTitle') || 'Estudio';
-            const newBlock: CalendarTimeBlock = {
-              id: String(Date.now()),
-              date: dateStr,
-              startTime,
-              endTime,
-              title,
-              completed: false,
-            };
+          (blockTitle) => {
+            void (async () => {
+              const title = blockTitle.trim() || t('calendar.defaultBlockTitle') || 'Estudio';
+              const newBlock: CalendarTimeBlock = {
+                id: String(Date.now()),
+                date: dateStr,
+                startTime,
+                endTime,
+                title,
+                completed: false,
+              };
 
-            await saveTimeBlock(this.plugin, newBlock);
-            new Notice(
-              t('calendar.blockCreatedNotice', {
-                title: newBlock.title,
-                time: `${newBlock.startTime}—${newBlock.endTime}`,
-              }) || `Bloque creado: ${newBlock.title} (${newBlock.startTime} - ${newBlock.endTime})`
-            );
-            await this.callbacks.onRefresh();
+              await saveTimeBlock(this.plugin, newBlock);
+              new Notice(
+                t('calendar.blockCreatedNotice', {
+                  title: newBlock.title,
+                  time: `${newBlock.startTime}—${newBlock.endTime}`,
+                }) || `Bloque creado: ${newBlock.title} (${newBlock.startTime} - ${newBlock.endTime})`
+              );
+              await this.callbacks.onRefresh();
+            })();
           }
         ).open();
       };
@@ -392,7 +398,7 @@ export class CalendarGridComponent {
     }
 
     // Title
-    const titleEl = content.createDiv({
+    content.createDiv({
       text: block.title,
       cls: `study-flow-grid-block-title ${block.completed ? 'is-strikethrough' : ''}`,
     });
@@ -406,10 +412,12 @@ export class CalendarGridComponent {
       cls: 'study-flow-timeblock-cb',
     });
     cb.checked = !!block.completed;
-    cb.addEventListener('change', async (e) => {
-      e.stopPropagation();
-      await toggleTimeBlockCompletion(this.plugin, block.date, block.id, cb.checked);
-      await this.callbacks.onRefresh();
+    cb.addEventListener('change', (e) => {
+      void (async () => {
+        e.stopPropagation();
+        await toggleTimeBlockCompletion(this.plugin, block.date, block.id, cb.checked);
+        await this.callbacks.onRefresh();
+      })();
     });
 
     // Pomodoro Focus button
@@ -420,7 +428,7 @@ export class CalendarGridComponent {
     setIcon(pomoBtn, 'timer');
     pomoBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.plugin.pomodoro.setActiveTask({
+      void this.plugin.pomodoro.setActiveTask({
         id: block.id,
         text: `${block.title} [${block.startTime} - ${block.endTime}]`,
         sourceFile: getDailyNotePath(this.plugin.settings, block.date),
@@ -441,14 +449,16 @@ export class CalendarGridComponent {
         this.app,
         t('calendar.blockTitlePlaceholder') || 'Título del bloque',
         block.title,
-        async (newTitle) => {
-          const trimmed = newTitle.trim();
-          if (trimmed && trimmed !== block.title) {
-            block.title = trimmed;
-            await saveTimeBlock(this.plugin, block);
-            new Notice(t('calendar.blockSavedNotice', { title: trimmed }));
-            await this.callbacks.onRefresh();
-          }
+        (newTitle) => {
+          void (async () => {
+            const trimmed = newTitle.trim();
+            if (trimmed && trimmed !== block.title) {
+              block.title = trimmed;
+              await saveTimeBlock(this.plugin, block);
+              new Notice(t('calendar.blockSavedNotice', { title: trimmed }));
+              await this.callbacks.onRefresh();
+            }
+          })();
         }
       ).open();
     });
@@ -459,11 +469,13 @@ export class CalendarGridComponent {
       attr: { 'aria-label': t('calendar.deleteBlockTooltip') },
     });
     setIcon(delBtn, 'trash-2');
-    delBtn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await deleteTimeBlock(this.plugin, block.date, block.id);
-      new Notice(t('calendar.blockDeletedNotice'));
-      await this.callbacks.onRefresh();
+    delBtn.addEventListener('click', (e) => {
+      void (async () => {
+        e.stopPropagation();
+        await deleteTimeBlock(this.plugin, block.date, block.id);
+        new Notice(t('calendar.blockDeletedNotice'));
+        await this.callbacks.onRefresh();
+      })();
     });
 
     // Bottom Resize Handle
@@ -596,8 +608,12 @@ export class CalendarGridComponent {
       }
     };
 
-    blockEl.addEventListener('pointerup', handlePointerEnd);
-    blockEl.addEventListener('pointercancel', handlePointerEnd);
+    blockEl.addEventListener('pointerup', (e: PointerEvent) => {
+      void handlePointerEnd(e);
+    });
+    blockEl.addEventListener('pointercancel', (e: PointerEvent) => {
+      void handlePointerEnd(e);
+    });
   }
 
   public destroy(): void {

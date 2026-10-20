@@ -128,9 +128,11 @@ export class PomodoroClosingReviewModal extends Modal {
       text: t('pomodoroReview.save'),
       cls: 'mod-cta',
     });
-    saveBtn.addEventListener('click', async () => {
-      await this.handleSubmit();
-      this.close();
+    saveBtn.addEventListener('click', () => {
+      void (async () => {
+        await this.handleSubmit();
+        this.close();
+      })();
     });
   }
 

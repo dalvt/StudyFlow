@@ -1,20 +1,4 @@
-import { App, Modal, Notice, setIcon, Setting, TFile } from 'obsidian';
-import type StudyFlowPlugin from './main';
-import {
-  appendTaskToMarkdownSection,
-  calculateDaysRemaining,
-  formatDeadlineHuman,
-  formatTaskWithDeadline,
-  formatTaskWithPomodoroEstimate,
-  formatTaskWithPriority,
-  getOrCreateFile,
-  parseTaskDeadline,
-  parseTaskPomodoroEstimate,
-  parseTaskPriority,
-  type PendingTaskItem,
-  extractTagsFromText,
-  type TaskPriority,
-} from './utils.ts';
+import { App, Notice, TFile } from 'obsidian';
 
 import {
   type SubtaskItem,
@@ -86,7 +70,7 @@ export async function incrementTaskPomodoroInFile(
   app: App,
   task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<{ updatedText: string } | null> {
-  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'increment' });
+  const res = await mutateTaskLine(app, task, { action: 'increment' });
   return res.success && res.updatedText ? { updatedText: res.updatedText } : null;
 }
 
@@ -94,7 +78,7 @@ export async function decrementTaskPomodoroInFile(
   app: App,
   task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<{ updatedText: string } | null> {
-  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'decrement' });
+  const res = await mutateTaskLine(app, task, { action: 'decrement' });
   return res.success && res.updatedText ? { updatedText: res.updatedText } : null;
 }
 
@@ -104,7 +88,7 @@ export async function promoteIdeaToTaskInFile(
   tasksSectionHeader?: string
 ): Promise<boolean> {
   const priority = ('priority' in task && task.priority) ? task.priority : 'none';
-  const res = await mutateTaskLine(app, task as TaskLocator, {
+  const res = await mutateTaskLine(app, task, {
     action: 'promote',
     priority,
     tasksSectionHeader,
@@ -117,7 +101,7 @@ export async function toggleTaskCompletionInFile(
   task: TaskLocator | { sourceFile: string; text: string },
   newCompleted?: boolean
 ): Promise<boolean> {
-  const res = await mutateTaskLine(app, task as TaskLocator, {
+  const res = await mutateTaskLine(app, task, {
     action: 'toggle',
     completed: newCompleted,
   });
@@ -129,7 +113,7 @@ export async function updateTaskTextInFile(
   task: TaskLocator | { sourceFile: string; text: string },
   newText: string
 ): Promise<boolean> {
-  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'update', newText });
+  const res = await mutateTaskLine(app, task, { action: 'update', newText });
   return res.success;
 }
 
@@ -156,7 +140,7 @@ export async function addSubtaskToFile(
   task: TaskLocator | { sourceFile: string; text: string },
   subtaskText: string
 ): Promise<boolean> {
-  const res = await mutateTaskLine(app, task as TaskLocator, {
+  const res = await mutateTaskLine(app, task, {
     action: 'subtask',
     subtaskAction: 'add',
     subtaskText,
@@ -168,7 +152,7 @@ export async function deleteTaskFromFile(
   app: App,
   task: TaskLocator | { sourceFile: string; text: string }
 ): Promise<boolean> {
-  const res = await mutateTaskLine(app, task as TaskLocator, { action: 'delete' });
+  const res = await mutateTaskLine(app, task, { action: 'delete' });
   return res.success;
 }
 

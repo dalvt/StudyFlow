@@ -133,36 +133,38 @@ export class CalendarTab implements TabComponent {
       attr: { 'aria-label': t('calendar.prev') },
     });
     setIcon(prevBtn, 'chevron-left');
-    prevBtn.addEventListener('click', async () => {
-      const parts = this.selectedCalendarDate.split('-').map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    prevBtn.addEventListener('click', () => {
+      void (async () => {
+        const parts = this.selectedCalendarDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
 
-      if (this.calendarViewMode === 'day') {
-        d.setDate(d.getDate() - 1);
-        this.calendarYear = d.getFullYear();
-        this.calendarMonth = d.getMonth();
-        this.selectedCalendarDate = formatDateKey(d);
-      } else if (this.calendarViewMode === 'week') {
-        d.setDate(d.getDate() - 7);
-        this.calendarYear = d.getFullYear();
-        this.calendarMonth = d.getMonth();
-        this.selectedCalendarDate = formatDateKey(d);
-      } else {
-        if (this.calendarMonth === 0) {
-          this.calendarMonth = 11;
-          this.calendarYear -= 1;
+        if (this.calendarViewMode === 'day') {
+          d.setDate(d.getDate() - 1);
+          this.calendarYear = d.getFullYear();
+          this.calendarMonth = d.getMonth();
+          this.selectedCalendarDate = formatDateKey(d);
+        } else if (this.calendarViewMode === 'week') {
+          d.setDate(d.getDate() - 7);
+          this.calendarYear = d.getFullYear();
+          this.calendarMonth = d.getMonth();
+          this.selectedCalendarDate = formatDateKey(d);
         } else {
-          this.calendarMonth -= 1;
+          if (this.calendarMonth === 0) {
+            this.calendarMonth = 11;
+            this.calendarYear -= 1;
+          } else {
+            this.calendarMonth -= 1;
+          }
         }
-      }
-      if (this.container) await this.render(this.container);
+        if (this.container) await this.render(this.container);
+      })();
     });
 
     const titleText = this.calendarViewMode === 'day'
       ? this.selectedCalendarDate
       : formatMonthYearHeader(this.calendarYear, this.calendarMonth, getEffectiveLanguage());
 
-    navGroup.createEl('span', {
+    navGroup.createSpan({
       cls: 'study-flow-calendar-month-title',
       text: titleText,
     });
@@ -172,41 +174,45 @@ export class CalendarTab implements TabComponent {
       attr: { 'aria-label': t('calendar.next') },
     });
     setIcon(nextBtn, 'chevron-right');
-    nextBtn.addEventListener('click', async () => {
-      const parts = this.selectedCalendarDate.split('-').map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+    nextBtn.addEventListener('click', () => {
+      void (async () => {
+        const parts = this.selectedCalendarDate.split('-').map(Number);
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
 
-      if (this.calendarViewMode === 'day') {
-        d.setDate(d.getDate() + 1);
-        this.calendarYear = d.getFullYear();
-        this.calendarMonth = d.getMonth();
-        this.selectedCalendarDate = formatDateKey(d);
-      } else if (this.calendarViewMode === 'week') {
-        d.setDate(d.getDate() + 7);
-        this.calendarYear = d.getFullYear();
-        this.calendarMonth = d.getMonth();
-        this.selectedCalendarDate = formatDateKey(d);
-      } else {
-        if (this.calendarMonth === 11) {
-          this.calendarMonth = 0;
-          this.calendarYear += 1;
+        if (this.calendarViewMode === 'day') {
+          d.setDate(d.getDate() + 1);
+          this.calendarYear = d.getFullYear();
+          this.calendarMonth = d.getMonth();
+          this.selectedCalendarDate = formatDateKey(d);
+        } else if (this.calendarViewMode === 'week') {
+          d.setDate(d.getDate() + 7);
+          this.calendarYear = d.getFullYear();
+          this.calendarMonth = d.getMonth();
+          this.selectedCalendarDate = formatDateKey(d);
         } else {
-          this.calendarMonth += 1;
+          if (this.calendarMonth === 11) {
+            this.calendarMonth = 0;
+            this.calendarYear += 1;
+          } else {
+            this.calendarMonth += 1;
+          }
         }
-      }
-      if (this.container) await this.render(this.container);
+        if (this.container) await this.render(this.container);
+      })();
     });
 
     const todayBtn = navGroup.createEl('button', {
       cls: 'study-flow-icon-action-btn-styled study-flow-calendar-today-btn',
       text: t('common.today'),
     });
-    todayBtn.addEventListener('click', async () => {
-      const now = new Date();
-      this.calendarYear = now.getFullYear();
-      this.calendarMonth = now.getMonth();
-      this.selectedCalendarDate = formatDateKey(now);
-      if (this.container) await this.render(this.container);
+    todayBtn.addEventListener('click', () => {
+      void (async () => {
+        const now = new Date();
+        this.calendarYear = now.getFullYear();
+        this.calendarMonth = now.getMonth();
+        this.selectedCalendarDate = formatDateKey(now);
+        if (this.container) await this.render(this.container);
+      })();
     });
 
     // Right: Segmented view toggles (Mes, Semana, Día)
@@ -225,9 +231,11 @@ export class CalendarTab implements TabComponent {
       const iconSpan = btn.createSpan();
       setIcon(iconSpan, v.icon);
       btn.createSpan({ text: v.label, cls: 'study-flow-segmented-label' });
-      btn.addEventListener('click', async () => {
-        this.calendarViewMode = v.id;
-        if (this.container) await this.render(this.container);
+      btn.addEventListener('click', () => {
+        void (async () => {
+          this.calendarViewMode = v.id;
+          if (this.container) await this.render(this.container);
+        })();
       });
     });
 
@@ -331,13 +339,15 @@ export class CalendarTab implements TabComponent {
         blChip.createSpan({ text: ` ${dayBlocks.length}` });
       }
 
-      cellEl.addEventListener('click', async () => {
-        this.selectedCalendarDate = cell.dateStr;
-        if (!cell.isCurrentMonth) {
-          this.calendarYear = cell.year;
-          this.calendarMonth = cell.month;
-        }
-        if (this.container) await this.render(this.container);
+      cellEl.addEventListener('click', () => {
+        void (async () => {
+          this.selectedCalendarDate = cell.dateStr;
+          if (!cell.isCurrentMonth) {
+            this.calendarYear = cell.year;
+            this.calendarMonth = cell.month;
+          }
+          if (this.container) await this.render(this.container);
+        })();
       });
     });
   }

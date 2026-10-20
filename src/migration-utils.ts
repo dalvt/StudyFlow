@@ -40,7 +40,7 @@ export function formatSessionsToJsonl(sessions: FocusSessionRecord[]): string {
 /**
  * Determines if raw loaded data requires a storage migration to schemaVersion 3.
  */
-export function needsMigration(rawData: Record<string, any> | null | undefined): boolean {
+export function needsMigration(rawData: Record<string, unknown> | null | undefined): boolean {
   if (!rawData || typeof rawData !== 'object' || Object.keys(rawData).length === 0) {
     return false;
   }
@@ -51,10 +51,10 @@ export function needsMigration(rawData: Record<string, any> | null | undefined):
 /**
  * Pure helper to extract legacy data and clean settings object for schemaVersion 3.
  */
-export function prepareMigrationData(rawData: Record<string, any>): {
+export function prepareMigrationData(rawData: Record<string, unknown>): {
   calendarBlocks: Record<string, CalendarTimeBlock[]>;
   sessions: FocusSessionRecord[];
-  cleanedSettings: Record<string, any>;
+  cleanedSettings: Record<string, unknown>;
 } {
   const calendarBlocks = (rawData.calendarBlocks && typeof rawData.calendarBlocks === 'object'
     ? rawData.calendarBlocks

@@ -26,17 +26,17 @@ test('validateSettingNumber validates required numbers and boundaries accurately
   // Floating point values
   const floatRes = validateSettingNumber('25.5', 1, 100);
   assert.equal(floatRes.valid, false);
-  assert.ok(floatRes.error?.includes('entero'));
+  assert.ok(floatRes.error?.includes('entero') || floatRes.error?.includes('integer'));
 
   // Out of range (below min)
   const lowRes = validateSettingNumber('0', 1, 60, 'Descanso');
   assert.equal(lowRes.valid, false);
-  assert.ok(lowRes.error?.includes('entre 1 y 60'));
+  assert.ok(lowRes.error?.includes('entre 1 y 60') || lowRes.error?.includes('between 1 and 60'));
 
   // Out of range (above max)
   const highRes = validateSettingNumber('121', 1, 120, 'Descanso largo');
   assert.equal(highRes.valid, false);
-  assert.ok(highRes.error?.includes('entre 1 y 120'));
+  assert.ok(highRes.error?.includes('entre 1 y 120') || highRes.error?.includes('between 1 and 120'));
 
   // Valid values
   const validMin = validateSettingNumber('1', 1, 180);

@@ -1,10 +1,10 @@
 {
   "id": "study-flow-assistant",
   "name": "Study Flow Assistant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.8.7",
   "description": "Comprehensive academic study assistant: customizable Pomodoro timer, task and habit tracker, time blocking calendar, metrics, and distraction-free Zen mode.",
   "author": "dalt",
-  "authorUrl": "https://github.com/dalt-builds",
+  "authorUrl": "https://github.com/dalvt",
   "isDesktopOnly": false
 }

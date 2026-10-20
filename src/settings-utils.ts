@@ -147,7 +147,7 @@ export const DEFAULT_SETTINGS: StudyFlowSettings = {
 
 
 export function cloneDefaultSettings(lang?: SupportedConventionLanguage): StudyFlowSettings {
-  const base: StudyFlowSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  const base = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as StudyFlowSettings;
   if (lang) {
     const conv = getDefaultConventions(lang);
     Object.assign(base, conv);
@@ -171,7 +171,10 @@ export function validateSettingNumber(
   if (raw === undefined || raw === null) {
     return { valid: false, error: t('settings.validationEmpty', { name }) };
   }
-  const str = String(raw).trim();
+  if (typeof raw === 'object') {
+    return { valid: false, error: t('settings.validationNumber', { name }) };
+  }
+  const str = typeof raw === 'string' ? raw.trim() : (typeof raw === 'number' || typeof raw === 'boolean' ? String(raw).trim() : '');
   if (str === '') {
     return { valid: false, error: t('settings.validationEmpty', { name }) };
   }

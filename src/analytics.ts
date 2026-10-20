@@ -1,4 +1,3 @@
-import type { App } from 'obsidian';
 import type { HabitItem } from './habits';
 import type { TaskRecord } from './tasks';
 import type { Subject } from './settings-utils.ts';

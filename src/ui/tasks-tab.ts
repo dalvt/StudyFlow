@@ -26,7 +26,7 @@ import { t } from '../i18n/index.ts';
 
 function showUndoNotice(message: string, onUndo: () => Promise<void>): void {
   const notice = new Notice('', 8000);
-  const el = notice.noticeEl;
+  const el = notice.messageEl;
   el.empty();
   const wrapper = el.createDiv({ cls: 'study-flow-notice-undo-wrapper' });
   wrapper.createSpan({ text: message, cls: 'study-flow-notice-undo-msg' });
@@ -34,10 +34,12 @@ function showUndoNotice(message: string, onUndo: () => Promise<void>): void {
     text: t('common.undo'),
     cls: 'study-flow-notice-undo-btn mod-cta',
   });
-  btn.addEventListener('click', async (e: MouseEvent) => {
-    e.stopPropagation();
-    notice.hide();
-    await onUndo();
+  btn.addEventListener('click', (e: MouseEvent) => {
+    void (async () => {
+      e.stopPropagation();
+      notice.hide();
+      await onUndo();
+    })();
   });
 }
 
@@ -117,10 +119,12 @@ export class TasksTab implements TabComponent {
       setIcon(iconSpan, v.icon);
       btn.createSpan({ text: v.label, cls: 'study-flow-segmented-label' });
       btn.createSpan({ text: String(v.count), cls: 'study-flow-count-pill' });
-      btn.addEventListener('click', async () => {
-        this.taskView = v.id;
-        this.selectedSubjectTag = null;
-        if (this.container) await this.render(this.container);
+      btn.addEventListener('click', () => {
+        void (async () => {
+          this.taskView = v.id;
+          this.selectedSubjectTag = null;
+          if (this.container) await this.render(this.container);
+        })();
       });
     });
 
@@ -214,7 +218,7 @@ export class TasksTab implements TabComponent {
     sortSelect.createEl('option', { value: 'alpha', text: t('tasks.sortAlpha') });
     sortSelect.value = this.taskSortBy;
     sortSelect.addEventListener('change', () => {
-      this.taskSortBy = sortSelect.value as any;
+      this.taskSortBy = sortSelect.value as 'priority' | 'urgency' | 'estimate' | 'alpha';
       renderList();
     });
 
@@ -671,8 +675,10 @@ export class TasksTab implements TabComponent {
     } else {
       cb = cbWrapper.createEl('input', { type: 'checkbox' });
       cb.checked = task.completed;
-      cb.addEventListener('change', async () => {
-        await handleToggleCompletion(cb!.checked);
+      cb.addEventListener('change', () => {
+        void (async () => {
+          await handleToggleCompletion(cb!.checked);
+        })();
       });
     }
 
@@ -708,11 +714,13 @@ export class TasksTab implements TabComponent {
         if (this.container) await this.render(this.container);
       };
 
-      saveBtn.addEventListener('click', handleSave);
+      saveBtn.addEventListener('click', () => {
+        void handleSave();
+      });
       editInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          handleSave();
+          void handleSave();
         } else if (e.key === 'Escape') {
           e.preventDefault();
           this.editingTaskId = null;
@@ -727,7 +735,7 @@ export class TasksTab implements TabComponent {
       // Normal Display Row
       const titleRow = mainCol.createDiv({ cls: 'study-flow-task-title-row' });
       const displayTitle = getCleanTaskDisplayTitle(task.text);
-      const textSpan = titleRow.createEl('span', {
+      const textSpan = titleRow.createSpan({
         text: displayTitle,
         cls: `study-flow-task-text ${task.completed ? 'is-strikethrough' : ''}`,
       });
@@ -868,15 +876,17 @@ export class TasksTab implements TabComponent {
         const subItem = subtasksWrap.createDiv({ cls: 'study-flow-subtask-item' });
         const subCb = subItem.createEl('input', { type: 'checkbox', cls: 'study-flow-subtask-cb' });
         subCb.checked = sub.completed;
-        subCb.addEventListener('change', async (e) => {
-          e.stopPropagation();
-          await toggleSubtaskInFile(this.app, task.sourceFile, sub.text, subCb.checked);
-          sub.completed = subCb.checked;
-          new Notice(subCb.checked ? t('tasks.subtaskCompletedNotice') : t('tasks.subtaskUnmarkedNotice'));
-          if (this.container) await this.render(this.container);
+        subCb.addEventListener('change', (e) => {
+          void (async () => {
+            e.stopPropagation();
+            await toggleSubtaskInFile(this.app, task.sourceFile, sub.text, subCb.checked);
+            sub.completed = subCb.checked;
+            new Notice(subCb.checked ? t('tasks.subtaskCompletedNotice') : t('tasks.subtaskUnmarkedNotice'));
+            if (this.container) await this.render(this.container);
+          })();
         });
 
-        const subSpan = subItem.createEl('span', {
+        const subSpan = subItem.createSpan({
           text: sub.text,
           cls: `study-flow-subtask-text ${sub.completed ? 'is-strikethrough' : ''}`,
         });
@@ -897,17 +907,19 @@ export class TasksTab implements TabComponent {
         attr: { 'aria-label': t('tasks.focusPomodoroTooltip') },
       });
       setIcon(linkPomodoroBtn, 'timer');
-      linkPomodoroBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        this.plugin.pomodoro.setActiveTask({
-          id: task.id,
-          text: task.text,
-          sourceFile: task.sourceFile,
-          originalLine: task.originalLine,
-          lineNumber: task.lineNumber,
-          lineHash: task.lineHash,
-        });
-        this.onSwitchTab('pomodoro');
+      linkPomodoroBtn.addEventListener('click', (e) => {
+        void (async () => {
+          e.stopPropagation();
+          await this.plugin.pomodoro.setActiveTask({
+            id: task.id,
+            text: task.text,
+            sourceFile: task.sourceFile,
+            originalLine: task.originalLine,
+            lineNumber: task.lineNumber,
+            lineHash: task.lineHash,
+          });
+          this.onSwitchTab('pomodoro');
+        })();
       });
 
       // Add subtask quick button
@@ -922,10 +934,12 @@ export class TasksTab implements TabComponent {
           this.app,
           t('tasks.newSubtaskTitle', { text: task.text }),
           t('tasks.newSubtaskPlaceholder'),
-          async (subtaskText) => {
-            await addSubtaskToFile(this.app, task, subtaskText);
-            new Notice(t('tasks.subtaskAddedNotice'));
-            if (this.container) await this.render(this.container);
+          (subtaskText) => {
+            void (async () => {
+              await addSubtaskToFile(this.app, task, subtaskText);
+              new Notice(t('tasks.subtaskAddedNotice'));
+              if (this.container) await this.render(this.container);
+            })();
           }
         ).open();
       });
@@ -939,11 +953,13 @@ export class TasksTab implements TabComponent {
       const pIcon = promoteBtn.createSpan({ cls: 'study-flow-btn-icon' });
       setIcon(pIcon, 'zap');
       promoteBtn.createSpan({ text: t('tasks.promoteBtn') });
-      promoteBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await promoteIdeaToTaskInFile(this.app, task);
-        new Notice(t('tasks.promotedToTaskNotice', { text: task.text }));
-        if (this.container) await this.render(this.container);
+      promoteBtn.addEventListener('click', (e) => {
+        void (async () => {
+          e.stopPropagation();
+          await promoteIdeaToTaskInFile(this.app, task);
+          new Notice(t('tasks.promotedToTaskNotice', { text: task.text }));
+          if (this.container) await this.render(this.container);
+        })();
       });
     }
 

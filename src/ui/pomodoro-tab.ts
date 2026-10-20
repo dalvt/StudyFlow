@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
-import type { PomodoroPreset } from '../settings-utils';
+import type { PomodoroStatus } from '../pomodoro';
 import {
   parseTaskPomodoroEstimate,
   PendingTaskItem,
@@ -100,11 +100,13 @@ export class PomodoroAdjustModal extends Modal {
     cancelBtn.addEventListener('click', () => this.close());
 
     const saveBtn = footer.createEl('button', { text: t('pomodoro.applyTimes'), cls: 'mod-cta' });
-    saveBtn.addEventListener('click', async () => {
-      await this.plugin.pomodoro.setCustomWorkAndBreak(this.workMinutes, this.breakMinutes, saveAsDefault);
-      new Notice(t('pomodoro.timesConfiguredNotice', { work: String(this.workMinutes), break: String(this.breakMinutes) }));
-      this.close();
-      this.onSaved();
+    saveBtn.addEventListener('click', () => {
+      void (async () => {
+        await this.plugin.pomodoro.setCustomWorkAndBreak(this.workMinutes, this.breakMinutes, saveAsDefault);
+        new Notice(t('pomodoro.timesConfiguredNotice', { work: String(this.workMinutes), break: String(this.breakMinutes) }));
+        this.close();
+        this.onSaved();
+      })();
     });
   }
 
@@ -167,13 +169,15 @@ export class PomodoroTab implements TabComponent {
         text: t('pomodoro.presetCountUp'),
         attr: { 'aria-label': t('pomodoro.presetCountUpTooltip') },
       });
-      countUpBtn.addEventListener('click', async () => {
-        if (!status.isCountUp) {
-          await this.plugin.pomodoro.startCountUp();
-        } else {
-          await this.plugin.pomodoro.finishCountUpSession();
-        }
-        if (this.container) await this.render(this.container);
+      countUpBtn.addEventListener('click', () => {
+        void (async () => {
+          if (!status.isCountUp) {
+            await this.plugin.pomodoro.startCountUp();
+          } else {
+            await this.plugin.pomodoro.finishCountUpSession();
+          }
+          if (this.container) await this.render(this.container);
+        })();
       });
 
       // Zen toggle chip
@@ -194,7 +198,7 @@ export class PomodoroTab implements TabComponent {
 
       // Native Dial Wrapper
       const dialWrapper = card.createDiv({ cls: 'study-flow-dial-wrapper' });
-      const liveAnnouncer = dialWrapper.createDiv({
+      dialWrapper.createDiv({
         cls: 'sr-only study-flow-sr-announcer',
         attr: { 'aria-live': 'polite', 'aria-atomic': 'true' },
       });
@@ -241,7 +245,7 @@ export class PomodoroTab implements TabComponent {
       cls: `study-flow-mode-pill study-flow-luxury-pill ${activeModeCls}`,
     });
 
-    const timeHeroEl = centerInfo.createDiv({
+    centerInfo.createDiv({
       text: this.plugin.pomodoro.formatTime(status.remainingSeconds),
       cls: `study-flow-dial-time-hero ${isRunning ? 'is-running' : ''}`,
     });
@@ -279,9 +283,11 @@ export class PomodoroTab implements TabComponent {
         attr: { 'aria-label': t('pomodoro.previousCycle') },
       });
       setIcon(prevBtn, 'skip-back');
-      prevBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.previousCycle();
-        if (this.container) await this.render(this.container);
+      prevBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.previousCycle();
+          if (this.container) await this.render(this.container);
+        })();
       });
     }
 
@@ -292,7 +298,7 @@ export class PomodoroTab implements TabComponent {
     const heroIcon = heroBtn.createSpan({ cls: 'study-flow-hero-icon' });
     setIcon(heroIcon, isRunning ? 'pause' : 'play');
     heroBtn.addEventListener('click', () => {
-      this.plugin.pomodoro.toggleStartPause();
+      void this.plugin.pomodoro.toggleStartPause();
     });
 
     if (status.isCountUp) {
@@ -301,9 +307,11 @@ export class PomodoroTab implements TabComponent {
         attr: { 'aria-label': t('pomodoro.finishSession') },
       });
       setIcon(finishBtn, 'check-square');
-      finishBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.finishCountUpSession();
-        if (this.container) await this.render(this.container);
+      finishBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.finishCountUpSession();
+          if (this.container) await this.render(this.container);
+        })();
       });
     } else {
       const skipBtn = controlDeck.createEl('button', {
@@ -311,9 +319,11 @@ export class PomodoroTab implements TabComponent {
         attr: { 'aria-label': t('pomodoro.skip') },
       });
       setIcon(skipBtn, 'skip-forward');
-      skipBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.skipCycle();
-        if (this.container) await this.render(this.container);
+      skipBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.skipCycle();
+          if (this.container) await this.render(this.container);
+        })();
       });
 
       const add5Btn = controlDeck.createEl('button', {
@@ -324,7 +334,7 @@ export class PomodoroTab implements TabComponent {
       setIcon(plusIcon, 'plus');
       add5Btn.createSpan({ text: '5m', cls: 'study-flow-deck-btn-label' });
       add5Btn.addEventListener('click', () => {
-        this.plugin.pomodoro.addMinutes(5);
+        void this.plugin.pomodoro.addMinutes(5);
       });
     }
 
@@ -335,7 +345,7 @@ export class PomodoroTab implements TabComponent {
     }
   }
 
-  private async renderActiveTaskBanner(container: HTMLElement, status: any): Promise<void> {
+  private async renderActiveTaskBanner(container: HTMLElement, status: PomodoroStatus): Promise<void> {
     const taskSection = container.createDiv({ cls: 'study-flow-active-task-container' });
 
     if (status.activeTask) {
@@ -370,9 +380,11 @@ export class PomodoroTab implements TabComponent {
       const cIcon = completeBtn.createSpan();
       setIcon(cIcon, 'check');
       completeBtn.createSpan({ text: t('pomodoro.complete') });
-      completeBtn.addEventListener('click', async () => {
-        await this.plugin.pomodoro.completeActiveTask();
-        if (this.container) await this.render(this.container);
+      completeBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.completeActiveTask();
+          if (this.container) await this.render(this.container);
+        })();
       });
 
       const unlinkBtn = banner.createEl('button', {
@@ -380,9 +392,11 @@ export class PomodoroTab implements TabComponent {
         attr: { 'aria-label': t('pomodoro.unlinkTask') },
       });
       setIcon(unlinkBtn, 'x');
-      unlinkBtn.addEventListener('click', async () => {
-        this.plugin.pomodoro.setActiveTask(null);
-        if (this.container) await this.render(this.container);
+      unlinkBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.pomodoro.setActiveTask(null);
+          if (this.container) await this.render(this.container);
+        })();
       });
     } else {
       // If a subject is actively chosen without a task, render active subject banner
@@ -425,9 +439,11 @@ export class PomodoroTab implements TabComponent {
           attr: { 'aria-label': t('subjects.unlinkSubjectTooltip') },
         });
         setIcon(unlinkSubBtn, 'x');
-        unlinkSubBtn.addEventListener('click', async () => {
-          await this.plugin.pomodoro.setActiveSubject(null);
-          if (this.container) await this.render(this.container);
+        unlinkSubBtn.addEventListener('click', () => {
+          void (async () => {
+            await this.plugin.pomodoro.setActiveSubject(null);
+            if (this.container) await this.render(this.container);
+          })();
         });
       }
 
@@ -440,10 +456,12 @@ export class PomodoroTab implements TabComponent {
         const tIcon = linkBtn.createSpan({ cls: 'study-flow-link-btn-icon' });
         setIcon(tIcon, 'target');
         linkBtn.createSpan({ text: t('pomodoro.linkTaskShort') });
-        linkBtn.addEventListener('click', async () => {
-          this.isSelectingTaskForPomodoro = true;
-          this.loadPendingInboxTasks();
-          if (this.container) await this.render(this.container);
+        linkBtn.addEventListener('click', () => {
+          void (async () => {
+            this.isSelectingTaskForPomodoro = true;
+            this.loadPendingInboxTasks();
+            if (this.container) await this.render(this.container);
+          })();
         });
 
         const linkHabitBtn = btnRow.createEl('button', {
@@ -462,7 +480,7 @@ export class PomodoroTab implements TabComponent {
                 sourceFile: this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md',
               });
             } else {
-              this.plugin.pomodoro.setActiveTask(null);
+              await this.plugin.pomodoro.setActiveTask(null);
             }
             if (this.container) await this.render(this.container);
           }).open();
@@ -485,7 +503,7 @@ export class PomodoroTab implements TabComponent {
         }
       } else {
         const pickerBox = taskSection.createDiv({ cls: 'study-flow-task-picker-box' });
-        pickerBox.createEl('div', { text: t('pomodoro.selectInboxTask'), cls: 'study-flow-picker-title' });
+        pickerBox.createDiv({ text: t('pomodoro.selectInboxTask'), cls: 'study-flow-picker-title' });
 
         // Quick add task input
         const quickRow = pickerBox.createDiv({ cls: 'study-flow-search-bar study-flow-task-add-bar study-flow-picker-add-row' });
@@ -539,22 +557,26 @@ export class PomodoroTab implements TabComponent {
               attr: { 'aria-label': t('pomodoro.selectTaskLabel', { text: cleanTitle }) },
             });
             item.createSpan({ text: cleanTitle });
-            item.addEventListener('click', async () => {
-              this.plugin.pomodoro.setActiveTask({
-                id: tTask.id,
-                text: tTask.text,
-                sourceFile: tTask.sourceFile,
-              });
-              this.isSelectingTaskForPomodoro = false;
-              if (this.container) await this.render(this.container);
+            item.addEventListener('click', () => {
+              void (async () => {
+                await this.plugin.pomodoro.setActiveTask({
+                  id: tTask.id,
+                  text: tTask.text,
+                  sourceFile: tTask.sourceFile,
+                });
+                this.isSelectingTaskForPomodoro = false;
+                if (this.container) await this.render(this.container);
+              })();
             });
           });
         }
 
         const cancelPicker = pickerBox.createEl('button', { text: t('common.cancel'), cls: 'study-flow-mini-btn' });
-        cancelPicker.addEventListener('click', async () => {
-          this.isSelectingTaskForPomodoro = false;
-          if (this.container) await this.render(this.container);
+        cancelPicker.addEventListener('click', () => {
+          void (async () => {
+            this.isSelectingTaskForPomodoro = false;
+            if (this.container) await this.render(this.container);
+          })();
         });
       }
     }
@@ -573,7 +595,7 @@ export class PomodoroTab implements TabComponent {
     const status = this.plugin.pomodoro.getStatus();
     const isRunning = status.state === 'running';
 
-    const card = this.container.querySelector('.study-flow-pomodoro-luxury-card') as HTMLElement | null;
+    const card = this.container.querySelector<HTMLElement>('.study-flow-pomodoro-luxury-card');
     if (card) {
       card.classList.toggle('is-work', status.mode === 'work');
       card.classList.toggle('is-break', status.mode === 'break');
@@ -644,7 +666,7 @@ export class PomodoroTab implements TabComponent {
 
   private updateProgressRing(status: { progressPercent: number; mode: string; state?: string; isCountUp?: boolean }): void {
     if (!this.container) return;
-    const progressCircle = this.container.querySelector('.study-flow-dial-progress') as SVGCircleElement | null;
+    const progressCircle = this.container.querySelector<SVGCircleElement>('.study-flow-dial-progress');
     if (progressCircle) {
       const offset = CIRCUMFERENCE * (1 - status.progressPercent / 100);
       progressCircle.setAttribute('stroke-dashoffset', String(offset));

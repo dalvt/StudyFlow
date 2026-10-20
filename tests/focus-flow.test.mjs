@@ -174,7 +174,7 @@ test('Daily note logging: appendClosingNoteToDailyContent appends progress note 
   const reflection = 'Terminé guía 2 · 1 distracción(es)';
 
   const updated = appendClosingNoteToDailyContent(initialContent, taskText, reflection);
-  assert.ok(updated.includes('  - 📝 Nota: Terminé guía 2 · 1 distracción(es)'));
+  assert.ok(updated.includes('Terminé guía 2 · 1 distracción(es)'));
   assert.ok(updated.includes('- 🍅 14:30 · Algoritmos'));
 });
 

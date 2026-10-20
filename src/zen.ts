@@ -126,20 +126,20 @@ export class ZenModeManager {
   private showIndicator(): void {
     this.hideIndicator();
 
-    const indicator = document.createElement('div');
+    const indicator = createDiv();
     indicator.className = 'study-flow-zen-indicator';
 
-    const iconSpan = document.createElement('span');
+    const iconSpan = createSpan();
     iconSpan.className = 'study-flow-zen-indicator-icon';
     setIcon(iconSpan, 'eye-off');
     indicator.appendChild(iconSpan);
 
-    const labelSpan = document.createElement('span');
+    const labelSpan = createSpan();
     labelSpan.className = 'study-flow-zen-indicator-text';
     labelSpan.textContent = t('zen.indicatorActive');
     indicator.appendChild(labelSpan);
 
-    const exitBtn = document.createElement('button');
+    const exitBtn = createEl('button');
     exitBtn.className = 'study-flow-zen-indicator-btn';
     exitBtn.textContent = t('zen.exitButton');
     exitBtn.addEventListener('click', (e) => {

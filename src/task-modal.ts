@@ -103,7 +103,7 @@ export class TaskCreateModal extends Modal {
 
     // Cell 1: Materia
     const subjectField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    subjectField.createEl('span', { text: t('tasks.subjectLabel'), cls: 'study-flow-cloud-label' });
+    subjectField.createSpan({ text: t('tasks.subjectLabel'), cls: 'study-flow-cloud-label' });
     const subjectSelect = subjectField.createEl('select', { cls: 'study-flow-cloud-control dropdown' });
     subjectSelect.createEl('option', { value: '', text: t('tasks.subjectNoneOption') });
 
@@ -144,7 +144,7 @@ export class TaskCreateModal extends Modal {
 
     // Cell 2: Fecha Límite (Deadline)
     const deadlineField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    const dlLabel = deadlineField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const dlLabel = deadlineField.createSpan({ cls: 'study-flow-cloud-label' });
     const dlIcon = dlLabel.createSpan({ cls: 'study-flow-label-icon' });
     setIcon(dlIcon, 'calendar');
     dlLabel.createSpan({ text: t('tasks.deadlineLabel') });
@@ -159,7 +159,7 @@ export class TaskCreateModal extends Modal {
 
     // Cell 3: Estimación Pomodoro
     const estimateField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    const estLabel = estimateField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const estLabel = estimateField.createSpan({ cls: 'study-flow-cloud-label' });
     const estIcon = estLabel.createSpan({ cls: 'study-flow-label-icon' });
     setIcon(estIcon, 'timer');
     estLabel.createSpan({ text: t('tasks.estimateLabel') });
@@ -207,7 +207,7 @@ export class TaskCreateModal extends Modal {
 
     // Cell 4: Prioridad (Segmented row with NO wrapping)
     const priorityField = metaGrid.createDiv({ cls: 'study-flow-cloud-grid-cell' });
-    const prioLabel = priorityField.createEl('span', { cls: 'study-flow-cloud-label' });
+    const prioLabel = priorityField.createSpan({ cls: 'study-flow-cloud-label' });
     const prioIcon = prioLabel.createSpan({ cls: 'study-flow-label-icon' });
     setIcon(prioIcon, 'zap');
     prioLabel.createSpan({ text: t('tasks.priorityLabel') });
@@ -241,7 +241,7 @@ export class TaskCreateModal extends Modal {
 
     // 4. Footer
     const footer = contentEl.createDiv({ cls: 'study-flow-cloud-modal-footer' });
-    const hint = footer.createEl('span', {
+    footer.createSpan({
       text: t('tasks.cloudShortcutHint'),
       cls: 'study-flow-shortcut-hint',
     });
@@ -285,12 +285,14 @@ export class TaskCreateModal extends Modal {
       await this.saveAndClose();
     };
 
-    submitBtn.addEventListener('click', doSubmit);
+    submitBtn.addEventListener('click', () => {
+      void doSubmit();
+    });
 
     titleInput.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        doSubmit();
+        void doSubmit();
       }
     });
   }
@@ -349,7 +351,7 @@ export class TaskCreateModal extends Modal {
       }
 
       this.close();
-    } catch (err) {
+    } catch {
       new Notice(t('tasks.saveMarkdownError'));
     }
   }

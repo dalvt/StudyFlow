@@ -1,4 +1,5 @@
 import { ItemView, normalizePath, Platform, setIcon, setTooltip, ViewStateResult, WorkspaceLeaf } from 'obsidian';
+import type { Events } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
 import { TodayTab } from './today-tab';
@@ -139,10 +140,12 @@ export class StudyFlowView extends ItemView {
     );
 
     this.registerEvent(
-      (this.app.workspace as any).on('study-flow:focus-session-recorded', async () => {
-        if (this.activeTab === 'analytics') {
-          await this.analyticsTab.refresh();
-        }
+      (this.app.workspace as Events).on('study-flow:focus-session-recorded', () => {
+        void (async () => {
+          if (this.activeTab === 'analytics') {
+            await this.analyticsTab.refresh();
+          }
+        })();
       })
     );
   }
@@ -204,8 +207,10 @@ export class StudyFlowView extends ItemView {
       const expIcon = expandBtn.createSpan();
       setIcon(expIcon, 'maximize-2');
       expandBtn.createSpan({ text: t('view.fullTab') });
-      expandBtn.addEventListener('click', async () => {
-        await this.plugin.activateView(true);
+      expandBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.activateView(true);
+        })();
       });
     } else {
       const dockBtn = headerActions.createEl('button', {
@@ -213,8 +218,10 @@ export class StudyFlowView extends ItemView {
         attr: { 'aria-label': t('view.moveToSidebar') },
       });
       setIcon(dockBtn, 'panel-right');
-      dockBtn.addEventListener('click', async () => {
-        await this.plugin.activateView(false);
+      dockBtn.addEventListener('click', () => {
+        void (async () => {
+          await this.plugin.activateView(false);
+        })();
       });
     }
 
@@ -223,11 +230,13 @@ export class StudyFlowView extends ItemView {
       attr: { 'aria-label': t('view.reloadView') },
     });
     setIcon(refreshBtn, 'rotate-cw');
-    refreshBtn.addEventListener('click', async () => {
-      const currentContainer = this.tabContainers.get(this.activeTab);
-      if (currentContainer) {
-        await this.tabComponents[this.activeTab].render(currentContainer);
-      }
+    refreshBtn.addEventListener('click', () => {
+      void (async () => {
+        const currentContainer = this.tabContainers.get(this.activeTab);
+        if (currentContainer) {
+          await this.tabComponents[this.activeTab].render(currentContainer);
+        }
+      })();
     });
 
     // Navigation Tab Bar (role="tablist")
@@ -266,39 +275,43 @@ export class StudyFlowView extends ItemView {
       setIcon(iconSpan, tab.icon);
       btn.createSpan({ text: tab.label, cls: 'study-flow-nav-pill-label' });
 
-      btn.addEventListener('click', async () => {
-        await this.switchTab(tab.id);
+      btn.addEventListener('click', () => {
+        void (async () => {
+          await this.switchTab(tab.id);
+        })();
       });
 
       this.navButtons.set(tab.id, btn);
     });
 
     // Arrow keys & Home/End navigation on tablist
-    navBar.addEventListener('keydown', async (e: KeyboardEvent) => {
-      const tabIds = tabsConfig.map((t) => t.id);
-      const currentIndex = tabIds.indexOf(this.activeTab);
-      let targetIndex = -1;
+    navBar.addEventListener('keydown', (e: KeyboardEvent) => {
+      void (async () => {
+        const tabIds = tabsConfig.map((t) => t.id);
+        const currentIndex = tabIds.indexOf(this.activeTab);
+        let targetIndex = -1;
 
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        targetIndex = (currentIndex + 1) % tabIds.length;
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        targetIndex = (currentIndex - 1 + tabIds.length) % tabIds.length;
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        targetIndex = 0;
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        targetIndex = tabIds.length - 1;
-      }
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          targetIndex = (currentIndex + 1) % tabIds.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          targetIndex = (currentIndex - 1 + tabIds.length) % tabIds.length;
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          targetIndex = 0;
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          targetIndex = tabIds.length - 1;
+        }
 
-      if (targetIndex !== -1) {
-        const nextTab = tabIds[targetIndex];
-        await this.switchTab(nextTab);
-        const targetBtn = this.navButtons.get(nextTab);
-        targetBtn?.focus();
-      }
+        if (targetIndex !== -1) {
+          const nextTab = tabIds[targetIndex];
+          await this.switchTab(nextTab);
+          const targetBtn = this.navButtons.get(nextTab);
+          targetBtn?.focus();
+        }
+      })();
     });
 
     // Persistent Content Container Body

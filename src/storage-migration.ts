@@ -10,11 +10,9 @@ import {
   needsMigration,
   prepareMigrationData,
   parseSessionsFromJsonl,
-  formatSessionsToJsonl,
 } from './migration-utils.ts';
 import {
   parsePomodoroLogLine,
-  formatPomodoroLogLine,
 } from './conventions.ts';
 
 export * from './migration-utils.ts';
@@ -76,13 +74,15 @@ export async function updateFocusSessionInFile(
       const trimmed = lines[i].trim();
       if (!trimmed) continue;
       try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && parsed.id === session.id) {
+        const parsed = JSON.parse(trimmed) as { id?: string } | null;
+        if (parsed && typeof parsed === 'object' && parsed.id === session.id) {
           lines[i] = JSON.stringify(session);
           found = true;
           break;
         }
-      } catch {}
+      } catch {
+        // Ignore unparseable historical lines
+      }
     }
     if (!found) {
       lines.push(JSON.stringify(session));
@@ -100,7 +100,7 @@ export async function updateFocusSessionInFile(
  * 5. Marks schemaVersion = 2 and removes legacy keys from data.json.
  */
 export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<boolean> {
-  const rawData = (await plugin.loadData()) || {};
+  const rawData = ((await plugin.loadData()) || {}) as Record<string, unknown>;
   if (!needsMigration(rawData)) {
     return false;
   }
@@ -157,8 +157,8 @@ export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<bool
   }
 
   // 4. Update settings, mark schemaVersion and remove legacy keys from data.json
-  delete (plugin.settings as any).calendarBlocks;
-  delete (plugin.settings as any).focusHistory;
+  delete (plugin.settings as unknown as Record<string, unknown>).calendarBlocks;
+  delete (plugin.settings as unknown as Record<string, unknown>).focusHistory;
   plugin.settings.schemaVersion = SCHEMA_VERSION;
   await plugin.saveSettings();
 

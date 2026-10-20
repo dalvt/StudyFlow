@@ -1,6 +1,7 @@
 import { App, Menu, Modal, Notice, setTooltip } from 'obsidian';
+import type { Events } from 'obsidian';
 import type StudyFlowPlugin from './main.ts';
-import { playPomodoroSound, playPomodoroChime } from './audio.ts';
+import { playPomodoroSound } from './audio.ts';
 import { getDailyNotePath, getOrCreateFile, parseTaskPriority, getLocalDateString } from './utils.ts';
 import { toggleTaskCompletionInFile, incrementTaskPomodoroInFile, type TaskRecord } from './tasks.ts';
 import { toggleTimeBlockCompletion } from './calendar.ts';
@@ -117,7 +118,7 @@ export class PomodoroManager {
 
     this.plugin.registerDomEvent(this.statusBarEl, 'click', (evt: MouseEvent) => {
       evt.preventDefault();
-      this.toggleStartPause();
+      void this.toggleStartPause();
     });
 
     this.plugin.registerDomEvent(this.statusBarEl, 'contextmenu', (evt: MouseEvent) => {
@@ -138,9 +139,11 @@ export class PomodoroManager {
 
   public promptReset(): void {
     if ((this.state === 'running' || this.state === 'paused') && this.getElapsedSeconds() > 60) {
-      new PomodoroConfirmResetModal(this.plugin.app, async () => {
-        await this.reset();
-        new Notice(t('pomodoro.timerResetNotice'));
+      new PomodoroConfirmResetModal(this.plugin.app, () => {
+        void (async () => {
+          await this.reset();
+          new Notice(t('pomodoro.timerResetNotice'));
+        })();
       }).open();
     } else {
       void (async () => {
@@ -376,7 +379,7 @@ export class PomodoroManager {
     let persisted: PersistedPomodoroState | null = null;
 
     if (typeof this.plugin.app.loadLocalStorage === 'function') {
-      persisted = this.plugin.app.loadLocalStorage(key);
+      persisted = this.plugin.app.loadLocalStorage(key) as PersistedPomodoroState | null;
     }
 
     // Migration from data.json if not yet in localStorage
@@ -884,7 +887,7 @@ export class PomodoroManager {
       if (Notification.permission === 'granted') {
         new Notification(title, { body });
       } else if (Notification.permission === 'default') {
-        Notification.requestPermission().then((perm) => {
+        void Notification.requestPermission().then((perm) => {
           if (perm === 'granted') {
             new Notification(title, { body });
           }
@@ -919,7 +922,7 @@ export class PomodoroManager {
     }
 
     if (remaining <= 0) {
-      this.onCycleComplete();
+      void this.onCycleComplete();
     } else {
       this.updateDisplay();
       this.notifyListeners();
@@ -950,10 +953,10 @@ export class PomodoroManager {
           'pomodoro.breakTip3',
           'pomodoro.breakTip4',
           'pomodoro.breakTip5',
-        ];
+        ] as const;
         const tipKey = tips[this.breakTipIndex % tips.length];
         this.breakTipIndex = (this.breakTipIndex + 1) % tips.length;
-        breakTipText = ` • ${t(tipKey as any)}`;
+        breakTipText = ` • ${t(tipKey)}`;
       }
 
       // Single Notice at session end
@@ -1113,7 +1116,7 @@ export class PomodoroManager {
 
       await appendFocusSessionToFile(this.plugin.app, session);
       try {
-        (this.plugin.app.workspace as any)?.trigger?.('study-flow:focus-session-recorded', session);
+        (this.plugin.app.workspace as Events)?.trigger?.('study-flow:focus-session-recorded', session);
       } catch (triggerErr) {
         console.error('Study Flow: Error disparando evento focus-session-recorded', triggerErr);
       }

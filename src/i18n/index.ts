@@ -80,7 +80,8 @@ export function t(key: TranslationKey, params?: Record<string, string | number>)
     return raw;
   }
 
-  return raw.replace(/\{(\w+)\}/g, (match, paramKey) => {
-    return paramKey in params ? String(params[paramKey]) : match;
+  return raw.replace(/\{(\w+)\}/g, (match: string, paramKey: string): string => {
+    const val = params[paramKey];
+    return val !== undefined ? String(val) : match;
   });
 }

@@ -49,8 +49,12 @@ export function playPomodoroSound(
 
       window.setTimeout(() => {
         try {
-          ctx.close().catch(() => {});
-        } catch {}
+          ctx.close().catch(() => {
+            // Ignore audio context close error
+          });
+        } catch {
+          // Ignore audio context close error
+        }
       }, 100);
       return;
     }
@@ -81,8 +85,12 @@ export function playPomodoroSound(
 
       window.setTimeout(() => {
         try {
-          ctx.close().catch(() => {});
-        } catch {}
+          ctx.close().catch(() => {
+            // Ignore audio context close error
+          });
+        } catch {
+          // Ignore audio context close error
+        }
       }, 2000);
       return;
     }
@@ -118,8 +126,12 @@ export function playPomodoroSound(
 
     window.setTimeout(() => {
       try {
-        ctx.close().catch(() => {});
-      } catch {}
+        ctx.close().catch(() => {
+          // Ignore audio context close error
+        });
+      } catch {
+        // Ignore audio context close error
+      }
     }, 3200);
   } catch (err) {
     console.warn('StudyFlow: Error synthesizing audio sound:', err);

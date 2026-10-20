@@ -68,9 +68,11 @@ export class HabitSelectModal extends Modal {
           });
         }
 
-        itemBtn.addEventListener('click', async () => {
-          this.close();
-          await this.onSelect(habit);
+        itemBtn.addEventListener('click', () => {
+          void (async () => {
+            this.close();
+            await this.onSelect(habit);
+          })();
         });
       });
     }
@@ -82,9 +84,11 @@ export class HabitSelectModal extends Modal {
     const noIcon = noHabitBtn.createSpan({ cls: 'study-flow-subject-color-dot is-none' });
     setIcon(noIcon, 'minus');
     noHabitBtn.createSpan({ text: t('pomodoro.noHabitOption'), cls: 'study-flow-subject-item-name' });
-    noHabitBtn.addEventListener('click', async () => {
-      this.close();
-      await this.onSelect(null);
+    noHabitBtn.addEventListener('click', () => {
+      void (async () => {
+        this.close();
+        await this.onSelect(null);
+      })();
     });
 
     // Footer

@@ -48,11 +48,13 @@ export class PromptModal extends Modal {
       }
     };
 
-    submitBtn.addEventListener('click', handleConfirm);
+    submitBtn.addEventListener('click', () => {
+      void handleConfirm();
+    });
     input.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        handleConfirm();
+        void handleConfirm();
       }
     });
   }
