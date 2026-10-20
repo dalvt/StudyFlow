@@ -98,14 +98,18 @@ body,
   box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
 
-/* Utility classes */
-.is-hidden,
+/* Scoped utility classes */
+.study-flow-container .is-hidden,
+.study-flow-cloud-modal .is-hidden,
+.modal.study-flow-modal .is-hidden,
 .study-flow-tab-content.is-hidden,
-.study-flow-today-tab.is-hidden {
+.study-flow-today-tab.is-hidden,
+.study-flow-setting-error.is-hidden {
   display: none;
 }
 
-.sr-only {
+.study-flow-container .sr-only,
+.modal.study-flow-modal .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;

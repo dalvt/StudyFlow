@@ -58,28 +58,35 @@ export function matchesSubjectTag(subjectTag: string, tags?: string[], text?: st
 }
 
 /**
- * Computes the Monday-to-Sunday date range for a given local reference date.
+ * Computes the local week date range for a given local reference date based on weekStartDay.
  */
-export function getLocalWeekRange(refDate: Date = new Date()): {
+export function getLocalWeekRange(
+  refDate: Date = new Date(),
+  weekStartDay: 'sunday' | 'monday' = 'monday'
+): {
   startMonday: Date;
   endSunday: Date;
   startDateStr: string;
   endDateStr: string;
 } {
-  const dayOfWeek = (refDate.getDay() + 6) % 7; // 0 for Monday, 6 for Sunday
-  const monday = new Date(
+  const dayOffset =
+    weekStartDay === 'sunday'
+      ? refDate.getDay() // 0 for Sunday, 6 for Saturday
+      : (refDate.getDay() + 6) % 7; // 0 for Monday, 6 for Sunday
+
+  const startDate = new Date(
     refDate.getFullYear(),
     refDate.getMonth(),
-    refDate.getDate() - dayOfWeek,
+    refDate.getDate() - dayOffset,
     0,
     0,
     0,
     0
   );
-  const sunday = new Date(
+  const endDate = new Date(
     refDate.getFullYear(),
     refDate.getMonth(),
-    refDate.getDate() - dayOfWeek + 6,
+    refDate.getDate() - dayOffset + 6,
     23,
     59,
     59,
@@ -87,10 +94,10 @@ export function getLocalWeekRange(refDate: Date = new Date()): {
   );
 
   return {
-    startMonday: monday,
-    endSunday: sunday,
-    startDateStr: getLocalDateString(monday),
-    endDateStr: getLocalDateString(sunday),
+    startMonday: startDate,
+    endSunday: endDate,
+    startDateStr: getLocalDateString(startDate),
+    endDateStr: getLocalDateString(endDate),
   };
 }
 
@@ -107,6 +114,7 @@ export function calculateSubjectWeeklyFocusMinutes(
   let sessionCount = 0;
 
   for (const session of sessions) {
+    if (session.interrupted) continue;
     if (session.date >= startDateStr && session.date <= endDateStr) {
       if (matchesSubjectTag(subject.tag, session.tags, session.taskText)) {
         actualMinutes += session.durationMinutes || 0;
@@ -162,12 +170,13 @@ export function calculateSubjectTaskPomodoros(
 export function calculateSubjectGoalStreak(
   sessions: FocusSessionRecord[],
   subject: Subject,
-  refDate: Date = new Date()
+  refDate: Date = new Date(),
+  weekStartDay: 'sunday' | 'monday' = 'monday'
 ): number {
   const goalMinutes = Math.round((subject.weeklyGoalHours || 0) * 60);
   if (goalMinutes <= 0) return 0;
 
-  const currentRange = getLocalWeekRange(refDate);
+  const currentRange = getLocalWeekRange(refDate, weekStartDay);
   const currentWeek = calculateSubjectWeeklyFocusMinutes(
     sessions,
     subject,
@@ -188,7 +197,7 @@ export function calculateSubjectGoalStreak(
       0,
       0
     );
-    const priorRange = getLocalWeekRange(priorRef);
+    const priorRange = getLocalWeekRange(priorRef, weekStartDay);
     const priorWeek = calculateSubjectWeeklyFocusMinutes(
       sessions,
       subject,
@@ -213,9 +222,10 @@ export function computeSubjectsAnalyticsSummary(
   sessions: FocusSessionRecord[],
   tasks: TaskRecord[],
   subjects: Subject[],
-  refDate: Date = new Date()
+  refDate: Date = new Date(),
+  weekStartDay: 'sunday' | 'monday' = 'monday'
 ): SubjectsAnalyticsSummary {
-  const weekRange = getLocalWeekRange(refDate);
+  const weekRange = getLocalWeekRange(refDate, weekStartDay);
 
   const subjectProgressList: SubjectWeeklyProgress[] = subjects.map((subject) => {
     const weekly = calculateSubjectWeeklyFocusMinutes(
@@ -227,7 +237,7 @@ export function computeSubjectsAnalyticsSummary(
     const taskPomos = calculateSubjectTaskPomodoros(tasks, subject);
     const goalMinutes = Math.round((subject.weeklyGoalHours || 0) * 60);
     const percentage = goalMinutes > 0 ? Math.round((weekly.actualMinutes / goalMinutes) * 100) : 0;
-    const goalStreakWeeks = calculateSubjectGoalStreak(sessions, subject, refDate);
+    const goalStreakWeeks = calculateSubjectGoalStreak(sessions, subject, refDate, weekStartDay);
 
     return {
       subject,

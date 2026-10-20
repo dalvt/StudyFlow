@@ -341,25 +341,29 @@ export function computeHabitHeatmap(habits: HabitItem[], numDays: number = 35): 
 }
 
 /**
- * Computes 52 weeks of habit consistency aligned to Monday-Sunday columns, exactly like GitHub.
+ * Computes 52 weeks of habit consistency aligned to Monday-Sunday or Sunday-Saturday columns, exactly like GitHub.
  */
 export function computeHabitHeatmapYear(
   habits: HabitItem[],
   referenceDate: Date = new Date(),
-  numWeeks: number = 52
+  numWeeks: number = 52,
+  weekStartDay: 'sunday' | 'monday' = 'monday'
 ): HeatmapYearData {
   const todayStr = getLocalDateString(referenceDate);
   const totalHabits = habits.length;
 
-  // Day of week where Monday is 0 and Sunday is 6
-  const refDayOfWeek = (referenceDate.getDay() + 6) % 7;
+  // Day of week where start day is 0 and end day is 6
+  const refDayOfWeek =
+    weekStartDay === 'sunday'
+      ? referenceDate.getDay() // 0 (Sun) to 6 (Sat)
+      : (referenceDate.getDay() + 6) % 7; // 0 (Mon) to 6 (Sun)
 
-  // End date is Sunday of current week
+  // End date is end of current week (Saturday if Sunday-first, Sunday if Monday-first)
   const endDate = new Date(referenceDate);
   endDate.setDate(endDate.getDate() + (6 - refDayOfWeek));
   endDate.setHours(23, 59, 59, 999);
 
-  // Start date is Monday 51 weeks before
+  // Start date is start day of week (numWeeks - 1) weeks before
   const startDate = new Date(endDate);
   startDate.setDate(startDate.getDate() - (numWeeks * 7 - 1));
   startDate.setHours(0, 0, 0, 0);
@@ -441,9 +445,13 @@ export function computeHabitHeatmapYear(
 /**
  * Renders a full-year GitHub-style habit activity heatmap in the target container.
  */
-export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]): HTMLElement {
+export function renderHabitHeatmap(
+  container: HTMLElement,
+  habits: HabitItem[],
+  weekStartDay: 'sunday' | 'monday' = 'monday'
+): HTMLElement {
   const card = container.createDiv({ cls: 'study-flow-heatmap-card' });
-  const yearData = computeHabitHeatmapYear(habits, new Date(), 52);
+  const yearData = computeHabitHeatmapYear(habits, new Date(), 52, weekStartDay);
 
   // 1. Header
   const header = card.createDiv({ cls: 'study-flow-heatmap-header' });
@@ -479,13 +487,23 @@ export function renderHabitHeatmap(container: HTMLElement, habits: HabitItem[]):
 
   // Weekdays on left
   const weekdaysCol = bodyRow.createDiv({ cls: 'study-flow-heatmap-weekdays-col' });
-  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayMon') });
-  weekdaysCol.createSpan();
-  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayWed') });
-  weekdaysCol.createSpan();
-  weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayFri') });
-  weekdaysCol.createSpan();
-  weekdaysCol.createSpan();
+  if (weekStartDay === 'sunday') {
+    weekdaysCol.createSpan(); // Sun
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayMon') }); // Mon
+    weekdaysCol.createSpan(); // Tue
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayWed') }); // Wed
+    weekdaysCol.createSpan(); // Thu
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayFri') }); // Fri
+    weekdaysCol.createSpan(); // Sat
+  } else {
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayMon') });
+    weekdaysCol.createSpan();
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayWed') });
+    weekdaysCol.createSpan();
+    weekdaysCol.createSpan({ text: t('habits.heatmapWeekdayFri') });
+    weekdaysCol.createSpan();
+    weekdaysCol.createSpan();
+  }
 
   // 52 Week columns
   const weeksTrack = bodyRow.createDiv({ cls: 'study-flow-heatmap-weeks-track' });

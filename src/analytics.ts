@@ -122,6 +122,7 @@ export function computeWeeklyFocusTrend(
   // Group minutes and counts by YYYY-MM-DD
   const minutesByDate: Record<string, { minutes: number; count: number }> = {};
   for (const s of sessions) {
+    if (s.interrupted) continue;
     if (!minutesByDate[s.date]) {
       minutesByDate[s.date] = { minutes: 0, count: 0 };
     }
@@ -165,6 +166,7 @@ export function computeTagDistribution(
   let overallMinutes = 0;
 
   for (const s of sessions) {
+    if (s.interrupted) continue;
     const duration = s.durationMinutes || 0;
     overallMinutes += duration;
     const tags = s.tags && s.tags.length > 0 ? s.tags : ['#general'];
@@ -273,6 +275,7 @@ export function computeFocusAllocation(
   let validSessionsCount = 0;
 
   for (const session of sessions) {
+    if (session.interrupted) continue;
     const mins = session.durationMinutes || 0;
     if (mins <= 0) continue;
     grandTotalMinutes += mins;

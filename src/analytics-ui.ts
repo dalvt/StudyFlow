@@ -272,7 +272,7 @@ export async function renderAnalyticsDashboard(
 
     let targetSessions = sessions;
     if (activeRange === 'week') {
-      const weekRange = getLocalWeekRange(new Date());
+      const weekRange = getLocalWeekRange(new Date(), plugin.settings.weekStartDay || 'monday');
       targetSessions = sessions.filter(
         (s) => s.date >= weekRange.startDateStr && s.date <= weekRange.endDateStr
       );

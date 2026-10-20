@@ -48,7 +48,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Verification: `npm run check-types && node --test tests/focus-flow.test.mjs tests/calendar-blocks.test.mjs tests/habits-streak.test.mjs`
   - Evidence: Verified clean type check (`tsc --noEmit`), 47/47 target tests passed, and full test suite passed (238/238 tests passing).
 
-- [ ] **Task 4: Metrics accuracy, week start day, settings reactivity, and scoped CSS**
+- [x] **Task 4: Metrics accuracy, week start day, settings reactivity, and scoped CSS**
   - Route: Delegated / Writer trigger (`src/analytics.ts`, `src/subject-analytics.ts`, `src/habits.ts`, `src/settings.ts`, `src/ui/calendar-grid.ts`, `styles.css`).
   - Filter `!s.interrupted` in all focus time and completed session analytics.
   - Honor `settings.weekStartDay` in weekly subject and habit analytics.
@@ -57,7 +57,7 @@ The plugin is preparing for submission to the official Obsidian Community Plugin
   - Clean up drag listeners and preview DOM in `CalendarGridComponent.destroy()`.
   - Acceptance Criteria: Interrupted sessions do not count towards completed focus metrics; Sunday/Monday week starts are respected; settings reflect immediately; styles do not leak.
   - Verification: `npm run check-types && npm test`
-  - Evidence: Pending
+  - Evidence: Verified clean type check (`tsc --noEmit`), 11/11 subject analytics tests passed, and full test suite passed (242/242 tests passing with 0 failures).
 
 - [ ] **Task 5: Packaging, CI release workflow, gitignore, and documentation**
   - Route: Direct inline (`.gitignore`, `package.json`, `package-lock.json`, `.github/workflows/release.yml`, `README.md`).

@@ -351,7 +351,12 @@ export class CalendarTab implements TabComponent {
     }
   }
 
+  get grid(): CalendarGridComponent {
+    return this.gridComponent;
+  }
+
   destroy(): void {
+    this.grid?.destroy();
     this.container = null;
   }
 }

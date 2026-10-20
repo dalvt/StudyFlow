@@ -258,7 +258,7 @@ export class HabitsTab implements TabComponent {
     }
 
     // Heatmap consistency visualization
-    renderHabitHeatmap(container, this.habits);
+    renderHabitHeatmap(container, this.habits, this.plugin.settings.weekStartDay || 'monday');
     } finally {
       this.isRendering = false;
       if (this.pendingRender) {

@@ -89,6 +89,20 @@ export class StudyFlowView extends ItemView {
     }
   }
 
+  public async render(): Promise<void> {
+    // Invalidate non-active tabs so they re-render when switched to
+    for (const id of this.tabContainers.keys()) {
+      if (id !== this.activeTab) {
+        this.tabRendered.set(id, false);
+      }
+    }
+    const currentContainer = this.tabContainers.get(this.activeTab);
+    if (currentContainer) {
+      await this.tabComponents[this.activeTab].render(currentContainer);
+      this.tabRendered.set(this.activeTab, true);
+    }
+  }
+
   async onOpen(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();

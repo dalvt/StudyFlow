@@ -34,6 +34,7 @@ export class CalendarGridComponent {
   private callbacks: CalendarGridCallbacks;
 
   private hourHeight = 52; // pixels per hour (15m = 13px)
+  private activeDragCleanup: (() => void) | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin, callbacks: CalendarGridCallbacks) {
     this.app = app;
@@ -267,8 +268,14 @@ export class CalendarGridComponent {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerCancel);
-        preview.remove();
+        if (preview.parentElement) {
+          preview.remove();
+        }
+        if (this.activeDragCleanup === cleanupDrag) {
+          this.activeDragCleanup = null;
+        }
       };
+      this.activeDragCleanup = cleanupDrag;
 
       const onPointerCancel = () => {
         cleanupDrag();
@@ -591,5 +598,14 @@ export class CalendarGridComponent {
 
     blockEl.addEventListener('pointerup', handlePointerEnd);
     blockEl.addEventListener('pointercancel', handlePointerEnd);
+  }
+
+  public destroy(): void {
+    if (this.activeDragCleanup) {
+      this.activeDragCleanup();
+      this.activeDragCleanup = null;
+    }
+    const danglingPreviews = document.querySelectorAll('.study-flow-grid-block.is-creation-preview');
+    danglingPreviews.forEach((el) => el.remove());
   }
 }

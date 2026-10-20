@@ -8,6 +8,7 @@ export * from './settings-utils';
 import { t, setLanguage, getEffectiveLanguage } from './i18n/index.ts';
 import { getDefaultConventions } from './conventions.ts';
 import { SubjectEditModal } from './subject-modal.ts';
+import { VIEW_TYPE_STUDY_FLOW, StudyFlowView } from './ui/view.ts';
 
 export class StudyFlowSettingTab extends PluginSettingTab {
   plugin: StudyFlowPlugin;
@@ -15,6 +16,24 @@ export class StudyFlowSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: StudyFlowPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  public async onSave(): Promise<void> {
+    await this.plugin.saveSettings();
+    this.refreshViews();
+  }
+
+  public refreshViews(): void {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW).forEach((leaf) => {
+      if (leaf.view instanceof StudyFlowView) {
+        leaf.view.render();
+      }
+    });
+  }
+
+  hide(): void {
+    super.hide();
+    this.refreshViews();
   }
 
   display(): void {
@@ -33,7 +52,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       180,
       async (val) => {
         this.plugin.settings.pomodoroWorkDuration = val;
-        await this.plugin.saveSettings();
+        await this.onSave();
         this.plugin.pomodoro.onSettingsUpdated();
       }
     );
@@ -47,7 +66,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       60,
       async (val) => {
         this.plugin.settings.pomodoroBreakDuration = val;
-        await this.plugin.saveSettings();
+        await this.onSave();
         this.plugin.pomodoro.onSettingsUpdated();
       }
     );
@@ -61,7 +80,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       120,
       async (val) => {
         this.plugin.settings.pomodoroLongBreakDuration = val;
-        await this.plugin.saveSettings();
+        await this.onSave();
         this.plugin.pomodoro.onSettingsUpdated();
       }
     );
@@ -75,7 +94,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       20,
       async (val) => {
         this.plugin.settings.pomodoroLongBreakInterval = val;
-        await this.plugin.saveSettings();
+        await this.onSave();
         this.plugin.pomodoro.onSettingsUpdated();
       }
     );
@@ -88,7 +107,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.autoStartNextPhase)
           .onChange(async (value) => {
             this.plugin.settings.autoStartNextPhase = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -100,7 +119,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableChimeSound)
           .onChange(async (value) => {
             this.plugin.settings.enableChimeSound = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -116,7 +135,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.pomodoroSound || 'bell')
           .onChange(async (value) => {
             this.plugin.settings.pomodoroSound = value as PomodoroSoundType;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -130,7 +149,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.chimeVolume = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       )
       .addButton((btn) =>
@@ -150,7 +169,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableSessionClosingReview)
           .onChange(async (value) => {
             this.plugin.settings.enableSessionClosingReview = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -162,7 +181,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.enableBreakTips)
           .onChange(async (value) => {
             this.plugin.settings.enableBreakTips = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -174,7 +193,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.logPomodoroToDailyNote)
           .onChange(async (value) => {
             this.plugin.settings.logPomodoroToDailyNote = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -189,7 +208,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
             if (value && typeof Notification !== 'undefined' && Notification.permission === 'default') {
               Notification.requestPermission();
             }
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -205,7 +224,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.tasksSectionHeader)
           .onChange(async (value) => {
             this.plugin.settings.tasksSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).tasksSectionHeader;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -218,7 +237,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.iceboxSectionHeader)
           .onChange(async (value) => {
             this.plugin.settings.iceboxSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).iceboxSectionHeader;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -231,7 +250,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.timeBlocksSectionHeader)
           .onChange(async (value) => {
             this.plugin.settings.timeBlocksSectionHeader = value.trim() || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -248,7 +267,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
               .map((s) => s.trim())
               .filter((s) => s.length > 0);
             this.plugin.settings.taskIncludedFolders = folders;
-            await this.plugin.saveSettings();
+            await this.onSave();
             if (this.plugin.taskIndex) {
               await this.plugin.taskIndex.reindexAll();
             }
@@ -268,7 +287,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
               .map((s) => s.trim())
               .filter((s) => s.length > 0);
             this.plugin.settings.taskExcludedFolders = folders;
-            await this.plugin.saveSettings();
+            await this.onSave();
             if (this.plugin.taskIndex) {
               await this.plugin.taskIndex.reindexAll();
             }
@@ -287,7 +306,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.dailyNotesFolder)
           .onChange(async (value) => {
             this.plugin.settings.dailyNotesFolder = value.trim() || 'StudyFlow/Daily';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -300,7 +319,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.dailyNoteDateFormat)
           .onChange(async (value) => {
             this.plugin.settings.dailyNoteDateFormat = value.trim() || 'YYYY-MM-DD';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -313,7 +332,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.inboxFilePath)
           .onChange(async (value) => {
             this.plugin.settings.inboxFilePath = value.trim() || 'StudyFlow/Inbox.md';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -329,7 +348,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.habitsFilePath)
           .onChange(async (value) => {
             this.plugin.settings.habitsFilePath = value.trim() || 'StudyFlow/Habits.md';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -346,7 +365,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.weekStartDay || 'monday')
           .onChange(async (value) => {
             this.plugin.settings.weekStartDay = value as 'monday' | 'sunday';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -361,7 +380,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(String(this.plugin.settings.calendarStartHour ?? 7))
           .onChange(async (value) => {
             this.plugin.settings.calendarStartHour = parseInt(value, 10);
-            await this.plugin.saveSettings();
+            await this.onSave();
           });
       });
 
@@ -376,7 +395,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(String(this.plugin.settings.calendarEndHour ?? 22))
           .onChange(async (value) => {
             this.plugin.settings.calendarEndHour = parseInt(value, 10);
-            await this.plugin.saveSettings();
+            await this.onSave();
           });
       });
 
@@ -389,7 +408,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.scheduleFilePath || 'StudyFlow/Schedule.md')
           .onChange(async (value) => {
             this.plugin.settings.scheduleFilePath = value.trim() || 'StudyFlow/Schedule.md';
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -401,7 +420,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.autoZenMode)
           .onChange(async (value) => {
             this.plugin.settings.autoZenMode = value;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -419,7 +438,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
                 this.plugin.settings.subjects = [];
               }
               this.plugin.settings.subjects.push(saved);
-              await this.plugin.saveSettings();
+              await this.onSave();
               new Notice(t('subjects.savedNotice', { name: saved.name }));
               this.display();
             }).open();
@@ -451,7 +470,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
             .onClick(() => {
               new SubjectEditModal(this.app, this.plugin, sub, async (updated) => {
                 this.plugin.settings.subjects[index] = updated;
-                await this.plugin.saveSettings();
+                await this.onSave();
                 new Notice(t('subjects.savedNotice', { name: updated.name }));
                 this.display();
               }).open();
@@ -464,7 +483,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
             .setTooltip(t('common.delete'))
             .onClick(async () => {
               this.plugin.settings.subjects.splice(index, 1);
-              await this.plugin.saveSettings();
+              await this.onSave();
               new Notice(t('subjects.deletedNotice'));
               this.display();
             });
@@ -487,7 +506,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.language = value as 'es' | 'en' | 'auto';
             setLanguage(this.plugin.settings.language);
-            await this.plugin.saveSettings();
+            await this.onSave();
             this.display();
           })
       );
@@ -504,7 +523,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.spacedRepetitionTag)
           .onChange(async (value) => {
             this.plugin.settings.spacedRepetitionTag = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionTag;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -517,7 +536,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.spacedRepetitionNextKey)
           .onChange(async (value) => {
             this.plugin.settings.spacedRepetitionNextKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionNextKey;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -530,7 +549,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.spacedRepetitionIntervalKey)
           .onChange(async (value) => {
             this.plugin.settings.spacedRepetitionIntervalKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionIntervalKey;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -543,7 +562,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.spacedRepetitionReviewedKey)
           .onChange(async (value) => {
             this.plugin.settings.spacedRepetitionReviewedKey = value.trim() || getDefaultConventions(getEffectiveLanguage()).spacedRepetitionReviewedKey;
-            await this.plugin.saveSettings();
+            await this.onSave();
           })
       );
 
@@ -580,7 +599,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(todaySec.showNowNext).onChange(async (val) => {
           todaySec.showNowNext = val;
-          await this.plugin.saveSettings();
+          await this.onSave();
         })
       );
 
@@ -590,7 +609,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(todaySec.showTodayTasks).onChange(async (val) => {
           todaySec.showTodayTasks = val;
-          await this.plugin.saveSettings();
+          await this.onSave();
         })
       );
 
@@ -600,7 +619,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(todaySec.showHabits).onChange(async (val) => {
           todaySec.showHabits = val;
-          await this.plugin.saveSettings();
+          await this.onSave();
         })
       );
 
@@ -610,7 +629,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(todaySec.showSpacedRepetition).onChange(async (val) => {
           todaySec.showSpacedRepetition = val;
-          await this.plugin.saveSettings();
+          await this.onSave();
         })
       );
 
@@ -626,7 +645,7 @@ export class StudyFlowSettingTab extends PluginSettingTab {
             const effectiveLang = this.plugin.settings.language === 'en' ? 'en' : (this.plugin.settings.language === 'es' ? 'es' : getEffectiveLanguage());
             this.plugin.settings = cloneDefaultSettings(effectiveLang);
             setLanguage(this.plugin.settings.language);
-            await this.plugin.saveSettings();
+            await this.onSave();
             this.plugin.pomodoro.onSettingsUpdated();
             new Notice(t('settings.resetDefaultsNotice'));
             this.display();

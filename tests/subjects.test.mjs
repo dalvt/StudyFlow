@@ -9,6 +9,13 @@ import {
   calculateSubjectGoalStreak,
   computeSubjectsAnalyticsSummary,
 } from '../src/subject-analytics.ts';
+import {
+  computeWeeklyFocusTrend,
+  computeFocusAllocation,
+} from '../src/analytics.ts';
+import {
+  computeHabitHeatmapYear,
+} from '../src/habits.ts';
 
 test('normalizeTag normalizes tags with lowercasing and leading hash', () => {
   assert.equal(normalizeTag(''), '');
@@ -221,4 +228,109 @@ test('computeSubjectsAnalyticsSummary calculates summary for all subjects', () =
   assert.equal(lit.goalMinutes, 60);
   assert.equal(lit.actualMinutes, 60);
   assert.equal(lit.percentage, 100);
+});
+
+test('calculateSubjectWeeklyFocusMinutes excludes interrupted sessions', () => {
+  const subject = {
+    id: 'sub-1',
+    name: 'Álgebra',
+    tag: '#algebra',
+    color: '#4f46e5',
+    weeklyGoalHours: 4,
+  };
+
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-12', durationMinutes: 50, tags: ['#algebra'], interrupted: false },
+    { id: '2', timestamp: 2, date: '2026-10-14', durationMinutes: 25, tags: ['#algebra'], interrupted: true }, // Interrupted
+    { id: '3', timestamp: 3, date: '2026-10-15', durationMinutes: 30, tags: ['#algebra'] }, // Completed (default undefined is not interrupted)
+    { id: '4', timestamp: 4, date: '2026-10-16', durationMinutes: 40, tags: ['#algebra'], interrupted: true }, // Interrupted
+  ];
+
+  const result = calculateSubjectWeeklyFocusMinutes(sessions, subject, '2026-10-12', '2026-10-18');
+  assert.equal(result.actualMinutes, 80); // 50 + 30
+  assert.equal(result.sessionCount, 2);
+});
+
+test('computeWeeklyFocusTrend and computeFocusAllocation exclude interrupted sessions', () => {
+  const refDate = new Date(2026, 9, 14, 12, 0); // 2026-10-14
+  const sessions = [
+    { id: '1', timestamp: 1, date: '2026-10-14', durationMinutes: 25, tags: ['#focus'], interrupted: false },
+    { id: '2', timestamp: 2, date: '2026-10-14', durationMinutes: 10, tags: ['#focus'], interrupted: true }, // Should be excluded
+    { id: '3', timestamp: 3, date: '2026-10-13', durationMinutes: 50, tags: ['#study'], interrupted: false },
+    { id: '4', timestamp: 4, date: '2026-10-13', durationMinutes: 15, tags: ['#study'], interrupted: true }, // Should be excluded
+  ];
+
+  const trend = computeWeeklyFocusTrend(sessions, refDate, 7);
+  const todayEntry = trend.find((d) => d.date === '2026-10-14');
+  assert.ok(todayEntry);
+  assert.equal(todayEntry.totalMinutes, 25);
+  assert.equal(todayEntry.sessionCount, 1);
+
+  const prevEntry = trend.find((d) => d.date === '2026-10-13');
+  assert.ok(prevEntry);
+  assert.equal(prevEntry.totalMinutes, 50);
+  assert.equal(prevEntry.sessionCount, 1);
+
+  const allocation = computeFocusAllocation(sessions);
+  assert.equal(allocation.totalMinutes, 75); // 25 + 50
+  assert.equal(allocation.totalSessions, 2);
+});
+
+test('getLocalWeekRange handles weekStartDay: sunday correctly', () => {
+  // Wednesday, October 14, 2026
+  const wed = new Date(2026, 9, 14, 15, 30);
+  const wedRange = getLocalWeekRange(wed, 'sunday');
+  assert.equal(wedRange.startDateStr, '2026-10-11'); // Sunday
+  assert.equal(wedRange.endDateStr, '2026-10-17'); // Saturday
+  assert.equal(wedRange.startMonday.getDay(), 0); // Sunday
+  assert.equal(wedRange.endSunday.getDay(), 6); // Saturday
+
+  // Sunday, October 11, 2026 (first day of week)
+  const sun = new Date(2026, 9, 11, 8, 0);
+  const sunRange = getLocalWeekRange(sun, 'sunday');
+  assert.equal(sunRange.startDateStr, '2026-10-11');
+  assert.equal(sunRange.endDateStr, '2026-10-17');
+
+  // Saturday, October 17, 2026 (last day of week)
+  const sat = new Date(2026, 9, 17, 23, 50);
+  const satRange = getLocalWeekRange(sat, 'sunday');
+  assert.equal(satRange.startDateStr, '2026-10-11');
+  assert.equal(satRange.endDateStr, '2026-10-17');
+
+  // Sunday, October 18, 2026 (new week starts)
+  const nextSun = new Date(2026, 9, 18, 0, 5);
+  const nextSunRange = getLocalWeekRange(nextSun, 'sunday');
+  assert.equal(nextSunRange.startDateStr, '2026-10-18');
+  assert.equal(nextSunRange.endDateStr, '2026-10-24');
+});
+
+test('computeHabitHeatmapYear handles weekStartDay: sunday correctly', () => {
+  const habits = [
+    {
+      id: 'h1',
+      name: 'Leer',
+      frequency: 'daily',
+      history: ['2026-10-11', '2026-10-14'],
+      streak: 2,
+    },
+  ];
+
+  // Wednesday, October 14, 2026
+  const refDate = new Date(2026, 9, 14, 12, 0);
+  const data = computeHabitHeatmapYear(habits, refDate, 1, 'sunday');
+
+  assert.equal(data.weeks.length, 1);
+  const week = data.weeks[0];
+  assert.equal(week.days.length, 7);
+
+  // Sunday is day 0, Saturday is day 6
+  assert.equal(week.days[0].date, '2026-10-11');
+  assert.equal(week.days[0].dayOfWeek, 0);
+  assert.equal(week.days[0].completedCount, 1);
+
+  assert.equal(week.days[3].date, '2026-10-14');
+  assert.equal(week.days[3].completedCount, 1);
+
+  assert.equal(week.days[6].date, '2026-10-17');
+  assert.equal(week.days[6].dayOfWeek, 6);
 });
