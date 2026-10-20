@@ -2,6 +2,8 @@
 
 An all-in-one study and academic productivity assistant for [Obsidian](https://obsidian.md). Seamlessly combines an interactive time-blocking calendar, a customizable Pomodoro focus timer, full-vault task management with an Icebox, flexible habit tracking with a 52-week consistency heatmap, spaced repetition, study performance analytics, and a distraction-free Zen mode.
 
+![Study Flow Assistant Hub](assets/study-flow-hub.png)
+
 All your data stays **100% local in plain Markdown and JSONL files** within your vault. No external accounts, no cloud sync lock-in, no telemetry.
 
 ---
