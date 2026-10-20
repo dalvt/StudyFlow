@@ -8,7 +8,7 @@
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "check-types": "tsc --noEmit",
-    "test": "node --test 'tests/*.test.mjs'",
+    "test": "node --test tests/*.test.mjs",
     "deploy": "node -e 'const dest = process.env.OBSIDIAN_VAULT_PATH; if (!dest) { console.error(\"Set OBSIDIAN_VAULT_PATH\"); process.exit(1); } const fs = require(\"fs\"); const p = dest + \"/.obsidian/plugins/study-flow-assistant\"; fs.mkdirSync(p, { recursive: true }); [\"main.js\", \"manifest.json\", \"styles.css\"].forEach(f => fs.copyFileSync(f, p + \"/\" + f)); console.log(\"Deployed to \" + p);'"
   },
   "keywords": [
