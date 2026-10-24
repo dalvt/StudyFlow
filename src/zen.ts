@@ -44,7 +44,7 @@ export class ZenModeManager {
       try {
         l(this.isZenActive);
       } catch (err) {
-        console.error('Error en listener de modo zen', err);
+        console.error('Study Flow: Error in zen mode listener', err);
       }
     });
   }

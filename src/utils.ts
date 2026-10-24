@@ -143,7 +143,7 @@ export async function migratePluginFilesToDedicatedFolder(
       settings.dailyNotesFolder = 'StudyFlow/Daily';
     }
   } catch (err) {
-    console.error('Study Flow: Error migrando archivos a la carpeta dedicada StudyFlow', err);
+    console.error('Study Flow: Error migrating files to dedicated StudyFlow folder', err);
   }
 }
 
