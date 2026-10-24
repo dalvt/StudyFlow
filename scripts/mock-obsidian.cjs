@@ -68,13 +68,28 @@ export function setTooltip() {}
 export function getLanguage() { return 'en'; }
 
 export class Plugin {}
-export class PluginSettingTab {}
+export class PluginSettingTab {
+  constructor(app, plugin) {
+    this.app = app;
+    this.plugin = plugin;
+  }
+  getSettingDefinitions() { return []; }
+  getControlValue(key) { return this.plugin?.settings?.[key]; }
+  setControlValue(key, val) { if (this.plugin?.settings) this.plugin.settings[key] = val; }
+  update() {}
+  display() {}
+  hide() {}
+}
 export class ItemView {}
 export class WorkspaceLeaf {}
 export class ViewStateResult {}
 
 export class Modal {
-  constructor(app) { this.app = app; }
+  constructor(app) {
+    this.app = app;
+    this.modalEl = { addClass: () => {}, removeClass: () => {} };
+    this.contentEl = { addClass: () => {}, removeClass: () => {}, empty: () => {} };
+  }
   open() {}
   close() {}
 }
@@ -109,7 +124,7 @@ export class Setting {
     return this;
   }
   addButton(cb) {
-    cb({ setButtonText: () => ({ onClick: () => {} }), setCta: () => {}, setWarning: () => {}, onClick: () => {} });
+    cb({ setButtonText: () => ({ onClick: () => {} }), setCta: () => {}, setWarning: () => {}, setDestructive: () => ({ setCta: () => {} }), onClick: () => {} });
     return this;
   }
   addExtraButton(cb) {
