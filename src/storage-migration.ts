@@ -31,7 +31,7 @@ export async function loadFocusSessionsFromFile(
       const content = await app.vault.read(file);
       return parseSessionsFromJsonl(content);
     } catch (err) {
-      console.error('Study Flow: Error leyendo sesiones desde Sessions.jsonl', err);
+      console.error('Study Flow: Error reading sessions from Sessions.jsonl', err);
     }
   }
 
@@ -118,7 +118,7 @@ export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<bool
       await plugin.app.vault.adapter.write(backupJsonPath, originalJson);
     }
   } catch (backupErr) {
-    console.error('Study Flow: Error creando copia de seguridad data.json.bak', backupErr);
+    console.error('Study Flow: Error creating data.json.bak backup', backupErr);
   }
 
   const { calendarBlocks, sessions } = prepareMigrationData(rawData);
@@ -133,7 +133,7 @@ export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<bool
         return syncBlocksToMarkdown(content, blocks);
       });
     } catch (cbErr) {
-      console.error(`Study Flow: Error migrando calendarBlocks para ${dateStr}`, cbErr);
+      console.error(`Study Flow: Error migrating calendarBlocks for ${dateStr}`, cbErr);
     }
   }
 
@@ -152,7 +152,7 @@ export async function runStartupMigration(plugin: StudyFlowPlugin): Promise<bool
           : content + '\n' + newLines;
       });
     } catch (sessErr) {
-      console.error('Study Flow: Error migrando sesiones a Sessions.jsonl', sessErr);
+      console.error('Study Flow: Error migrating sessions to Sessions.jsonl', sessErr);
     }
   }
 
@@ -233,7 +233,7 @@ export async function syncHistoricalSessionsFromVault(
         }
       }
     } catch (err) {
-      console.error(`Error leyendo nota diaria para sincronizar métricas: ${file.path}`, err);
+      console.error(`Study Flow: Error reading daily note to sync metrics: ${file.path}`, err);
     }
   }
 

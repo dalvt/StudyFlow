@@ -257,7 +257,7 @@ export async function loadScheduleItems(
     }
     return [];
   } catch (err) {
-    console.error(`Study Flow: Error cargando horario recurrente desde ${normalizedPath}`, err);
+    console.error(`Study Flow: Error loading recurring schedule from ${normalizedPath}`, err);
     return [];
   }
 }

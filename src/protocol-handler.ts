@@ -155,7 +155,7 @@ export async function handleStudyFlowProtocol(
     }
 
     default: {
-      console.warn('Study Flow Protocol: Acción no reconocida', params);
+      console.warn('Study Flow Protocol: Unrecognized action', params);
       new Notice(t('protocol.unknownActionNotice'));
       break;
     }

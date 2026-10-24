@@ -470,7 +470,7 @@ export class PomodoroManager {
                 restoredTask.text = res.updatedText;
               }
             } catch (e) {
-              console.error('Error incrementing pomodoro count on task during restore:', e);
+              console.error('Study Flow: Error incrementing pomodoro count on task during restore:', e);
             }
           }
           if (this.plugin.settings.enableSessionClosingReview) {
@@ -1041,7 +1041,7 @@ export class PomodoroManager {
               activeTaskRef.text = res.updatedText;
             }
           } catch (e) {
-            console.error('Error incrementing pomodoro count on task:', e);
+            console.error('Study Flow: Error incrementing pomodoro count on task:', e);
           }
         }
       }
@@ -1135,7 +1135,7 @@ export class PomodoroManager {
       });
       // Exactly ONE Notice per session finish: second Notice omitted here intentionally.
     } catch (err) {
-      console.error('Study Flow Assistant: Error registrando sesión de Pomodoro', err);
+      console.error('Study Flow: Error logging pomodoro session', err);
     }
   }
 
@@ -1171,11 +1171,11 @@ export class PomodoroManager {
       try {
         (this.plugin.app.workspace as Events)?.trigger?.('study-flow:focus-session-recorded', session);
       } catch (triggerErr) {
-        console.error('Study Flow: Error disparando evento focus-session-recorded', triggerErr);
+        console.error('Study Flow: Error triggering focus-session-recorded event', triggerErr);
       }
       return session;
     } catch (err) {
-      console.error('Study Flow Assistant: Error guardando métricas de sesión de enfoque', err);
+      console.error('Study Flow: Error saving focus session metrics', err);
       return null;
     }
   }
