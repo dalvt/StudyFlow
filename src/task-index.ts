@@ -1,6 +1,7 @@
 import { App, Notice, TFile } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
+  calculateDaysRemaining,
   compareTasksByPriority,
   computeDeadlinesFromTasks,
   type DeadlineItem,
@@ -8,6 +9,7 @@ import {
   isPathIndexed,
   type TaskRecord,
 } from './markdown-utils.ts';
+import { getLocalDateString } from './utils.ts';
 import { t } from './i18n/index.ts';
 
 export { isPathIndexed };
@@ -18,8 +20,10 @@ export class TaskIndex {
   private tasksByFile: Map<string, TaskRecord[]> = new Map();
   private allTasksCache: TaskRecord[] | null = null;
   private allDeadlinesCache: DeadlineItem[] | null = null;
+  private lastCachedDate: string = '';
   private dirtyFiles: Set<string> = new Set();
-  private debounceTimer: number | null = null;
+  private processingTimer: number | null = null;
+  private notifyTimer: number | null = null;
   private listeners: Set<() => void> = new Set();
   private initialized: boolean = false;
   private isProcessing: boolean = false;
@@ -210,23 +214,23 @@ export class TaskIndex {
   }
 
   private triggerDebouncedProcessing(): void {
-    if (this.debounceTimer !== null) {
-      window.clearTimeout(this.debounceTimer);
+    if (this.processingTimer !== null) {
+      window.clearTimeout(this.processingTimer);
     }
-    this.debounceTimer = window.setTimeout(() => {
+    this.processingTimer = window.setTimeout(() => {
       void (async () => {
-        this.debounceTimer = null;
+        this.processingTimer = null;
         await this.processDirtyFiles();
       })();
     }, 300);
   }
 
   private triggerDebouncedNotify(): void {
-    if (this.debounceTimer !== null) {
-      window.clearTimeout(this.debounceTimer);
+    if (this.notifyTimer !== null) {
+      window.clearTimeout(this.notifyTimer);
     }
-    this.debounceTimer = window.setTimeout(() => {
-      this.debounceTimer = null;
+    this.notifyTimer = window.setTimeout(() => {
+      this.notifyTimer = null;
       this.emitChange();
     }, 300);
   }
@@ -251,6 +255,10 @@ export class TaskIndex {
       }
 
       this.invalidateCaches();
+      if (this.notifyTimer !== null) {
+        window.clearTimeout(this.notifyTimer);
+        this.notifyTimer = null;
+      }
       this.emitChange();
     } finally {
       this.isProcessing = false;
@@ -261,10 +269,20 @@ export class TaskIndex {
    * Returns all tasks across all indexed files, sorted by priority and deadline.
    */
   getAllTasks(): TaskRecord[] {
+    const today = getLocalDateString(new Date());
+    if (this.lastCachedDate !== today) {
+      this.invalidateCaches();
+      this.lastCachedDate = today;
+    }
     if (this.allTasksCache === null) {
       const all: TaskRecord[] = [];
       for (const tasks of this.tasksByFile.values()) {
-        all.push(...tasks);
+        for (const t of tasks) {
+          if (t.dueDate) {
+            t.daysRemaining = calculateDaysRemaining(t.dueDate);
+          }
+          all.push(t);
+        }
       }
       all.sort(compareTasksByPriority);
       this.allTasksCache = all;
@@ -348,9 +366,13 @@ export class TaskIndex {
    * Cleans up all pending timers and listeners.
    */
   destroy(): void {
-    if (this.debounceTimer !== null) {
-      window.clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
+    if (this.processingTimer !== null) {
+      window.clearTimeout(this.processingTimer);
+      this.processingTimer = null;
+    }
+    if (this.notifyTimer !== null) {
+      window.clearTimeout(this.notifyTimer);
+      this.notifyTimer = null;
     }
     this.isProcessing = false;
     this.listeners.clear();

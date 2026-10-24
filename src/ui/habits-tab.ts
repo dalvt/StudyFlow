@@ -5,16 +5,38 @@ import {
   addHabitToFile,
   computeHabitWeeklyProgress,
   deleteHabitFromFile,
+  formatHabitLine,
+  getHabitRawLine,
   type HabitFrequency,
   HabitItem,
   loadHabitsFromFile,
   renderHabitHeatmap,
+  restoreHabitLineToFile,
   toggleHabitRestDay,
   toggleHabitStatus,
   updateHabitInFile,
 } from '../habits.ts';
 import { HabitEditModal } from '../habit-edit-modal.ts';
 import { t } from '../i18n/index.ts';
+
+function showUndoNotice(message: string, onUndo: () => Promise<void>): void {
+  const notice = new Notice('', 6000);
+  const el = notice.messageEl;
+  el.empty();
+  const wrapper = el.createDiv({ cls: 'study-flow-notice-undo-wrapper' });
+  wrapper.createSpan({ text: message, cls: 'study-flow-notice-undo-msg' });
+  const btn = wrapper.createEl('button', {
+    text: t('tasks.undoAction') || t('common.undo'),
+    cls: 'study-flow-notice-undo-btn mod-cta',
+  });
+  btn.addEventListener('click', (e: MouseEvent) => {
+    void (async () => {
+      e.stopPropagation();
+      notice.hide();
+      await onUndo();
+    })();
+  });
+}
 
 export class HabitsTab implements TabComponent {
   private app: App;
@@ -145,7 +167,10 @@ export class HabitsTab implements TabComponent {
         });
 
         const cbWrapper = hCard.createDiv({ cls: 'study-flow-cb-wrapper' });
-        const cb = cbWrapper.createEl('input', { type: 'checkbox' });
+        const cb = cbWrapper.createEl('input', {
+          type: 'checkbox',
+          attr: { 'aria-label': t('habits.checkboxAria', { name: habit.name }) },
+        });
         cb.checked = habit.completedToday;
 
         cb.addEventListener('change', () => {
@@ -187,9 +212,18 @@ export class HabitsTab implements TabComponent {
         freqBadge.addClass('is-clickable');
         freqBadge.setAttribute('title', t('habits.editHabitTooltip'));
         freqBadge.setAttribute('aria-label', t('habits.editHabitTooltip'));
+        freqBadge.setAttribute('role', 'button');
+        freqBadge.setAttribute('tabindex', '0');
         freqBadge.addEventListener('click', (e) => {
           e.stopPropagation();
           openEditModal();
+        });
+        freqBadge.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            openEditModal();
+          }
         });
 
         // Weekly progress
@@ -257,9 +291,16 @@ export class HabitsTab implements TabComponent {
         delBtn.addEventListener('click', (e) => {
           void (async () => {
             e.stopPropagation();
+            const rawLine = (await getHabitRawLine(this.app, path, habit.id)) || formatHabitLine(habit);
             this.habits = await deleteHabitFromFile(this.app, path, habit.id);
-            new Notice(t('habits.habitDeletedNotice'));
             if (this.container) await this.render(this.container);
+
+            showUndoNotice(t('habits.habitDeletedNotice'), async () => {
+              if (rawLine) {
+                this.habits = await restoreHabitLineToFile(this.app, path, rawLine);
+                if (this.container) await this.render(this.container);
+              }
+            });
           })();
         });
       });

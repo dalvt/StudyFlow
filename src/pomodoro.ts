@@ -261,6 +261,20 @@ export class PomodoroManager {
     }
   }
 
+  public async setActiveHabit(habit: { id: string; name: string } | null): Promise<void> {
+    if (!habit) {
+      await this.setActiveTask(null);
+      return;
+    }
+    const habitsPath = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
+    await this.setActiveTask({
+      id: `habit-${habit.id}`,
+      text: habit.name,
+      sourceFile: habitsPath,
+      isHabit: true,
+    });
+  }
+
   public getActiveTask(): ActivePomodoroTask | null {
     return this.activeTask;
   }
@@ -275,8 +289,8 @@ export class PomodoroManager {
     return this.activeSubject;
   }
 
-  public async completeActiveTask(): Promise<void> {
-    if (!this.activeTask) return;
+  public async completeActiveTask(): Promise<boolean> {
+    if (!this.activeTask) return false;
     try {
       const activeTask = this.activeTask;
       const srcFile = activeTask.sourceFile || getDailyNotePath(this.plugin.settings, getLocalDateString(new Date()));
@@ -286,12 +300,15 @@ export class PomodoroManager {
         const habitsPath = this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md';
         const updatedHabits = await toggleHabitStatus(this.plugin.app, habitsPath, habitId, true);
         const targetHabit = updatedHabits.find((h) => h.id === habitId);
-        const streakCount = targetHabit ? targetHabit.streak : 1;
-        new Notice(t('habits.habitFulfilledNotice', { streak: streakCount }));
-        this.activeTask = null;
-        await this.savePomodoroState();
-        this.notifyListeners();
-        return;
+        if (targetHabit) {
+          const streakCount = targetHabit.streak;
+          new Notice(t('habits.habitFulfilledNotice', { streak: streakCount }));
+          this.activeTask = null;
+          await this.savePomodoroState();
+          this.notifyListeners();
+          return true;
+        }
+        return false;
       }
 
       const isTimeBlock =
@@ -304,12 +321,15 @@ export class PomodoroManager {
         const blockId = (activeTask.id || '').replace(/^block-/, '');
         const dateMatch = srcFile.match(/(\d{4}-\d{2}-\d{2})/);
         const dateStr = dateMatch ? dateMatch[1] : getLocalDateString(new Date());
-        await toggleTimeBlockCompletion(this.plugin, dateStr, blockId, true);
-        new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
-        this.activeTask = null;
-        await this.savePomodoroState();
-        this.notifyListeners();
-        return;
+        const success = await toggleTimeBlockCompletion(this.plugin, dateStr, blockId, true);
+        if (success) {
+          new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
+          this.activeTask = null;
+          await this.savePomodoroState();
+          this.notifyListeners();
+          return true;
+        }
+        return false;
       }
 
       const { priority } = parseTaskPriority(activeTask.text);
@@ -325,14 +345,19 @@ export class PomodoroManager {
         priority,
       };
 
-      await toggleTaskCompletionInFile(this.plugin.app, taskRecord, true);
-      new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
-      this.activeTask = null;
-      await this.savePomodoroState();
-      this.notifyListeners();
+      const success = await toggleTaskCompletionInFile(this.plugin.app, taskRecord, true);
+      if (success) {
+        new Notice(t('pomodoro.taskCompletedNotice', { task: activeTask.text }));
+        this.activeTask = null;
+        await this.savePomodoroState();
+        this.notifyListeners();
+        return true;
+      }
+      return false;
     } catch (err) {
-      console.error('Error completando tarea activa de pomodoro:', err);
+      console.error('Study Flow: Error completing active pomodoro task:', err);
       new Notice(t('pomodoro.taskCompleteError'));
+      return false;
     }
   }
 
@@ -342,7 +367,7 @@ export class PomodoroManager {
       try {
         listener(status);
       } catch (err) {
-        console.error('Error in pomodoro listener:', err);
+        console.error('Study Flow: Error in pomodoro listener:', err);
       }
     });
   }
@@ -370,7 +395,7 @@ export class PomodoroManager {
         this.plugin.app.saveLocalStorage(key, persisted);
       }
     } catch (err) {
-      console.error('Study Flow Assistant: Error persistiendo estado pomodoro', err);
+      console.error('Study Flow: Error persisting pomodoro state', err);
     }
   }
 
@@ -877,22 +902,50 @@ export class PomodoroManager {
   }
 
   private sendSystemNotification(title: string, body: string): void {
-    if (!this.plugin.settings.enableSystemNotifications) return;
-    const isFocused = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
-    if (!shouldSendSystemNotification(this.plugin.settings.enableSystemNotifications, isFocused)) {
-      return;
-    }
-
-    if (typeof Notification !== 'undefined') {
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body });
-      } else if (Notification.permission === 'default') {
-        void Notification.requestPermission().then((perm) => {
-          if (perm === 'granted') {
-            new Notification(title, { body });
-          }
-        });
+    try {
+      if (!this.plugin.settings.enableSystemNotifications) return;
+      let isFocused = true;
+      try {
+        if (typeof document !== 'undefined' && typeof document.hasFocus === 'function') {
+          isFocused = document.hasFocus();
+        }
+      } catch {
+        isFocused = true;
       }
+
+      if (!shouldSendSystemNotification(this.plugin.settings.enableSystemNotifications, isFocused)) {
+        return;
+      }
+
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          try {
+            new Notification(title, { body });
+          } catch (e) {
+            console.error('Study Flow: Failed to create Notification', e);
+          }
+        } else if (Notification.permission === 'default') {
+          try {
+            void Notification.requestPermission()
+              .then((perm) => {
+                if (perm === 'granted') {
+                  try {
+                    new Notification(title, { body });
+                  } catch (e) {
+                    console.error('Study Flow: Failed to create Notification after permission granted', e);
+                  }
+                }
+              })
+              .catch((e) => {
+                console.error('Study Flow: Failed to request notification permission', e);
+              });
+          } catch (e) {
+            console.error('Study Flow: Failed to invoke requestPermission', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Study Flow: System notification dispatch error', e);
     }
   }
 

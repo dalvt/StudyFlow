@@ -1,7 +1,7 @@
 import { ItemView, normalizePath, Platform, setIcon, setTooltip, ViewStateResult, WorkspaceLeaf } from 'obsidian';
 import type { Events } from 'obsidian';
 import type StudyFlowPlugin from '../main';
-import type { ActiveTab, TabComponent } from './types';
+import type { ActiveTab, StudyFlowViewHost, TabComponent } from './types';
 import { TodayTab } from './today-tab';
 import { PomodoroTab } from './pomodoro-tab';
 import { TasksTab } from './tasks-tab';
@@ -11,10 +11,10 @@ import { AnalyticsTab } from './analytics-tab';
 import { t } from '../i18n/index.ts';
 
 export const VIEW_TYPE_STUDY_FLOW = 'study-flow-view';
-export type { ActiveTab, TabComponent };
-export { PromptModal } from './prompt-modal';
+export type { ActiveTab, StudyFlowViewHost, TabComponent };
+export { PromptModal } from './prompt-modal.ts';
 
-export class StudyFlowView extends ItemView {
+export class StudyFlowView extends ItemView implements StudyFlowViewHost {
   private plugin: StudyFlowPlugin;
   private activeTab: ActiveTab = 'today';
 
@@ -38,9 +38,7 @@ export class StudyFlowView extends ItemView {
     super(leaf);
     this.plugin = plugin;
 
-    this.todayTab = new TodayTab(this.app, this.plugin, (tab) => {
-      void this.setActiveTab(tab);
-    });
+    this.todayTab = new TodayTab(this.app, this.plugin, this);
     this.pomodoroTab = new PomodoroTab(this.app, this.plugin);
     this.tasksTab = new TasksTab(this.app, this.plugin, (tab) => {
       void this.setActiveTab(tab);
@@ -90,6 +88,10 @@ export class StudyFlowView extends ItemView {
     }
   }
 
+  public async refresh(): Promise<void> {
+    await this.render();
+  }
+
   public async render(): Promise<void> {
     // Invalidate non-active tabs so they re-render when switched to
     for (const id of this.tabContainers.keys()) {
@@ -115,9 +117,8 @@ export class StudyFlowView extends ItemView {
     await this.switchTab(this.activeTab);
 
     // Reactive subscriptions (incremental updates without full renderView)
-    this.unsubscribePomodoro = this.plugin.pomodoro.subscribe((status) => {
+    this.unsubscribePomodoro = this.plugin.pomodoro.subscribe(() => {
       this.pomodoroTab.updateClock();
-      this.todayTab.onPomodoroTick(status);
     });
 
     if (this.plugin.taskIndex) {
@@ -130,10 +131,22 @@ export class StudyFlowView extends ItemView {
       this.app.vault.on('modify', async (file) => {
         const habitsPath = normalizePath(this.plugin.settings.habitsFilePath || 'StudyFlow/Habits.md');
         if (file.path === habitsPath) {
-          await this.habitsTab.onHabitsModified();
-          await this.todayTab.onHabitsChanged();
+          if (this.activeTab === 'habits') {
+            await this.habitsTab.onHabitsModified();
+          } else if (this.tabRendered.get('habits') === true) {
+            this.tabRendered.set('habits', false);
+          }
+
+          if (this.activeTab === 'today') {
+            await this.todayTab.onHabitsChanged();
+          } else if (this.tabRendered.get('today') === true) {
+            this.tabRendered.set('today', false);
+          }
+
           if (this.activeTab === 'analytics') {
             await this.analyticsTab.refresh();
+          } else if (this.tabRendered.get('analytics') === true) {
+            this.tabRendered.set('analytics', false);
           }
         }
       })
@@ -167,8 +180,15 @@ export class StudyFlowView extends ItemView {
     this.containerEl.empty();
   }
 
-  public async setActiveTab(tab: ActiveTab): Promise<void> {
-    await this.switchTab(tab);
+  public async setActiveTab(
+    tab: ActiveTab,
+    options?: { taskView?: 'today' | 'upcoming' | 'subjects' }
+  ): Promise<void> {
+    await this.switchTab(tab, options);
+  }
+
+  public async openTasksUpcoming(): Promise<void> {
+    await this.switchTab('tasks', { taskView: 'upcoming' });
   }
 
   public async openCalendarDate(dateStr: string, showPendingSelector: boolean = false): Promise<void> {
@@ -232,10 +252,7 @@ export class StudyFlowView extends ItemView {
     setIcon(refreshBtn, 'rotate-cw');
     refreshBtn.addEventListener('click', () => {
       void (async () => {
-        const currentContainer = this.tabContainers.get(this.activeTab);
-        if (currentContainer) {
-          await this.tabComponents[this.activeTab].render(currentContainer);
-        }
+        await this.refresh();
       })();
     });
 
@@ -334,7 +351,13 @@ export class StudyFlowView extends ItemView {
     });
   }
 
-  private async switchTab(tab: ActiveTab): Promise<void> {
+  public async switchTab(
+    tab: ActiveTab,
+    options?: { taskView?: 'today' | 'upcoming' | 'subjects' }
+  ): Promise<void> {
+    if (tab === 'tasks' && options?.taskView) {
+      this.tasksTab.setTaskView(options.taskView);
+    }
     this.activeTab = tab;
 
     // Update nav pills
@@ -361,11 +384,17 @@ export class StudyFlowView extends ItemView {
   }
 
   private handleTaskIndexChanged(): void {
-    // Incrementally notify components without destroying active view or tab state
-    this.todayTab.onTasksChanged();
-    this.tasksTab.onTasksChanged();
-    this.calendarTab.onTasksChanged();
-    this.analyticsTab.onTasksChanged();
-    this.pomodoroTab.onTasksChanged();
+    // Only invoke onTasksChanged immediately on the currently visible active tab.
+    // For previously rendered hidden tabs, invalidate them so they re-render lazily on switchTab.
+    for (const tab of this.tabContainers.keys()) {
+      if (tab === this.activeTab) {
+        const comp = this.tabComponents[tab] as { onTasksChanged?: () => void };
+        if (typeof comp.onTasksChanged === 'function') {
+          comp.onTasksChanged();
+        }
+      } else if (this.tabRendered.get(tab) === true) {
+        this.tabRendered.set(tab, false);
+      }
+    }
   }
 }

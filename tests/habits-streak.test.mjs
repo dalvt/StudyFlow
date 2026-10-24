@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TFile } from 'obsidian';
-import { toggleHabitStatus, updateHabitInFile } from '../src/habits.ts';
+import {
+  deleteHabitFromFile,
+  getHabitRawLine,
+  restoreHabitLineToFile,
+  toggleHabitStatus,
+  updateHabitInFile,
+} from '../src/habits.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
@@ -528,5 +534,49 @@ test('toggleHabitStatus: atomic updates inside vault.process preserve concurrent
 
   assert.ok(habitsFile.content.includes('- [x] 📚 Lectura'), 'Habit 1 must be toggled');
   assert.ok(habitsFile.content.includes('- [x] 💧 Agua'), 'Habit 2 must be toggled without being overwritten');
+});
+
+test('deleteHabitFromFile and restoreHabitLineToFile (Undo): restores deleted habit and full history', async () => {
+  const habitsFile = new TFile('Habits.md');
+  habitsFile.content = `# Registro de Hábitos
+
+- [x] 📚 Lectura <!-- streak: 5 | last: 2026-10-14 | history: 2026-10-10,2026-10-11,2026-10-12,2026-10-13,2026-10-14 -->
+- [ ] 💧 Tomar Agua <!-- streak: 2 | last: 2026-10-13 | history: 2026-10-12,2026-10-13 -->
+`;
+
+  const app = {
+    vault: {
+      getAbstractFileByPath: (p) => (p === 'Habits.md' ? habitsFile : null),
+      read: async (f) => f.content,
+      process: async (f, fn) => {
+        f.content = fn(f.content);
+        return f.content;
+      },
+      create: async (p, content) => {
+        habitsFile.content = content;
+        return habitsFile;
+      },
+    },
+  };
+
+  // 1. Capture raw line before deletion
+  const rawLine = await getHabitRawLine(app, 'Habits.md', 'lectura');
+  assert.ok(rawLine, 'Raw line must be found');
+  assert.ok(rawLine.includes('streak: 5'));
+  assert.ok(rawLine.includes('2026-10-14'));
+
+  // 2. Delete habit
+  const remaining = await deleteHabitFromFile(app, 'Habits.md', 'lectura');
+  assert.strictEqual(remaining.length, 1);
+  assert.strictEqual(remaining[0].id, 'tomar-agua');
+  assert.ok(!habitsFile.content.includes('📚 Lectura'), 'Lectura must be removed from Habits.md');
+  assert.ok(habitsFile.content.includes('💧 Tomar Agua'), 'Agua must remain in Habits.md');
+
+  // 3. Restore habit via Undo
+  const restoredHabits = await restoreHabitLineToFile(app, 'Habits.md', rawLine);
+  assert.strictEqual(restoredHabits.length, 2);
+  assert.ok(habitsFile.content.includes('📚 Lectura'), 'Lectura must be restored to Habits.md');
+  assert.ok(habitsFile.content.includes('streak: 5'), 'Restored line must preserve original streak');
+  assert.ok(habitsFile.content.includes('2026-10-10,2026-10-11,2026-10-12,2026-10-13,2026-10-14'), 'Full history must be preserved');
 });
 

@@ -150,6 +150,15 @@ test('i18n English dictionary: key settings and actions adhere to sentence case'
   assert.equal(en['analytics.title'], 'Analytics & study performance');
   assert.equal(en['habits.editModalTitle'], 'Edit habit');
   assert.equal(en['habits.nameLabel'], 'Habit name');
+  assert.equal(en['pomodoro.pillFocus'], '• Focus •');
+  assert.equal(en['pomodoro.pillLongBreak'], '• Long break •');
+  assert.equal(en['pomodoro.pillBreak'], '• Break •');
+  assert.equal(en['pomodoro.statusBarTooltip'], 'Click: start/pause | Right click: menu');
+  assert.equal(en['calendar.deadlineTitlePlaceholder'], 'Deadline title (e.g. final project)...');
+  assert.equal(en['calendar.masterHubDeadlinePlaceholder'], 'Deadline title (e.g. networks project due)...');
+  assert.equal(en['analytics.allocationGeneralCategory'], 'General / unclassified');
+  assert.equal(en['settings.timeBlocksHeaderDesc'], 'Markdown heading name for time blocks in daily notes (default: ## Time blocks).');
+  assert.equal(en['today.nowNextTitle'], 'Now / next');
 });
 
 test('computeWeeklyFocusTrend formats day names according to effective language', async () => {

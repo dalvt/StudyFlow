@@ -1,22 +1,25 @@
-import { App, setIcon } from 'obsidian';
+import { App, setIcon, TFile } from 'obsidian';
 import { getOrCreateFile, getLocalDateString } from './utils.ts';
 import {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
   createHabitId,
+  formatHabitLine,
   type HabitFrequency,
   type HabitFrequencyType,
   type HabitItemData,
   type HabitWeeklyProgress,
   parseHabitLine,
   syncHabitsToMarkdown,
-} from './markdown-utils.ts';
+} from './habit-utils.ts';
 import { getEffectiveLanguage, t } from './i18n/index.ts';
 
 export {
   calculateHabitStreak,
   computeHabitWeeklyProgress,
   createHabitId,
+  formatHabitLine,
+  parseHabitLine,
   syncHabitsToMarkdown,
 };
 export type { HabitFrequency, HabitFrequencyType, HabitWeeklyProgress };
@@ -277,6 +280,77 @@ export async function deleteHabitFromFile(app: App, filePath: string, habitId: s
     const habits = parseHabitsFromLines(lines, today);
     updatedHabits = habits.filter((h) => h.id !== habitId);
     return syncHabitsToMarkdown(content, updatedHabits);
+  });
+
+  return updatedHabits;
+}
+
+/**
+ * Retrieves the raw line of a habit from Habits.md before deletion.
+ */
+export async function getHabitRawLine(
+  app: App,
+  filePath: string,
+  habitId: string
+): Promise<string | null> {
+  const file = app.vault.getAbstractFileByPath(filePath || 'Habits.md');
+  if (!(file instanceof TFile)) return null;
+  const content = await app.vault.read(file);
+  const lines = content.split(/\r?\n/);
+  for (const line of lines) {
+    const parsed = parseHabitLine(line);
+    if (parsed && (parsed.id === habitId || createHabitId(parsed.name) === habitId)) {
+      return line;
+    }
+  }
+  return null;
+}
+
+/**
+ * Restores a deleted habit line back into Habits.md preserving all history.
+ */
+export async function restoreHabitLineToFile(
+  app: App,
+  filePath: string,
+  rawHabitLine: string
+): Promise<HabitItem[]> {
+  const defaultHeader = getEffectiveLanguage() === 'en' ? '# Habit Tracker\n\n' : '# Registro de Hábitos\n\n';
+  const file = await getOrCreateFile(app, filePath || 'Habits.md', defaultHeader);
+
+  let updatedHabits: HabitItem[] = [];
+  await app.vault.process(file, (content) => {
+    const lines = content.split(/\r?\n/);
+    const parsed = parseHabitLine(rawHabitLine);
+    if (!parsed) return content;
+
+    const existing = parseHabitsFromLines(lines);
+    if (existing.some((h) => h.id === parsed.id || createHabitId(h.name) === parsed.id)) {
+      updatedHabits = existing;
+      return content;
+    }
+
+    const habitLineRegex = /^\s*-\s+\[(.)\]\s+(.*?)(?:\s*<!--\s*(.*?)\s*-->)?$/;
+    let lastHabitIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (habitLineRegex.test(lines[i])) {
+        lastHabitIdx = i;
+      }
+    }
+
+    if (lastHabitIdx !== -1) {
+      lines.splice(lastHabitIdx + 1, 0, rawHabitLine);
+    } else {
+      const headerIdx = lines.findIndex((l) => /^#+\s+.*(h[aá]bito|habit)/i.test(l));
+      if (headerIdx !== -1) {
+        lines.splice(headerIdx + 1, 0, '', rawHabitLine);
+      } else {
+        lines.push(rawHabitLine);
+      }
+    }
+
+    const newContent = lines.join('\n');
+    updatedHabits = parseHabitsFromLines(lines);
+    return newContent;
   });
 
   return updatedHabits;

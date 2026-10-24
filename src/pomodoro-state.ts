@@ -10,6 +10,7 @@ export interface ActivePomodoroTask {
   text: string;
   sourceFile: string;
   isTimeBlock?: boolean;
+  isHabit?: boolean;
   originalLine?: string;
   lineNumber?: number;
   lineHash?: string;

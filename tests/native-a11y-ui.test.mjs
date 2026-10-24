@@ -120,6 +120,24 @@ test('A11y and Context Menu i18n keys are present and localized in both language
   }
 });
 
+test('CSS dark mode select arrow: data URI uses stroke="%23888888" instead of currentColor', () => {
+  const css = fs.readFileSync('styles.css', 'utf8');
+  assert.ok(
+    !css.includes('stroke="currentColor"') && !css.includes("stroke='currentColor'"),
+    'CSS select data URIs must not use stroke="currentColor" (invisible in dark mode)'
+  );
+  assert.ok(
+    css.includes('stroke="%23888888"'),
+    'CSS select data URIs must use stroke="%23888888"'
+  );
+});
+
+test('CSS variables: zero raw #ea580c or #8b5cf6 in styles.css', () => {
+  const css = fs.readFileSync('styles.css', 'utf8');
+  assert.ok(!css.includes('#ea580c'), 'styles.css must not contain raw #ea580c');
+  assert.ok(!css.includes('#8b5cf6'), 'styles.css must not contain raw #8b5cf6');
+});
+
 test('Command IDs: no plugin ID prefix (open-hub, open-calendar, open-hub-sidebar)', () => {
   const mainContent = fs.readFileSync('src/main.ts', 'utf8');
   assert.ok(!mainContent.includes("'open-study-flow-hub'"), 'Should not have open-study-flow-hub');

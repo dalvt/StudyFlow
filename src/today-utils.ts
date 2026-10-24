@@ -1,6 +1,7 @@
 import type { CalendarTimeBlock } from './calendar-utils.ts';
 import type { TaskRecord } from './tasks.ts';
 import type { DeadlineItem } from './calendar.ts';
+import { calculateDaysRemaining } from './markdown-utils.ts';
 
 export interface CurrentOrNextBlock {
   type: 'now' | 'next';
@@ -44,18 +45,33 @@ export function filterTodayAndOverdueTasks(
 ): TaskRecord[] {
   const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1, none: 0 };
 
+  const refDate = todayDateStr
+    ? (() => {
+        const parts = todayDateStr.split('-').map(Number);
+        return parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date();
+      })()
+    : new Date();
+
+  const getDays = (t: TaskRecord): number | undefined => {
+    if (t.dueDate) {
+      return calculateDaysRemaining(t.dueDate, refDate);
+    }
+    return t.daysRemaining;
+  };
+
   return tasks
-    .filter(
-      (t) =>
-        !t.isIdea &&
-        !t.completed &&
-        ((t.daysRemaining !== undefined && t.daysRemaining <= 0) ||
-          t.dueDate === todayDateStr ||
-          (t.dueDate !== undefined && t.dueDate < todayDateStr))
-    )
+    .filter((t) => {
+      if (t.isIdea || t.completed) return false;
+      const rem = getDays(t);
+      return (
+        (rem !== undefined && rem <= 0) ||
+        t.dueDate === todayDateStr ||
+        (t.dueDate !== undefined && t.dueDate < todayDateStr)
+      );
+    })
     .sort((a, b) => {
-      const aRem = a.daysRemaining ?? 0;
-      const bRem = b.daysRemaining ?? 0;
+      const aRem = getDays(a) ?? 0;
+      const bRem = getDays(b) ?? 0;
       if (aRem !== bRem) {
         return aRem - bRem;
       }

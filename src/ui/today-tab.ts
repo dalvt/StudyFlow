@@ -1,6 +1,6 @@
 import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main.ts';
-import type { ActiveTab, TabComponent } from './types.ts';
+import type { ActiveTab, StudyFlowViewHost, TabComponent } from './types.ts';
 import { getTimeBlocksForDate } from '../calendar.ts';
 import { toggleTaskCompletionInFile } from '../tasks.ts';
 import { loadHabitsFromFile, toggleHabitStatus } from '../habits.ts';
@@ -8,7 +8,6 @@ import {
   getSpacedRepetitionQueue,
   reviewSpacedNote,
 } from '../spaced-repetition.ts';
-import type { PomodoroStatus } from '../pomodoro.ts';
 import { extractTagsFromText, getLocalDateString, formatDeadlineHuman, getDailyNotePath } from '../utils.ts';
 import { t } from '../i18n/index.ts';
 
@@ -18,6 +17,8 @@ import {
   filterUpcomingDeadlines,
   type CurrentOrNextBlock,
 } from '../today-utils.ts';
+import { calculateDaysRemaining } from '../markdown-utils.ts';
+import { getCleanTaskDisplayTitle } from '../task-parser.ts';
 
 export {
   findCurrentOrNextTimeBlock,
@@ -29,7 +30,7 @@ export {
 export class TodayTab implements TabComponent {
   private app: App;
   private plugin: StudyFlowPlugin;
-  private onSwitchTab: (tab: ActiveTab) => void;
+  private host: StudyFlowViewHost;
   private container: HTMLElement | null = null;
 
   // Incremental Section Elements
@@ -38,13 +39,22 @@ export class TodayTab implements TabComponent {
   private habitsSectionEl: HTMLElement | null = null;
   private spacedSectionEl: HTMLElement | null = null;
 
+  // Race condition sequence guards
+  private nowNextSeq = 0;
+  private habitsSeq = 0;
+  private spacedSeq = 0;
+
   private isRendering = false;
   private pendingRender = false;
 
-  constructor(app: App, plugin: StudyFlowPlugin, onSwitchTab: (tab: ActiveTab) => void) {
+  constructor(app: App, plugin: StudyFlowPlugin, host: StudyFlowViewHost | ((tab: ActiveTab) => void)) {
     this.app = app;
     this.plugin = plugin;
-    this.onSwitchTab = onSwitchTab;
+    this.host = typeof host === 'function' ? { switchTab: host } : host;
+  }
+
+  private onSwitchTab(tab: ActiveTab): void {
+    void this.host.switchTab(tab);
   }
 
   public async render(container: HTMLElement): Promise<void> {
@@ -107,10 +117,6 @@ export class TodayTab implements TabComponent {
 
   // --- Incremental Updates ---
 
-  public onPomodoroTick(_status: PomodoroStatus): void {
-    // MiniTimer was removed from TodayTab to reduce visual clutter
-  }
-
   public onTasksChanged(): void {
     if (this.todayTasksSectionEl) {
       this.renderTodayTasksSection();
@@ -124,6 +130,9 @@ export class TodayTab implements TabComponent {
   }
 
   public destroy(): void {
+    this.nowNextSeq++;
+    this.habitsSeq++;
+    this.spacedSeq++;
     this.container = null;
     this.nowNextSectionEl = null;
     this.todayTasksSectionEl = null;
@@ -137,10 +146,13 @@ export class TodayTab implements TabComponent {
 
   private async renderNowNextSection(): Promise<void> {
     if (!this.nowNextSectionEl) return;
-    this.nowNextSectionEl.empty();
+    const seq = ++this.nowNextSeq;
 
     const todayDate = getLocalDateString(new Date());
     const blocks = await getTimeBlocksForDate(this.app, this.plugin.settings, todayDate);
+    if (seq !== this.nowNextSeq || !this.nowNextSectionEl) return;
+    this.nowNextSectionEl.empty();
+
     const now = new Date();
     const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const currentOrNext = findCurrentOrNextTimeBlock(blocks, currentHHMM);
@@ -209,10 +221,9 @@ export class TodayTab implements TabComponent {
           await this.plugin.pomodoro.setActiveSubject(matchedSubject);
         }
         const dailyPath = getDailyNotePath(this.plugin.settings, todayDate);
-        const blockId = block.id.startsWith('block-') ? block.id : `block-${block.id}`;
         await this.plugin.pomodoro.setActiveTask({
-          id: blockId,
-          text: block.title,
+          id: block.id,
+          text: `${block.title} [${block.startTime} - ${block.endTime}]`,
           sourceFile: dailyPath,
           isTimeBlock: true,
         });
@@ -270,6 +281,7 @@ export class TodayTab implements TabComponent {
       const check = itemRow.createEl('input', {
         type: 'checkbox',
         cls: 'study-flow-task-checkbox',
+        attr: { 'aria-label': t('tasks.checkboxAria', { title: getCleanTaskDisplayTitle(task.text) }) },
       });
       check.checked = Boolean(task.completed);
 
@@ -293,19 +305,44 @@ export class TodayTab implements TabComponent {
         check.dispatchEvent(new Event('change'));
       });
 
-      if (task.daysRemaining !== undefined && task.daysRemaining < 0) {
+      const daysRemaining = task.dueDate ? calculateDaysRemaining(task.dueDate) : task.daysRemaining;
+      if (daysRemaining !== undefined && daysRemaining < 0) {
         const badge = itemRow.createSpan({ cls: 'study-flow-deadline-badge is-overdue' });
         const bIcon = badge.createSpan({ cls: 'study-flow-badge-icon' });
         setIcon(bIcon, 'alert-circle');
         badge.createSpan({
-          text: t('today.daysOverdue', { days: String(Math.abs(task.daysRemaining)) }),
+          text: t('today.daysOverdue', { days: String(Math.abs(daysRemaining)) }),
         });
-      } else if (task.daysRemaining === 0 || task.dueDate === todayDate) {
+      } else if (daysRemaining === 0 || task.dueDate === todayDate) {
         const badge = itemRow.createSpan({ cls: 'study-flow-deadline-badge is-today' });
         const bIcon = badge.createSpan({ cls: 'study-flow-badge-icon' });
         setIcon(bIcon, 'clock');
         badge.createSpan({ text: t('today.dueToday') });
       }
+
+      const pomoBtn = itemRow.createEl('button', {
+        cls: 'study-flow-icon-action-btn study-flow-today-quick-pomo-btn',
+        attr: {
+          'aria-label': t('today.startFocusBtn') || 'Pomodoro',
+          title: t('today.startFocusBtn') || 'Pomodoro',
+        },
+      });
+      setIcon(pomoBtn, 'timer');
+      pomoBtn.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation();
+        void (async () => {
+          await this.plugin.pomodoro.setActiveTask({
+            id: task.id,
+            text: task.text,
+            sourceFile: task.sourceFile,
+            originalLine: task.originalLine,
+            lineNumber: task.lineNumber,
+            lineHash: task.lineHash,
+          });
+          await this.plugin.pomodoro.start();
+          await this.host.switchTab('pomodoro');
+        })();
+      });
     });
 
     if (upcomingDeadlines.length > 0) {
@@ -313,9 +350,27 @@ export class TodayTab implements TabComponent {
       subHeader.setText(t('today.deadlinesTitle'));
 
       upcomingDeadlines.forEach((item) => {
-        const itemRow = list.createDiv({ cls: 'study-flow-today-deadline-row study-flow-clickable-row' });
-        itemRow.addEventListener('click', () => {
-          this.onSwitchTab('tasks');
+        const itemRow = list.createDiv({
+          cls: 'study-flow-today-deadline-row study-flow-clickable-row',
+          attr: {
+            role: 'button',
+            tabindex: '0',
+            'aria-label': `${item.cleanTitle} - ${formatDeadlineHuman(item.daysRemaining, item.dueDate)}`,
+          },
+        });
+        const activateUpcoming = () => {
+          if (this.host.openTasksUpcoming) {
+            void this.host.openTasksUpcoming();
+          } else {
+            void this.host.switchTab('tasks', { taskView: 'upcoming' });
+          }
+        };
+        itemRow.addEventListener('click', activateUpcoming);
+        itemRow.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            activateUpcoming();
+          }
         });
 
         itemRow.createSpan({
@@ -339,9 +394,11 @@ export class TodayTab implements TabComponent {
 
   private async renderHabitsSection(): Promise<void> {
     if (!this.habitsSectionEl) return;
-    this.habitsSectionEl.empty();
+    const seq = ++this.habitsSeq;
 
     const habits = await loadHabitsFromFile(this.app, this.plugin.settings.habitsFilePath);
+    if (seq !== this.habitsSeq || !this.habitsSectionEl) return;
+    this.habitsSectionEl.empty();
     const pendingHabits = habits.filter((h) => !h.completedToday && !h.isRestDayToday);
 
     const card = this.habitsSectionEl.createDiv({ cls: 'study-flow-card' });
@@ -380,6 +437,7 @@ export class TodayTab implements TabComponent {
       const check = itemRow.createEl('input', {
         type: 'checkbox',
         cls: 'study-flow-task-checkbox',
+        attr: { 'aria-label': t('habits.checkboxAria', { name: habit.name }) },
       });
       check.checked = false;
       check.addEventListener('change', () => {
@@ -398,6 +456,23 @@ export class TodayTab implements TabComponent {
         const streakBadge = itemRow.createSpan({ cls: 'study-flow-habit-streak-badge' });
         streakBadge.createSpan({ text: `🔥 ${habit.streak}` });
       }
+
+      const pomoBtn = itemRow.createEl('button', {
+        cls: 'study-flow-icon-action-btn study-flow-today-quick-pomo-btn',
+        attr: {
+          'aria-label': t('today.startFocusBtn') || 'Pomodoro',
+          title: t('today.startFocusBtn') || 'Pomodoro',
+        },
+      });
+      setIcon(pomoBtn, 'timer');
+      pomoBtn.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation();
+        void (async () => {
+          await this.plugin.pomodoro.setActiveHabit(habit);
+          await this.plugin.pomodoro.start();
+          await this.host.switchTab('pomodoro');
+        })();
+      });
     });
   }
 
@@ -405,10 +480,12 @@ export class TodayTab implements TabComponent {
 
   private async renderSpacedSection(): Promise<void> {
     if (!this.spacedSectionEl) return;
-    this.spacedSectionEl.empty();
+    const seq = ++this.spacedSeq;
 
     const todayDate = getLocalDateString(new Date());
     const queue = await getSpacedRepetitionQueue(this.app, todayDate, this.plugin);
+    if (seq !== this.spacedSeq || !this.spacedSectionEl) return;
+    this.spacedSectionEl.empty();
     const dueToday = queue.filter((item) => item.isDueToday);
 
     const card = this.spacedSectionEl.createDiv({ cls: 'study-flow-card' });

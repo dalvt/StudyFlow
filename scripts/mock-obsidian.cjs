@@ -49,9 +49,34 @@ export class Notice {
   constructor(message, duration) {
     this.message = message;
     this.duration = duration;
+    this.messageEl = {
+      empty: () => {},
+      createDiv: () => {
+        const div = {
+          createSpan: (spanOpts = {}) => ({ text: spanOpts.text || '' }),
+          createEl: (tag, elOpts = {}) => {
+            const btn = {
+              text: elOpts.text || '',
+              listeners: {},
+              addEventListener: (evt, fn) => {
+                btn.listeners[evt] = btn.listeners[evt] || [];
+                btn.listeners[evt].push(fn);
+              },
+              click: () => {
+                const list = btn.listeners['click'] || [];
+                for (const fn of list) fn({ stopPropagation: () => {} });
+              },
+            };
+            this.actionBtn = btn;
+            return btn;
+          },
+        };
+        return div;
+      },
+    };
   }
   setMessage(msg) { this.message = msg; return this; }
-  hide() {}
+  hide() { this.hidden = true; }
 }
 
 export function normalizePath(path) {
@@ -104,11 +129,13 @@ export class Setting {
   setDesc() { return this; }
   setHeading() { return this; }
   addText(cb) {
-    cb({
-      setValue: () => ({ onChange: () => {} }),
+    const textMock = {
+      setValue: () => textMock,
+      setPlaceholder: () => textMock,
       inputEl: { addClass: () => {}, removeClass: () => {} },
-      onChange: () => {}
-    });
+      onChange: () => textMock,
+    };
+    cb(textMock);
     return this;
   }
   addToggle(cb) {
@@ -120,15 +147,34 @@ export class Setting {
     return this;
   }
   addSlider(cb) {
-    cb({ setValue: () => ({ onChange: () => {} }), onChange: () => {} });
+    const sliderMock = {
+      setLimits: () => sliderMock,
+      setValue: () => sliderMock,
+      onChange: () => sliderMock,
+    };
+    cb(sliderMock);
     return this;
   }
   addButton(cb) {
-    cb({ setButtonText: () => ({ onClick: () => {} }), setCta: () => {}, setWarning: () => {}, setDestructive: () => ({ setCta: () => {} }), onClick: () => {} });
+    const btnMock = {
+      setButtonText: () => btnMock,
+      setIcon: () => btnMock,
+      setCta: () => btnMock,
+      setWarning: () => btnMock,
+      setTooltip: () => btnMock,
+      setDestructive: () => btnMock,
+      onClick: () => btnMock,
+    };
+    cb(btnMock);
     return this;
   }
   addExtraButton(cb) {
-    cb({ setIcon: () => ({ setTooltip: () => ({ onClick: () => {} }) }), onClick: () => {} });
+    const extraMock = {
+      setIcon: () => extraMock,
+      setTooltip: () => extraMock,
+      onClick: () => extraMock,
+    };
+    cb(extraMock);
     return this;
   }
 }

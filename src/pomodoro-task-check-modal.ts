@@ -171,7 +171,7 @@ export class PomodoroClosingReviewModal extends Modal {
         });
       }
     } catch (err) {
-      console.error('Study Flow Assistant: Error procesando cierre de sesión de pomodoro', err);
+      console.error('Study Flow: Error processing pomodoro session closing', err);
     }
   }
 

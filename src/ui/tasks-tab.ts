@@ -1,7 +1,7 @@
 import { App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab, TabComponent } from './types';
-import { PromptModal } from './prompt-modal';
+import { PromptModal } from './prompt-modal.ts';
 import { TaskCreateModal } from '../task-modal';
 import {
   addSubtaskToFile,
@@ -20,7 +20,11 @@ import {
   formatDateKey,
   getCleanTaskDisplayTitle,
 } from '../utils';
-import { locateTaskLineIndex, mutateTaskLineInContent } from '../markdown-utils';
+import {
+  calculateDaysRemaining,
+  locateTaskLineIndex,
+  mutateTaskLineInContent,
+} from '../markdown-utils.ts';
 import { matchesSubjectTag } from '../subject-analytics';
 import { t } from '../i18n/index.ts';
 
@@ -55,7 +59,26 @@ export class TasksTab implements TabComponent {
   private taskSearchQuery: string = '';
   private taskSortBy: 'urgency' | 'priority' | 'estimate' | 'alpha' = 'urgency';
   private editingTaskId: string | null = null;
+  private editingDraftText: string = '';
   private selectedSubjectTag: string | null = null;
+
+  private getDaysRemaining(task: TaskRecord): number | undefined {
+    if (task.dueDate) {
+      return calculateDaysRemaining(task.dueDate);
+    }
+    return task.daysRemaining;
+  }
+
+  private isTaskToday(t: TaskRecord, todayDate: string): boolean {
+    if (t.isIdea) return false;
+    const rem = this.getDaysRemaining(t);
+    return (
+      (rem !== undefined && rem <= 0) ||
+      t.dueDate === todayDate ||
+      (t.dueDate !== undefined && t.dueDate < todayDate) ||
+      (t.dueDate === undefined && t.daysRemaining === undefined)
+    );
+  }
 
   constructor(app: App, plugin: StudyFlowPlugin, onSwitchTab: (tab: ActiveTab) => void) {
     this.app = app;
@@ -64,6 +87,24 @@ export class TasksTab implements TabComponent {
   }
 
   async render(container: HTMLElement): Promise<void> {
+    // 1. Preserve scroll position, search input focus/cursor selection, and inline edit draft
+    const prevList = container.querySelector<HTMLElement>('.study-flow-task-list-cards');
+    const prevScrollTop = prevList ? prevList.scrollTop : null;
+
+    const prevSearchInput = container.querySelector<HTMLInputElement>(
+      '.study-flow-tasks-search-input, .study-flow-task-search-input'
+    );
+    const wasSearchFocused = Boolean(prevSearchInput && document.activeElement === prevSearchInput);
+    const searchSelectionStart = wasSearchFocused && prevSearchInput ? prevSearchInput.selectionStart : null;
+    const searchSelectionEnd = wasSearchFocused && prevSearchInput ? prevSearchInput.selectionEnd : null;
+
+    if (this.editingTaskId !== null) {
+      const inlineInput = container.querySelector<HTMLInputElement>('.study-flow-inline-edit-input');
+      if (inlineInput) {
+        this.editingDraftText = inlineInput.value;
+      }
+    }
+
     this.container = container;
     container.empty();
 
@@ -75,16 +116,16 @@ export class TasksTab implements TabComponent {
 
     const todayDate = formatDateKey(new Date());
 
-    const isToday = (t: TaskRecord) =>
-      !t.isIdea &&
-      ((t.daysRemaining !== undefined && t.daysRemaining <= 0) ||
-        t.dueDate === todayDate ||
-        (t.dueDate !== undefined && t.dueDate < todayDate));
+    const isToday = (t: TaskRecord) => this.isTaskToday(t, todayDate);
 
-    const isUpcoming = (t: TaskRecord) =>
-      !t.isIdea &&
-      ((t.daysRemaining !== undefined && t.daysRemaining > 0) ||
-        (t.dueDate !== undefined && t.dueDate > todayDate));
+    const isUpcoming = (t: TaskRecord) => {
+      if (t.isIdea) return false;
+      const rem = this.getDaysRemaining(t);
+      return (
+        (rem !== undefined && rem > 0) ||
+        (t.dueDate !== undefined && t.dueDate > todayDate)
+      );
+    };
 
     const isSubject = (t: TaskRecord) => !t.isIdea;
     const isIcebox = (t: TaskRecord) => Boolean(t.isIdea);
@@ -168,6 +209,7 @@ export class TasksTab implements TabComponent {
     const toggleCheckbox = toggleLabel.createEl('input', {
       type: 'checkbox',
       cls: 'study-flow-toggle-checkbox',
+      attr: { 'aria-label': t('tasks.showCompleted') },
     });
     toggleCheckbox.checked = this.showCompleted;
     toggleLabel.createSpan({ text: t('tasks.showCompleted'), cls: 'study-flow-toggle-text' });
@@ -184,7 +226,7 @@ export class TasksTab implements TabComponent {
 
     const searchInput = searchWrap.createEl('input', {
       type: 'text',
-      cls: 'study-flow-task-search-input',
+      cls: 'study-flow-task-search-input study-flow-tasks-search-input',
       placeholder: t('tasks.searchPlaceholder'),
       value: this.taskSearchQuery,
       attr: { 'aria-label': t('tasks.searchLabel') },
@@ -278,6 +320,23 @@ export class TasksTab implements TabComponent {
     };
 
     renderList();
+
+    // 6. Restore scroll position
+    if (prevScrollTop !== null) {
+      listContainer.scrollTop = prevScrollTop;
+    }
+
+    // 7. Restore search input focus and cursor selection
+    if (wasSearchFocused) {
+      searchInput.focus();
+      if (searchSelectionStart !== null && searchSelectionEnd !== null) {
+        try {
+          searchInput.setSelectionRange(searchSelectionStart, searchSelectionEnd);
+        } catch {
+          // Ignore if input does not support selection
+        }
+      }
+    }
   }
 
   private renderFilteredTaskList(listContainer: HTMLElement, rootContainer: HTMLElement): void {
@@ -286,17 +345,13 @@ export class TasksTab implements TabComponent {
     // 1. Filter by 4 views
     let filtered = this.tasks.filter((t) => {
       if (this.taskView === 'today') {
-        if (t.isIdea) return false;
-        return (
-          (t.daysRemaining !== undefined && t.daysRemaining <= 0) ||
-          t.dueDate === todayDate ||
-          (t.dueDate !== undefined && t.dueDate < todayDate)
-        );
+        return this.isTaskToday(t, todayDate);
       }
       if (this.taskView === 'upcoming') {
         if (t.isIdea) return false;
+        const rem = this.getDaysRemaining(t);
         return (
-          (t.daysRemaining !== undefined && t.daysRemaining > 0) ||
+          (rem !== undefined && rem > 0) ||
           (t.dueDate !== undefined && t.dueDate > todayDate)
         );
       }
@@ -338,11 +393,13 @@ export class TasksTab implements TabComponent {
     filtered.sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       if (this.taskSortBy === 'urgency') {
-        if (a.daysRemaining !== undefined && b.daysRemaining !== undefined) {
-          return a.daysRemaining - b.daysRemaining;
+        const aRem = this.getDaysRemaining(a);
+        const bRem = this.getDaysRemaining(b);
+        if (aRem !== undefined && bRem !== undefined) {
+          return aRem - bRem;
         }
-        if (a.daysRemaining !== undefined) return -1;
-        if (b.daysRemaining !== undefined) return 1;
+        if (aRem !== undefined) return -1;
+        if (bRem !== undefined) return 1;
         return compareTasksByPriority(a, b);
       }
       if (this.taskSortBy === 'priority') {
@@ -423,7 +480,7 @@ export class TasksTab implements TabComponent {
           ? t('tasks.unclassified')
           : (matchedSubject ? matchedSubject.name : groupTag);
         const titleEl = headerLeft.createEl('h4', {
-          text: displayName.toUpperCase(),
+          text: displayName,
           cls: 'study-flow-subject-title',
         });
         if (matchedSubject?.color) {
@@ -564,6 +621,7 @@ export class TasksTab implements TabComponent {
           .setIcon('pencil')
           .onClick(() => {
             this.editingTaskId = task.id;
+            this.editingDraftText = task.text;
             if (this.container) void this.render(this.container);
           });
       });
@@ -673,8 +731,11 @@ export class TasksTab implements TabComponent {
       const iceboxBullet = cbWrapper.createSpan({ cls: 'study-flow-icebox-bullet' });
       setIcon(iceboxBullet, 'snowflake');
     } else {
-      cb = cbWrapper.createEl('input', { type: 'checkbox' });
-      cb.checked = task.completed;
+      cb = cbWrapper.createEl('input', {
+        type: 'checkbox',
+        attr: { 'aria-label': t('tasks.checkboxAria', { title: getCleanTaskDisplayTitle(task.text) }) },
+      });
+      cb.checked = Boolean(task.completed);
       cb.addEventListener('change', () => {
         void (async () => {
           await handleToggleCompletion(cb!.checked);
@@ -688,10 +749,15 @@ export class TasksTab implements TabComponent {
     if (isEditing) {
       // Inline Editing Input Row
       const editRow = mainCol.createDiv({ cls: 'study-flow-task-inline-edit' });
+      const draftVal = this.editingDraftText !== '' ? this.editingDraftText : task.text;
+      this.editingDraftText = draftVal;
       const editInput = editRow.createEl('input', {
         type: 'text',
         cls: 'study-flow-inline-edit-input',
-        value: task.text,
+        value: draftVal,
+      });
+      editInput.addEventListener('input', () => {
+        this.editingDraftText = editInput.value;
       });
       editInput.focus();
 
@@ -705,12 +771,13 @@ export class TasksTab implements TabComponent {
       });
 
       const handleSave = async () => {
-        const newText = editInput.value.trim();
+        const newText = (this.editingDraftText || editInput.value).trim();
         if (newText && newText !== task.text) {
           await updateTaskTextInFile(this.app, task, newText);
           new Notice(t('tasks.taskUpdatedNotice'));
         }
         this.editingTaskId = null;
+        this.editingDraftText = '';
         if (this.container) await this.render(this.container);
       };
 
@@ -724,11 +791,13 @@ export class TasksTab implements TabComponent {
         } else if (e.key === 'Escape') {
           e.preventDefault();
           this.editingTaskId = null;
+          this.editingDraftText = '';
           if (this.container) void this.render(this.container);
         }
       });
       cancelBtn.addEventListener('click', () => {
         this.editingTaskId = null;
+        this.editingDraftText = '';
         if (this.container) void this.render(this.container);
       });
     } else {
@@ -756,9 +825,20 @@ export class TasksTab implements TabComponent {
             matchesSubjectTag(s.tag, [tag])
           );
 
+          const selectSubject = () => {
+            this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
+            this.taskView = 'subjects';
+            if (this.container) void this.render(this.container);
+          };
+
           if (matchedSubject) {
             const tagChip = badgesRow.createSpan({
               cls: 'study-flow-subject-chip has-custom-color',
+              attr: {
+                role: 'button',
+                tabindex: '0',
+                'aria-label': t('tasks.filterBySubjectTooltip', { subject: matchedSubject.name }),
+              },
             });
             if (matchedSubject.color) {
               tagChip.style.borderColor = `${matchedSubject.color}66`;
@@ -770,20 +850,36 @@ export class TasksTab implements TabComponent {
             tagChip.createSpan({ text: matchedSubject.name });
             tagChip.addEventListener('click', (e) => {
               e.stopPropagation();
-              this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
-              this.taskView = 'subjects';
-              if (this.container) void this.render(this.container);
+              selectSubject();
+            });
+            tagChip.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                selectSubject();
+              }
             });
           } else {
+            const rawTag = tag.startsWith('#') ? tag : `#${tag}`;
             const tagChip = badgesRow.createSpan({
-              text: tag.startsWith('#') ? tag : `#${tag}`,
+              text: rawTag,
               cls: 'study-flow-subject-chip',
+              attr: {
+                role: 'button',
+                tabindex: '0',
+                'aria-label': t('tasks.filterBySubjectTooltip', { subject: rawTag }),
+              },
             });
             tagChip.addEventListener('click', (e) => {
               e.stopPropagation();
-              this.selectedSubjectTag = tag.startsWith('#') ? tag : `#${tag}`;
-              this.taskView = 'subjects';
-              if (this.container) void this.render(this.container);
+              selectSubject();
+            });
+            tagChip.addEventListener('keydown', (e: KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                selectSubject();
+              }
             });
           }
         });
@@ -815,20 +911,21 @@ export class TasksTab implements TabComponent {
         }
 
         if (task.dueDate) {
+          const rem = this.getDaysRemaining(task);
           const badgeText =
-            task.daysRemaining !== undefined
-              ? formatDeadlineHuman(task.daysRemaining, task.dueDate)
+            rem !== undefined
+              ? formatDeadlineHuman(rem, task.dueDate)
               : task.dueDate;
           let badgeCls = 'study-flow-deadline-badge';
           let dlIconName = 'calendar';
-          if (task.daysRemaining !== undefined) {
-            if (task.daysRemaining < 0) {
+          if (rem !== undefined) {
+            if (rem < 0) {
               badgeCls += ' is-overdue';
               dlIconName = 'alert-circle';
-            } else if (task.daysRemaining === 0) {
+            } else if (rem === 0) {
               badgeCls += ' is-today';
               dlIconName = 'clock';
-            } else if (task.daysRemaining <= 3) {
+            } else if (rem <= 3) {
               badgeCls += ' is-soon';
             }
           }
@@ -874,7 +971,11 @@ export class TasksTab implements TabComponent {
       const subtasksWrap = mainCol.createDiv({ cls: 'study-flow-subtasks-wrapper' });
       task.subtasks!.forEach((sub) => {
         const subItem = subtasksWrap.createDiv({ cls: 'study-flow-subtask-item' });
-        const subCb = subItem.createEl('input', { type: 'checkbox', cls: 'study-flow-subtask-cb' });
+        const subCb = subItem.createEl('input', {
+          type: 'checkbox',
+          cls: 'study-flow-subtask-cb',
+          attr: { 'aria-label': t('tasks.subtaskCheckboxAria', { title: getCleanTaskDisplayTitle(sub.text) }) },
+        });
         subCb.checked = sub.completed;
         subCb.addEventListener('change', (e) => {
           void (async () => {
@@ -972,6 +1073,7 @@ export class TasksTab implements TabComponent {
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.editingTaskId = this.editingTaskId === task.id ? null : task.id;
+      this.editingDraftText = this.editingTaskId === task.id ? task.text : '';
       if (this.container) void this.render(this.container);
     });
 
@@ -987,6 +1089,14 @@ export class TasksTab implements TabComponent {
     });
   }
 
+  public setTaskView(view: 'today' | 'upcoming' | 'subjects'): void {
+    this.taskView = view;
+    this.selectedSubjectTag = null;
+    if (this.container) {
+      void this.render(this.container);
+    }
+  }
+
   public onTasksChanged(): void {
     if (this.plugin.taskIndex) {
       this.tasks = this.plugin.taskIndex.getAllTasks();
@@ -998,5 +1108,7 @@ export class TasksTab implements TabComponent {
 
   destroy(): void {
     this.container = null;
+    this.editingTaskId = null;
+    this.editingDraftText = '';
   }
 }
