@@ -1,7 +1,7 @@
 import { App } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { TabComponent } from './types';
-import { renderAnalyticsDashboard } from '../analytics-ui';
+import { renderAnalyticsDashboard } from '../analytics-ui.ts';
 
 export class AnalyticsTab implements TabComponent {
   private app: App;
@@ -9,6 +9,7 @@ export class AnalyticsTab implements TabComponent {
   private container: HTMLElement | null = null;
   private isRendering = false;
   private pendingRender = false;
+  public activeRange: 'total' | 'week' = 'total';
 
   constructor(app: App, plugin: StudyFlowPlugin) {
     this.app = app;
@@ -24,11 +25,22 @@ export class AnalyticsTab implements TabComponent {
 
     this.isRendering = true;
     try {
-      await renderAnalyticsDashboard(container, this.app, this.plugin, async () => {
-        if (this.container) {
-          await this.render(this.container);
+      await renderAnalyticsDashboard(
+        container,
+        this.app,
+        this.plugin,
+        async () => {
+          if (this.container) {
+            await this.render(this.container);
+          }
+        },
+        {
+          activeRange: this.activeRange,
+          onRangeChange: (range: 'total' | 'week') => {
+            this.activeRange = range;
+          },
         }
-      });
+      );
     } finally {
       this.isRendering = false;
       if (this.pendingRender) {

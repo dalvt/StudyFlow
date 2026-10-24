@@ -83,8 +83,49 @@ export interface AnalyticsSummary {
   tasks: TasksOverviewStat;
 }
 
-import { extractTagsFromText, getLocalDateString, getCleanTaskDisplayTitle } from './markdown-utils.ts';
+export interface DistractionMetrics {
+  totalDistractions: number;
+  totalSessions: number;
+  sessionsWithDistractions: number;
+  distractionFreeSessions: number;
+  distractionFreeRate: number;
+  averageDistractionsPerSession: number;
+}
+
+import { getLocalDateString } from './date-utils.ts';
+import { extractTagsFromText, getCleanTaskDisplayTitle } from './task-parser.ts';
 export { extractTagsFromText, getLocalDateString, getCleanTaskDisplayTitle };
+
+export function computeDistractionMetrics(sessions: FocusSessionRecord[]): DistractionMetrics {
+  const totalSessions = sessions.length;
+  let totalDistractions = 0;
+  let sessionsWithDistractions = 0;
+
+  for (const session of sessions) {
+    const count = session.distractions || 0;
+    if (count > 0) {
+      totalDistractions += count;
+      sessionsWithDistractions++;
+    }
+  }
+
+  const distractionFreeSessions = totalSessions - sessionsWithDistractions;
+  const distractionFreeRate = totalSessions > 0
+    ? Math.round((distractionFreeSessions / totalSessions) * 100)
+    : 100;
+  const averageDistractionsPerSession = totalSessions > 0
+    ? Math.round((totalDistractions / totalSessions) * 10) / 10
+    : 0;
+
+  return {
+    totalDistractions,
+    totalSessions,
+    sessionsWithDistractions,
+    distractionFreeSessions,
+    distractionFreeRate,
+    averageDistractionsPerSession,
+  };
+}
 
 /**
  * Formats a duration in minutes into a human-readable string (e.g. "2h 30m" or "45m").

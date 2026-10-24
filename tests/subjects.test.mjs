@@ -8,6 +8,7 @@ import {
   calculateSubjectTaskPomodoros,
   calculateSubjectGoalStreak,
   computeSubjectsAnalyticsSummary,
+  computeSubjectsWeeklyProgress,
 } from '../src/subject-analytics.ts';
 import {
   computeWeeklyFocusTrend,
@@ -16,6 +17,8 @@ import {
 import {
   computeHabitHeatmapYear,
 } from '../src/habits.ts';
+import { AnalyticsTab } from '../src/ui/analytics-tab.ts';
+import { renderAnalyticsDashboard } from '../src/analytics-ui.ts';
 
 test('normalizeTag normalizes tags with lowercasing and leading hash', () => {
   assert.equal(normalizeTag(''), '');
@@ -333,4 +336,297 @@ test('computeHabitHeatmapYear handles weekStartDay: sunday correctly', () => {
 
   assert.equal(week.days[6].date, '2026-10-17');
   assert.equal(week.days[6].dayOfWeek, 6);
+});
+
+function createMockElement(tag = 'div') {
+  const el = {
+    tag,
+    children: [],
+    classes: new Set(),
+    attributes: {},
+    listeners: {},
+    text: '',
+    checked: false,
+    style: {},
+    empty() {
+      el.children = [];
+    },
+    addClass(cls) {
+      if (cls) cls.split(/\s+/).filter(Boolean).forEach((c) => el.classes.add(c));
+      return el;
+    },
+    removeClass(cls) {
+      if (cls) cls.split(/\s+/).filter(Boolean).forEach((c) => el.classes.delete(c));
+      return el;
+    },
+    toggleClass(cls, val) {
+      if (val === undefined) val = !el.classes.has(cls);
+      if (val) el.addClass(cls);
+      else el.removeClass(cls);
+      return el;
+    },
+    setText(txt) {
+      el.text = txt;
+      return el;
+    },
+    setAttribute(k, v) {
+      el.attributes[k] = v;
+    },
+    createDiv(options = {}) {
+      const child = createMockElement('div');
+      if (options.cls) child.addClass(options.cls);
+      if (options.text) child.setText(options.text);
+      el.children.push(child);
+      return child;
+    },
+    createSpan(options = {}) {
+      const child = createMockElement('span');
+      if (options.cls) child.addClass(options.cls);
+      if (options.text) child.setText(options.text);
+      el.children.push(child);
+      return child;
+    },
+    createEl(t, options = {}) {
+      const child = createMockElement(t);
+      if (options.cls) child.addClass(options.cls);
+      if (options.text) child.setText(options.text);
+      if (options.type) child.type = options.type;
+      el.children.push(child);
+      return child;
+    },
+    addEventListener(event, fn) {
+      el.listeners[event] = el.listeners[event] || [];
+      el.listeners[event].push(fn);
+    },
+    dispatchEvent(event) {
+      const fns = el.listeners[event] || [];
+      for (const fn of fns) fn();
+    },
+    click() {
+      el.dispatchEvent('click');
+    },
+    querySelectorAll(selector) {
+      const results = [];
+      const traverse = (node) => {
+        if (selector.startsWith('.') && node.classes.has(selector.slice(1))) {
+          results.push(node);
+        }
+        for (const child of node.children) {
+          traverse(child);
+        }
+      };
+      traverse(el);
+      return results;
+    },
+    querySelector(selector) {
+      const all = el.querySelectorAll(selector);
+      return all[0] || null;
+    },
+  };
+  return el;
+}
+
+test('computeSubjectsWeeklyProgress computes summary, metrics, and tasks count correctly', () => {
+  const subjects = [
+    { id: 's1', name: 'Álgebra Lineal', tag: '#algebra', color: '#6366f1', weeklyGoalHours: 2 },
+  ];
+  const sessions = [
+    { id: 'sess1', timestamp: 1, date: '2026-10-14', durationMinutes: 60, tags: ['#algebra'] },
+  ];
+  const tasks = [
+    { id: 't1', text: 'Tarea 1 #algebra', completed: true, tags: ['#algebra'], estimatedPomodoros: 2, completedPomodoros: 2 },
+    { id: 't2', text: 'Tarea 2 #algebra', completed: false, tags: ['#algebra'], estimatedPomodoros: 2, completedPomodoros: 0 },
+  ];
+
+  // Pass refDate: undefined, should use default new Date()
+  const summary = computeSubjectsWeeklyProgress(subjects, sessions, tasks, undefined, 'monday');
+  assert.ok(summary);
+  assert.equal(summary.subjects.length, 1);
+
+  const sub = summary.subjects[0];
+  assert.equal(sub.subject.name, 'Álgebra Lineal');
+  assert.equal(sub.goalMinutes, 120);
+  assert.equal(sub.totalTasks, 2);
+  assert.equal(sub.completedTasks, 1);
+  assert.equal(sub.pendingTasks, 1);
+  assert.equal(sub.estimatedPomodoros, 4);
+  assert.equal(sub.completedPomodoros, 2);
+});
+
+test('renderAnalyticsDashboard renders Weekly Subject Progress Card with progress bar, subject color, and metrics', async () => {
+  const mockApp = {
+    vault: {
+      getAbstractFileByPath: () => null,
+      read: async () => '',
+      process: async () => '',
+      create: async () => null,
+      modify: async () => {},
+    },
+    workspace: {
+      getLeavesOfType: () => [],
+      onLayoutReady: (cb) => cb(),
+    },
+  };
+
+  const mockPlugin = {
+    app: mockApp,
+    settings: {
+      habitsFilePath: 'Habits.md',
+      subjects: [
+        {
+          id: 'sub-alg',
+          name: 'Álgebra Lineal',
+          tag: '#algebra',
+          color: '#6366f1',
+          weeklyGoalHours: 4,
+        },
+      ],
+      weekStartDay: 'monday',
+    },
+    focusSessions: [],
+    taskIndex: {
+      getAllTasks: () => [
+        {
+          id: 't1',
+          text: 'Resolver examen #algebra',
+          completed: true,
+          tags: ['#algebra'],
+          estimatedPomodoros: 2,
+          completedPomodoros: 2,
+        },
+        {
+          id: 't2',
+          text: 'Guía vectores #algebra',
+          completed: false,
+          tags: ['#algebra'],
+          estimatedPomodoros: 3,
+          completedPomodoros: 0,
+        },
+      ],
+    },
+  };
+
+  const container = createMockElement('div');
+  await renderAnalyticsDashboard(container, mockApp, mockPlugin);
+
+  // Card exists
+  const card = container.querySelector('.study-flow-subjects-card');
+  assert.ok(card, 'Subjects card should be rendered');
+
+  // Rows and bars exist
+  const rows = container.querySelectorAll('.study-flow-subject-progress-row');
+  assert.equal(rows.length, 1, 'Should render 1 subject progress row');
+
+  const bgTrack = container.querySelectorAll('.study-flow-subject-progress-bar-bg');
+  assert.equal(bgTrack.length, 1, 'Should render subject progress bar background');
+
+  const fillBar = container.querySelectorAll('.study-flow-subject-progress-bar-fill');
+  assert.equal(fillBar.length, 1, 'Should render subject progress bar fill');
+  assert.equal(fillBar[0].style.backgroundColor, '#6366f1', 'Fill bar should have subject color');
+
+  const colorDot = container.querySelector('.study-flow-subject-color-dot');
+  assert.ok(colorDot, 'Color dot should be rendered');
+  assert.equal(colorDot.style.backgroundColor, '#6366f1', 'Color dot should have subject color');
+
+  // Task metrics
+  const pomoRow = container.querySelector('.study-flow-subject-pomo-row');
+  assert.ok(pomoRow, 'Pomo/tasks row should be rendered');
+  const tasksSpan = pomoRow.children[0];
+  assert.ok(tasksSpan && tasksSpan.text.includes('1'), 'Tasks metrics should be present');
+});
+
+test('renderAnalyticsDashboard does NOT render Weekly Subject Progress Card when no subjects configured', async () => {
+  const mockApp = {
+    vault: {
+      getAbstractFileByPath: () => null,
+      read: async () => '',
+      process: async () => '',
+      create: async () => null,
+      modify: async () => {},
+    },
+    workspace: {
+      getLeavesOfType: () => [],
+      onLayoutReady: (cb) => cb(),
+    },
+  };
+
+  const mockPlugin = {
+    app: mockApp,
+    settings: {
+      habitsFilePath: 'Habits.md',
+      subjects: [],
+      weekStartDay: 'monday',
+    },
+    focusSessions: [],
+    taskIndex: {
+      getAllTasks: () => [],
+    },
+  };
+
+  const container = createMockElement('div');
+  await renderAnalyticsDashboard(container, mockApp, mockPlugin);
+
+  const card = container.querySelector('.study-flow-subjects-card');
+  assert.equal(card, null, 'Subjects card must not be rendered when no subjects configured');
+});
+
+test('AnalyticsTab maintains activeRange across refresh', async () => {
+  const mockApp = {
+    vault: {
+      getAbstractFileByPath: () => null,
+      read: async () => '',
+      process: async () => '',
+      create: async () => null,
+      modify: async () => {},
+    },
+    workspace: {
+      getLeavesOfType: () => [],
+      onLayoutReady: (cb) => cb(),
+    },
+  };
+
+  const mockPlugin = {
+    app: mockApp,
+    settings: {
+      habitsFilePath: 'Habits.md',
+      subjects: [
+        { id: 's1', name: 'Química', tag: '#quimica', color: '#10b981', weeklyGoalHours: 3 },
+      ],
+      weekStartDay: 'monday',
+    },
+    focusSessions: [],
+    taskIndex: {
+      getAllTasks: () => [],
+    },
+  };
+
+  const analyticsTab = new AnalyticsTab(mockApp, mockPlugin);
+  const container = createMockElement('div');
+
+  // Initial render
+  await analyticsTab.render(container);
+  assert.equal(analyticsTab.activeRange, 'total');
+
+  const tabsBefore = container.querySelectorAll('.study-flow-allocation-tab-btn');
+  assert.equal(tabsBefore.length, 2);
+  const tabWeek = tabsBefore[0];
+  const tabTotal = tabsBefore[1];
+  assert.ok(tabTotal.classes.has('is-active'));
+  assert.ok(!tabWeek.classes.has('is-active'));
+
+  // Switch selector to "Esta semana"
+  tabWeek.click();
+  assert.equal(analyticsTab.activeRange, 'week');
+  assert.ok(tabWeek.classes.has('is-active'));
+  assert.ok(!tabTotal.classes.has('is-active'));
+
+  // Trigger refresh()
+  await analyticsTab.refresh();
+
+  // Selection must be preserved!
+  assert.equal(analyticsTab.activeRange, 'week');
+  const tabsAfter = container.querySelectorAll('.study-flow-allocation-tab-btn');
+  assert.equal(tabsAfter.length, 2);
+  assert.ok(tabsAfter[0].classes.has('is-active'), '"Esta semana" tab must stay active after refresh');
+  assert.ok(!tabsAfter[1].classes.has('is-active'), '"Total acumulado" tab must not be active');
 });

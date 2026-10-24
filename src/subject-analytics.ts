@@ -10,6 +10,9 @@ export interface SubjectWeeklyProgress {
   percentage: number;
   estimatedPomodoros: number;
   completedPomodoros: number;
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
   actualSessionsCount: number;
   goalStreakWeeks: number;
 }
@@ -21,13 +24,13 @@ export interface SubjectsAnalyticsSummary {
 }
 
 /**
- * Normalizes a hashtag to lowercase with leading '#' (e.g. 'algebra' -> '#algebra').
+ * Normalizes a hashtag to lowercase with leading '#' and no spaces (e.g. 'algebra lineal' -> '#algebra-lineal').
  */
 export function normalizeTag(tag: string): string {
   if (!tag) return '';
-  const trimmed = tag.trim().toLowerCase();
-  if (!trimmed) return '';
-  return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  const clean = tag.trim().replace(/^#+/, '').trim().replace(/\s+/g, '-').toLowerCase();
+  if (!clean) return '';
+  return `#${clean}`;
 }
 
 /**
@@ -246,6 +249,9 @@ export function computeSubjectsAnalyticsSummary(
       percentage,
       estimatedPomodoros: taskPomos.estimatedPomodoros,
       completedPomodoros: taskPomos.completedPomodoros,
+      totalTasks: taskPomos.totalTasks,
+      completedTasks: taskPomos.completedTasks,
+      pendingTasks: Math.max(0, taskPomos.totalTasks - taskPomos.completedTasks),
       actualSessionsCount: weekly.sessionCount,
       goalStreakWeeks,
     };
@@ -256,4 +262,23 @@ export function computeSubjectsAnalyticsSummary(
     weekEndDate: weekRange.endDateStr,
     subjects: subjectProgressList,
   };
+}
+
+/**
+ * Computes weekly progress for subjects (accepts subjects, sessions, tasks, refDate, weekStartDay).
+ */
+export function computeSubjectsWeeklyProgress(
+  subjects: Subject[],
+  sessions: FocusSessionRecord[],
+  tasks: TaskRecord[],
+  refDate?: Date,
+  weekStartDay: 'sunday' | 'monday' = 'monday'
+): SubjectsAnalyticsSummary {
+  return computeSubjectsAnalyticsSummary(
+    sessions,
+    tasks,
+    subjects,
+    refDate ?? new Date(),
+    weekStartDay ?? 'monday'
+  );
 }

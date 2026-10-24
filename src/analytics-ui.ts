@@ -1,67 +1,19 @@
-import { App, Notice, setIcon, TFile } from 'obsidian';
+import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import {
   buildAnalyticsSummary,
   formatMinutesHuman,
   computeFocusAllocation,
   getLocalWeekRange,
-} from './analytics';
-import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from './storage-migration';
-import { loadHabitsFromFile } from './habits';
-import { extractAllTasksFromContent, TaskRecord } from './tasks';
-import { getDailyNotePath } from './utils';
+} from './analytics.ts';
+import { loadFocusSessionsFromFile, syncHistoricalSessionsFromVault } from './storage-migration.ts';
+import { loadHabitsFromFile } from './habits.ts';
+import { computeSubjectsWeeklyProgress } from './subject-analytics.ts';
 import { t } from './i18n/index.ts';
 
-/**
- * Loads tasks from inbox and today's daily note to calculate task completion metrics.
- */
-async function loadAllCurrentTasks(app: App, plugin: StudyFlowPlugin): Promise<TaskRecord[]> {
-  if (plugin.taskIndex) {
-    return plugin.taskIndex.getAllTasks();
-  }
-
-  const allTasks: TaskRecord[] = [];
-  const processedKeys = new Set<string>();
-
-  // 1. Inbox tasks
-  const inboxPath = plugin.settings.inboxFilePath || 'Inbox.md';
-  const inboxFile = app.vault.getAbstractFileByPath(inboxPath);
-  if (inboxFile instanceof TFile) {
-    try {
-      const content = await app.vault.read(inboxFile);
-      const inboxTasks = extractAllTasksFromContent(content, inboxFile.path);
-      for (const t of inboxTasks) {
-        const key = `${t.sourceFile}:${t.text}`;
-        if (!processedKeys.has(key)) {
-          processedKeys.add(key);
-          allTasks.push(t);
-        }
-      }
-    } catch (e) {
-      console.error('Error cargando tareas de inbox para métricas', e);
-    }
-  }
-
-  // 2. Today's daily note tasks
-  try {
-    const dailyPath = getDailyNotePath(plugin.settings, 0);
-    const dailyFile = app.vault.getAbstractFileByPath(dailyPath);
-    if (dailyFile instanceof TFile) {
-      const content = await app.vault.read(dailyFile);
-      const dailyTasks = extractAllTasksFromContent(content, dailyFile.path);
-      for (const t of dailyTasks) {
-        const key = `${t.sourceFile}:${t.text}`;
-        if (!processedKeys.has(key)) {
-          processedKeys.add(key);
-          allTasks.push(t);
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Error cargando tareas de nota diaria para métricas', e);
-  }
-
-  return allTasks;
+export interface RenderAnalyticsOptions {
+  activeRange?: 'total' | 'week';
+  onRangeChange?: (range: 'total' | 'week') => void;
 }
 
 /**
@@ -71,11 +23,12 @@ export async function renderAnalyticsDashboard(
   container: HTMLElement,
   app: App,
   plugin: StudyFlowPlugin,
-  onRefresh?: () => Promise<void>
+  onRefresh?: () => Promise<void>,
+  options?: RenderAnalyticsOptions
 ): Promise<void> {
   // 1. Fetch data
   const habits = await loadHabitsFromFile(app, plugin.settings.habitsFilePath || 'Habits.md');
-  const tasks = await loadAllCurrentTasks(app, plugin);
+  const tasks = plugin.taskIndex ? plugin.taskIndex.getAllTasks() : [];
   const sessions = await loadFocusSessionsFromFile(app);
   plugin.focusSessions = sessions;
   const summary = buildAnalyticsSummary(sessions, habits, tasks);
@@ -114,7 +67,7 @@ export async function renderAnalyticsDashboard(
       if (onRefresh) {
         await onRefresh();
       } else {
-        await renderAnalyticsDashboard(container, app, plugin, onRefresh);
+        await renderAnalyticsDashboard(container, app, plugin, onRefresh, options);
       }
     })();
   });
@@ -254,20 +207,20 @@ export async function renderAnalyticsDashboard(
   const allocActions = allocHeader.createDiv({ cls: 'study-flow-allocation-actions' });
   const allocTotalBadge = allocActions.createDiv({ cls: 'study-flow-allocation-badge' });
 
+  let activeRange: 'total' | 'week' = options?.activeRange ?? 'total';
+
   // Range tabs [ Esta semana | Total acumulado ]
   const tabsWrap = allocActions.createDiv({ cls: 'study-flow-allocation-tabs' });
   const tabWeekBtn = tabsWrap.createEl('button', {
-    cls: 'study-flow-allocation-tab-btn',
+    cls: `study-flow-allocation-tab-btn ${activeRange === 'week' ? 'is-active' : ''}`.trim(),
     text: t('analytics.allocationRangeWeek'),
   });
   const tabTotalBtn = tabsWrap.createEl('button', {
-    cls: 'study-flow-allocation-tab-btn is-active',
+    cls: `study-flow-allocation-tab-btn ${activeRange === 'total' ? 'is-active' : ''}`.trim(),
     text: t('analytics.allocationRangeTotal'),
   });
 
   const allocBody = allocCard.createDiv();
-
-  let activeRange: 'total' | 'week' = 'total';
 
   const renderAllocationContent = () => {
     allocBody.empty();
@@ -349,6 +302,7 @@ export async function renderAnalyticsDashboard(
   tabWeekBtn.addEventListener('click', () => {
     if (activeRange === 'week') return;
     activeRange = 'week';
+    options?.onRangeChange?.(activeRange);
     tabWeekBtn.addClass('is-active');
     tabTotalBtn.removeClass('is-active');
     renderAllocationContent();
@@ -357,11 +311,132 @@ export async function renderAnalyticsDashboard(
   tabTotalBtn.addEventListener('click', () => {
     if (activeRange === 'total') return;
     activeRange = 'total';
+    options?.onRangeChange?.(activeRange);
     tabTotalBtn.addClass('is-active');
     tabWeekBtn.removeClass('is-active');
     renderAllocationContent();
   });
 
   renderAllocationContent();
+
+  // 6. Weekly Subject Progress Card
+  if (plugin.settings.subjects && plugin.settings.subjects.length > 0) {
+    const subjectsSummary = computeSubjectsWeeklyProgress(
+      plugin.settings.subjects,
+      sessions,
+      tasks,
+      undefined,
+      plugin.settings.weekStartDay
+    );
+
+    const subjectsCard = rootWrapper.createDiv({ cls: 'study-flow-card study-flow-subjects-card' });
+    const subjectsHeader = subjectsCard.createDiv({ cls: 'study-flow-chart-header' });
+    const subjectsTitleLeft = subjectsHeader.createDiv({ cls: 'study-flow-chart-title-left' });
+    const subjectsIcon = subjectsTitleLeft.createSpan({ cls: 'study-flow-chart-icon' });
+    setIcon(subjectsIcon, 'book-open');
+    subjectsTitleLeft.createEl('h4', { text: t('analytics.subjectsSectionTitle') });
+
+    subjectsHeader.createDiv({
+      cls: 'study-flow-chart-badge',
+      text: `${subjectsSummary.weekStartDate} — ${subjectsSummary.weekEndDate}`,
+    });
+
+    const subjectsList = subjectsCard.createDiv({ cls: 'study-flow-subjects-list' });
+
+    for (const item of subjectsSummary.subjects) {
+      const itemRow = subjectsList.createDiv({
+        cls: 'study-flow-subject-progress-item study-flow-subject-progress-row',
+      });
+
+      // Item Header: Badge, Tag, Streak
+      const itemHeader = itemRow.createDiv({ cls: 'study-flow-subject-item-header' });
+      const titleBox = itemHeader.createDiv({ cls: 'study-flow-subject-item-title-box' });
+
+      const badge = titleBox.createDiv({ cls: 'study-flow-subject-badge' });
+      if (item.subject.color) {
+        const dot = badge.createSpan({ cls: 'study-flow-subject-color-dot' });
+        dot.style.backgroundColor = item.subject.color;
+      }
+      badge.createSpan({ text: item.subject.name });
+
+      if (item.subject.tag) {
+        titleBox.createSpan({
+          cls: 'study-flow-subject-item-tag',
+          text: item.subject.tag,
+        });
+      }
+
+      const streakCls = item.goalStreakWeeks > 0
+        ? 'study-flow-subject-streak-badge'
+        : 'study-flow-subject-streak-badge is-zero';
+      const streakEl = itemHeader.createDiv({ cls: streakCls });
+      const fireIcon = streakEl.createSpan();
+      setIcon(fireIcon, 'flame');
+      streakEl.createSpan({
+        text: item.goalStreakWeeks > 0
+          ? t('subjects.streakBadge', { count: String(item.goalStreakWeeks) })
+          : t('subjects.noStreak'),
+      });
+
+      // Meta Row: completed hours vs goal, percentage, goal met badge
+      const metaRow = itemRow.createDiv({ cls: 'study-flow-subject-meta-row' });
+      const timeText = metaRow.createSpan({ cls: 'study-flow-subject-time-text' });
+      timeText.setText(
+        t('analytics.subjectGoalProgress', {
+          actual: formatMinutesHuman(item.actualMinutes),
+          goal: `${item.subject.weeklyGoalHours || 0}h`,
+          pct: String(item.percentage),
+        })
+      );
+
+      if (item.goalMinutes > 0 && item.actualMinutes >= item.goalMinutes) {
+        const metBadge = metaRow.createSpan({ cls: 'study-flow-subject-goal-met-badge' });
+        const checkIcon = metBadge.createSpan();
+        setIcon(checkIcon, 'check');
+        metBadge.createSpan({ text: t('analytics.subjectGoalMet') });
+      }
+
+      // Progress Bar Track & Fill
+      const track = itemRow.createDiv({
+        cls: 'study-flow-subject-track study-flow-subject-progress-bar-bg',
+      });
+      const fill = track.createDiv({
+        cls: 'study-flow-subject-fill study-flow-subject-progress-bar-fill',
+      });
+      const fillPercent = Math.min(100, Math.max(0, item.percentage));
+      fill.style.width = `${fillPercent}%`;
+      if (item.subject.color) {
+        fill.style.backgroundColor = item.subject.color;
+      }
+
+      // Tasks and Pomodoros row
+      const pomoRow = itemRow.createDiv({ cls: 'study-flow-subject-pomo-row' });
+      const tasksSpan = pomoRow.createSpan();
+      tasksSpan.setText(
+        t('analytics.kpiTasksSubtext', {
+          completed: String(item.completedTasks ?? 0),
+          pending: String(item.pendingTasks ?? 0),
+          pomos: '',
+        }).trim()
+      );
+
+      if (item.estimatedPomodoros > 0) {
+        const pomosSpan = pomoRow.createSpan();
+        pomosSpan.setText(
+          t('analytics.subjectPomodorosEstimateVsReal', {
+            completed: String(item.completedPomodoros),
+            estimated: String(item.estimatedPomodoros),
+          })
+        );
+      } else if (item.completedPomodoros > 0) {
+        const pomosSpan = pomoRow.createSpan();
+        pomosSpan.setText(
+          t('analytics.subjectPomodorosCompleted', {
+            completed: String(item.completedPomodoros),
+          })
+        );
+      }
+    }
+  }
 }
 
