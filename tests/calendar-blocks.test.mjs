@@ -11,6 +11,7 @@ import {
 } from '../src/calendar-utils.ts';
 import { syncBlocksToMarkdown } from '../src/markdown-utils.ts';
 import { createDeadlineTask } from '../src/calendar.ts';
+import { CalendarTab } from '../src/ui/calendar-tab.ts';
 import { TFile } from 'obsidian';
 
 test('formatTimeBlockLine formats uncompleted block with linked note in [[note]] syntax', () => {
@@ -271,4 +272,131 @@ test('syncBlocksToMarkdown preserves subject and color metadata in time blocks',
   assert.strictEqual(parsed[1].subject, 'Redes');
   assert.strictEqual(parsed[1].color, '#0d9488');
   assert.strictEqual(parsed[1].completed, true);
+});
+
+test('syncBlocksToMarkdown preserves free text, notes, bullets, and non-block tasks when modifying blocks', () => {
+  const initialContent = `# 2026-10-13
+
+## Bloques de Tiempo
+Nota inicial antes de cualquier bloque.
+
+- [ ] 08:30—10:00 Matemáticas Discretas [[Discretas]]
+> [!info] Recordar llevar calculadora
+- [ ] Comprar cuaderno de apuntes
+Texto libre dentro de la sección.
+- [x] 10:30—11:45 Algoritmos y Estructuras
+- [ ] 14:00—16:00 Proyecto Final [[Tesis]]
+
+Nota final de la sección.
+
+## Tareas
+- [ ] Tarea regular en otra sección
+`;
+
+  // 1. Modificar un bloque (marcar como completado y editar horario)
+  const modifiedBlocks = [
+    {
+      startTime: '08:30',
+      endTime: '10:00',
+      title: 'Matemáticas Discretas',
+      completed: true,
+      linkedNote: 'Discretas',
+    },
+    {
+      startTime: '10:30',
+      endTime: '12:00',
+      title: 'Algoritmos y Estructuras',
+      completed: true,
+    },
+    {
+      startTime: '14:00',
+      endTime: '16:00',
+      title: 'Proyecto Final',
+      completed: false,
+      linkedNote: 'Tesis',
+    },
+  ];
+
+  const res1 = syncBlocksToMarkdown(initialContent, modifiedBlocks);
+  assert.ok(res1.includes('Nota inicial antes de cualquier bloque.'));
+  assert.ok(res1.includes('> [!info] Recordar llevar calculadora'));
+  assert.ok(res1.includes('- [ ] Comprar cuaderno de apuntes'));
+  assert.ok(res1.includes('Texto libre dentro de la sección.'));
+  assert.ok(res1.includes('Nota final de la sección.'));
+  assert.ok(res1.includes('- [x] 08:30—10:00 Matemáticas Discretas [[Discretas]]'));
+  assert.ok(res1.includes('- [x] 10:30—12:00 Algoritmos y Estructuras'));
+
+  // 2. Eliminar un bloque intermedio (eliminar Algoritmos)
+  const remainingBlocks = [
+    {
+      startTime: '08:30',
+      endTime: '10:00',
+      title: 'Matemáticas Discretas',
+      completed: true,
+      linkedNote: 'Discretas',
+    },
+    {
+      startTime: '14:00',
+      endTime: '16:00',
+      title: 'Proyecto Final',
+      completed: false,
+      linkedNote: 'Tesis',
+    },
+  ];
+
+  const res2 = syncBlocksToMarkdown(res1, remainingBlocks);
+  assert.ok(!res2.includes('Algoritmos y Estructuras'));
+  assert.ok(res2.includes('Nota inicial antes de cualquier bloque.'));
+  assert.ok(res2.includes('> [!info] Recordar llevar calculadora'));
+  assert.ok(res2.includes('- [ ] Comprar cuaderno de apuntes'));
+  assert.ok(res2.includes('Texto libre dentro de la sección.'));
+  assert.ok(res2.includes('Nota final de la sección.'));
+
+  // 3. Agregar un bloque nuevo
+  const addedBlocks = [
+    ...remainingBlocks,
+    {
+      startTime: '16:30',
+      endTime: '17:30',
+      title: 'Repaso Inglés',
+      completed: false,
+    },
+  ];
+
+  const res3 = syncBlocksToMarkdown(res2, addedBlocks);
+  assert.ok(res3.includes('- [ ] 16:30—17:30 Repaso Inglés'));
+  assert.ok(res3.includes('Texto libre dentro de la sección.'));
+  assert.ok(res3.includes('Nota final de la sección.'));
+});
+
+test('CalendarTab getDayDetailState persists state mutations across re-reads', () => {
+  const mockApp = { vault: {} };
+  const mockPlugin = { settings: {}, app: mockApp };
+  const calTab = new CalendarTab(mockApp, mockPlugin, () => {});
+
+  const state = calTab.getDayDetailState();
+  assert.strictEqual(state.isPendingSelectorOpen, false);
+  assert.strictEqual(state.isAddingTimeBlock, false);
+  assert.strictEqual(state.editingBlockId, null);
+
+  // Muta las propiedades como lo haría calendar-day-detail.ts
+  state.isPendingSelectorOpen = true;
+  state.isAddingTimeBlock = true;
+  state.editingBlockId = 'block-custom-123';
+  state.isAddingDeadline = true;
+  state.markMigratedInSource = true;
+  state.selectedPendingTaskIds.add('task-1');
+
+  // En la siguiente llamada (ej. tras callbacks.onRefresh), las mutaciones deben persistir
+  const freshState = calTab.getDayDetailState();
+  assert.strictEqual(freshState.isPendingSelectorOpen, true);
+  assert.strictEqual(freshState.isAddingTimeBlock, true);
+  assert.strictEqual(freshState.editingBlockId, 'block-custom-123');
+  assert.strictEqual(freshState.isAddingDeadline, true);
+  assert.strictEqual(freshState.markMigratedInSource, true);
+  assert.ok(freshState.selectedPendingTaskIds.has('task-1'));
+
+  // Toggle de vuelta
+  freshState.isPendingSelectorOpen = false;
+  assert.strictEqual(calTab.getDayDetailState().isPendingSelectorOpen, false);
 });

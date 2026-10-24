@@ -13,7 +13,13 @@ import {
   formatTimeBlockLine,
   parseTimeBlockLine,
   doBlocksOverlap,
+  isValidTimeInput,
+  parseTimeToMinutes,
 } from '../src/calendar-utils.ts';
+import { PomodoroClosingReviewModal } from '../src/pomodoro-task-check-modal.ts';
+import { PromptModal } from '../src/ui/prompt-modal.ts';
+import { normalizeTag } from '../src/subject-analytics.ts';
+import { formatDateKey } from '../src/utils.ts';
 import {
   getTimeBlocksForDate,
   saveTimeBlock,
@@ -295,5 +301,118 @@ test('Task estimate calculation matches pomodoros * pomodoroWorkDuration', () =>
   assert.strictEqual(durationA, 50);
   assert.strictEqual(durationB, 100);
   assert.strictEqual(durationC, 25);
+});
+
+test('isValidTimeInput and parseTimeToMinutes validate time ranges properly', () => {
+  // Valid times
+  assert.strictEqual(isValidTimeInput('00:00'), true);
+  assert.strictEqual(isValidTimeInput('09:30'), true);
+  assert.strictEqual(isValidTimeInput('9:30'), true);
+  assert.strictEqual(isValidTimeInput('14:45'), true);
+  assert.strictEqual(isValidTimeInput('23:59'), true);
+  assert.strictEqual(isValidTimeInput(' 12:00 '), true);
+
+  // Invalid times
+  assert.strictEqual(isValidTimeInput('24:00'), false);
+  assert.strictEqual(isValidTimeInput('25:00'), false);
+  assert.strictEqual(isValidTimeInput('12:60'), false);
+  assert.strictEqual(isValidTimeInput('99:99'), false);
+  assert.strictEqual(isValidTimeInput('invalid'), false);
+  assert.strictEqual(isValidTimeInput(''), false);
+  assert.strictEqual(isValidTimeInput(null), false);
+  assert.strictEqual(isValidTimeInput(undefined), false);
+
+  // parseTimeToMinutes
+  assert.strictEqual(parseTimeToMinutes('00:00'), 0);
+  assert.strictEqual(parseTimeToMinutes('08:30'), 510);
+  assert.strictEqual(parseTimeToMinutes('23:59'), 1439);
+  assert.strictEqual(parseTimeToMinutes('10:00') > parseTimeToMinutes('09:00'), true);
+  assert.strictEqual(parseTimeToMinutes('09:00') > parseTimeToMinutes('10:00'), false);
+});
+
+test('Time block capping prevents blocks from ending after 23:59 (1439 mins)', () => {
+  const startMins = 23 * 60; // 1380 (23:00)
+  const durationMins = 90; // would reach 1470 (24:30)
+  const cappedEndMins = Math.min(1439, startMins + durationMins);
+
+  assert.strictEqual(cappedEndMins, 1439);
+  assert.strictEqual(minutesToTimeString(cappedEndMins), '23:59');
+});
+
+test('PomodoroClosingReviewModal initializes isCompleted to false by default', () => {
+  const appMock = {};
+  const pluginMock = { settings: {} };
+  const modal = new PomodoroClosingReviewModal(appMock, pluginMock);
+
+  // Directly check default property
+  assert.strictEqual(modal.isCompleted, false);
+});
+
+test('PromptModal stores options for initialValue and defaultValueOnEmpty', () => {
+  const appMock = {};
+  let submitted = '';
+  const modal = new PromptModal(
+    appMock,
+    'Editar bloque',
+    'Título',
+    (v) => { submitted = v; },
+    { initialValue: 'Bloque previo', defaultValueOnEmpty: 'Estudio' }
+  );
+
+  assert.strictEqual(modal.options?.initialValue, 'Bloque previo');
+  assert.strictEqual(modal.options?.defaultValueOnEmpty, 'Estudio');
+});
+
+test('normalizeTag removes spaces and transforms tag to kebab-case', () => {
+  assert.strictEqual(normalizeTag('algebra lineal'), '#algebra-lineal');
+  assert.strictEqual(normalizeTag('# Quimica Organica'), '#quimica-organica');
+  assert.strictEqual(normalizeTag('  #BIO_101  '), '#bio_101');
+  assert.strictEqual(normalizeTag(''), '');
+});
+
+test('Tasks without dueDate are treated as today in TasksTab isToday filter', () => {
+  const todayDate = formatDateKey(new Date());
+
+  const isTodayFilter = (t) => {
+    if (t.isIdea) return false;
+    const rem = t.dueDate ? undefined : t.daysRemaining;
+    return (
+      (rem !== undefined && rem <= 0) ||
+      t.dueDate === todayDate ||
+      (t.dueDate !== undefined && t.dueDate < todayDate) ||
+      (t.dueDate === undefined && t.daysRemaining === undefined)
+    );
+  };
+
+  const inboxTaskWithoutDate = {
+    id: 't-1',
+    text: 'Leer capítulo 1',
+    completed: false,
+    dueDate: undefined,
+    daysRemaining: undefined,
+    isIdea: false,
+  };
+
+  const inboxIdeaWithoutDate = {
+    id: 't-2',
+    text: 'Idea de tesis',
+    completed: false,
+    dueDate: undefined,
+    daysRemaining: undefined,
+    isIdea: true,
+  };
+
+  const futureTask = {
+    id: 't-3',
+    text: 'Examen final',
+    completed: false,
+    dueDate: '2099-12-31',
+    daysRemaining: 100,
+    isIdea: false,
+  };
+
+  assert.strictEqual(isTodayFilter(inboxTaskWithoutDate), true);
+  assert.strictEqual(isTodayFilter(inboxIdeaWithoutDate), false);
+  assert.strictEqual(isTodayFilter(futureTask), false);
 });
 

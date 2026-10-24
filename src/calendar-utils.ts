@@ -1,4 +1,5 @@
-import { isTimeBlocksSection } from './conventions.ts';
+import { isTimeBlocksSection, isPomodoroLogLine } from './conventions.ts';
+import { getEffectiveLanguage, type SupportedLanguage } from './i18n/index.ts';
 
 export interface CalendarDayCell {
   dateStr: string; // YYYY-MM-DD
@@ -10,33 +11,13 @@ export interface CalendarDayCell {
 }
 
 export const MONTH_NAMES_ES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
 export const MONTH_NAMES_EN = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 export const DAY_NAMES_ES = [
@@ -387,6 +368,21 @@ export function timeStringToMinutes(timeStr: string): number {
 }
 
 /**
+ * Validates that a string represents a valid time in HH:mm or H:mm format (00:00 - 23:59).
+ */
+export function isValidTimeInput(timeStr: string | undefined | null): boolean {
+  if (!timeStr || typeof timeStr !== 'string') return false;
+  return /^([01]?\d|2[0-3]):[0-5]\d$/.test(timeStr.trim());
+}
+
+/**
+ * Converts "HH:mm" into minutes since 00:00. Alias of timeStringToMinutes.
+ */
+export function parseTimeToMinutes(timeStr: string): number {
+  return timeStringToMinutes(timeStr);
+}
+
+/**
  * Checks if two time intervals overlap.
  * Strictly overlapping intervals: max(startA, startB) < min(endA, endB).
  * Adjacent intervals (e.g. 09:00-10:00 and 10:00-11:00) do NOT overlap.
@@ -528,4 +524,231 @@ export function computeBlockLayouts(blocks: CalendarTimeBlock[]): BlockLayout[] 
 
   return results;
 }
+
+function getBlockMatchScore(
+  target: {
+    id?: string;
+    startTime: string;
+    endTime: string;
+    title: string;
+  },
+  existing: CalendarTimeBlock
+): number {
+  const targetId = (target as { id?: string }).id;
+  const existingId = existing.id;
+  if (
+    targetId &&
+    existingId &&
+    (targetId === existingId ||
+      targetId === `block-${existingId}` ||
+      `block-${targetId}` === existingId ||
+      targetId.replace(/^block-/, '') === existingId.replace(/^block-/, ''))
+  ) {
+    return 100;
+  }
+  const cleanTargetTitle = (target.title || '').trim().toLowerCase();
+  const cleanExistingTitle = (existing.title || '').trim().toLowerCase();
+  const sameTitle = cleanTargetTitle === cleanExistingTitle;
+  const sameStart = target.startTime === existing.startTime;
+  const sameEnd = target.endTime === existing.endTime;
+
+  if (sameTitle && sameStart && sameEnd) return 90;
+  if (sameTitle && (sameStart || sameEnd)) return 70;
+  if (sameTitle) return 50;
+  if (sameStart && sameEnd) return 40;
+  if (sameStart) return 20;
+  return 0;
+}
+
+export function syncBlocksToMarkdown(
+  content: string,
+  blocks: Array<{
+    id?: string;
+    startTime: string;
+    endTime: string;
+    title: string;
+    completed?: boolean;
+    linkedNote?: string;
+    subject?: string;
+    color?: string;
+  }>,
+  customHeader?: string
+): string {
+  const lines = content.split(/\r?\n/);
+  const header = customHeader || '## Bloques de Tiempo';
+  const headerIndex = lines.findIndex((l) => isTimeBlocksSection(l, customHeader));
+
+  if (headerIndex === -1) {
+    const blockLines = blocks.map((b) => formatTimeBlockLine(b));
+    return `${content.trimEnd()}\n\n${header}\n${blockLines.join('\n')}\n`;
+  }
+
+  let endIdx = lines.length;
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    if (/^#{1,6}\s+/.test(lines[i])) {
+      endIdx = i;
+      break;
+    }
+  }
+
+  const sectionLines = lines.slice(headerIndex + 1, endIdx);
+
+  interface ExistingBlock {
+    lineIndex: number;
+    parsed: CalendarTimeBlock;
+    line: string;
+    matchedTargetIndex: number;
+  }
+
+  const existingBlocks: ExistingBlock[] = [];
+  for (let j = 0; j < sectionLines.length; j++) {
+    const parsed = parseTimeBlockLine(sectionLines[j], '', j);
+    if (parsed) {
+      existingBlocks.push({
+        lineIndex: j,
+        parsed,
+        line: sectionLines[j],
+        matchedTargetIndex: -1,
+      });
+    }
+  }
+
+  const targetMatchedToExisting = new Array<number>(blocks.length).fill(-1);
+
+  interface MatchCandidate {
+    targetIdx: number;
+    existingIdx: number;
+    score: number;
+  }
+  const candidates: MatchCandidate[] = [];
+
+  for (let t = 0; t < blocks.length; t++) {
+    for (let e = 0; e < existingBlocks.length; e++) {
+      const score = getBlockMatchScore(blocks[t], existingBlocks[e].parsed);
+      if (score >= 20) {
+        candidates.push({ targetIdx: t, existingIdx: e, score });
+      }
+    }
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+
+  for (const c of candidates) {
+    if (
+      targetMatchedToExisting[c.targetIdx] === -1 &&
+      existingBlocks[c.existingIdx].matchedTargetIndex === -1
+    ) {
+      targetMatchedToExisting[c.targetIdx] = c.existingIdx;
+      existingBlocks[c.existingIdx].matchedTargetIndex = c.targetIdx;
+    }
+  }
+
+  let nextUnmatchedTarget = 0;
+  for (let e = 0; e < existingBlocks.length; e++) {
+    if (existingBlocks[e].matchedTargetIndex === -1) {
+      while (
+        nextUnmatchedTarget < blocks.length &&
+        targetMatchedToExisting[nextUnmatchedTarget] !== -1
+      ) {
+        nextUnmatchedTarget++;
+      }
+      if (nextUnmatchedTarget < blocks.length) {
+        targetMatchedToExisting[nextUnmatchedTarget] = e;
+        existingBlocks[e].matchedTargetIndex = nextUnmatchedTarget;
+        nextUnmatchedTarget++;
+      }
+    }
+  }
+
+  const newSectionLines: string[] = [];
+  const placedTargets = new Set<number>();
+
+  if (existingBlocks.length === 0) {
+    for (let t = 0; t < blocks.length; t++) {
+      newSectionLines.push(formatTimeBlockLine(blocks[t]));
+      placedTargets.add(t);
+    }
+    for (let j = 0; j < sectionLines.length; j++) {
+      newSectionLines.push(sectionLines[j]);
+    }
+  } else {
+    for (let j = 0; j < sectionLines.length; j++) {
+      const eb = existingBlocks.find((e) => e.lineIndex === j);
+      if (!eb) {
+        // Non-block line: preserve intact without modifying
+        newSectionLines.push(sectionLines[j]);
+      } else {
+        const targetIdx = eb.matchedTargetIndex;
+        if (targetIdx !== -1) {
+          for (let t = 0; t < targetIdx; t++) {
+            if (!placedTargets.has(t)) {
+              newSectionLines.push(formatTimeBlockLine(blocks[t]));
+              placedTargets.add(t);
+            }
+          }
+          newSectionLines.push(formatTimeBlockLine(blocks[targetIdx]));
+          placedTargets.add(targetIdx);
+        }
+      }
+    }
+
+    for (let t = 0; t < blocks.length; t++) {
+      if (!placedTargets.has(t)) {
+        newSectionLines.push(formatTimeBlockLine(blocks[t]));
+        placedTargets.add(t);
+      }
+    }
+  }
+
+  lines.splice(headerIndex + 1, endIdx - (headerIndex + 1), ...newSectionLines);
+  return lines.join('\n');
+}
+
+/**
+ * Appends a closing note associated with a completed pomodoro task to the daily note content.
+ * If the daily note has a pomodoro log entry for this task, indents the note right below it.
+ * Otherwise, appends as a bullet at the end of the note.
+ */
+export function appendClosingNoteToDailyContent(
+  content: string,
+  taskText: string,
+  closingNote: string,
+  lang?: SupportedLanguage
+): string {
+  const noteTrimmed = closingNote.trim();
+  if (!noteTrimmed) return content;
+
+  const effectiveLang = lang || getEffectiveLanguage();
+  const isEn = effectiveLang === 'en';
+  const lines = content.split('\n');
+  const cleanTask = taskText.trim();
+  const noteBullet = isEn ? `  - 📝 Note: ${noteTrimmed}` : `  - 📝 Nota: ${noteTrimmed}`;
+
+  // Find the last pomodoro log line that references this task
+  let lastMatchingIndex = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (isPomodoroLogLine(line) && (cleanTask.length === 0 || line.includes(cleanTask))) {
+      lastMatchingIndex = i;
+      break;
+    }
+  }
+
+  if (lastMatchingIndex !== -1) {
+    // Insert immediately after the matching pomodoro entry
+    lines.splice(lastMatchingIndex + 1, 0, noteBullet);
+    return lines.join('\n');
+  }
+
+  // If no matching pomodoro log line found, append at end of file
+  const fallbackBullet = isEn
+    ? (cleanTask ? `- 📝 Pomodoro note (*${cleanTask}*): ${noteTrimmed}` : `- 📝 Pomodoro note: ${noteTrimmed}`)
+    : (cleanTask ? `- 📝 Nota Pomodoro (*${cleanTask}*): ${noteTrimmed}` : `- 📝 Nota Pomodoro: ${noteTrimmed}`);
+
+  const trimmedEnd = content.trimEnd();
+  return trimmedEnd.length === 0 ? `${fallbackBullet}\n` : `${trimmedEnd}\n${fallbackBullet}\n`;
+}
+
+export const appendClosingNoteToLatestPomodoroInMarkdown = appendClosingNoteToDailyContent;
+
 

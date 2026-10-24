@@ -1,9 +1,9 @@
 import { App, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
-import type { ActiveTab, TabComponent } from './types';
+import type { ActiveTab, TabComponent } from './types.ts';
 import {
-  CalendarTimeBlock,
-  DeadlineItem,
+  type CalendarTimeBlock,
+  type DeadlineItem,
   formatDateKey,
   formatMonthYearHeader,
   getCalendarMonthMatrix,
@@ -12,14 +12,15 @@ import {
   SHORT_DAY_NAMES_SUN_FIRST_ES,
   SHORT_DAY_NAMES_EN,
   SHORT_DAY_NAMES_SUN_FIRST_EN,
-} from '../calendar';
+} from '../calendar.ts';
+import { loadScheduleItems } from '../schedule.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
 import {
-  DayDetailCallbacks,
-  DayDetailState,
+  type DayDetailCallbacks,
+  type DayDetailState,
   renderDayDetailPanel,
-} from './calendar-day-detail';
-import { CalendarGridComponent } from './calendar-grid';
+} from './calendar-day-detail.ts';
+import { CalendarGridComponent } from './calendar-grid.ts';
 
 export class CalendarTab implements TabComponent {
   private app: App;
@@ -40,6 +41,9 @@ export class CalendarTab implements TabComponent {
   private isPendingSelectorOpen: boolean = false;
   private selectedPendingTaskIds: Set<string> = new Set();
   private markMigratedInSource: boolean = false;
+
+  private isRendering = false;
+  private pendingRender = false;
 
   private gridComponent: CalendarGridComponent;
 
@@ -67,16 +71,58 @@ export class CalendarTab implements TabComponent {
     });
   }
 
-  private getDayDetailState(): DayDetailState {
-    return {
-      selectedCalendarDate: this.selectedCalendarDate,
-      isAddingTimeBlock: this.isAddingTimeBlock,
-      editingBlockId: this.editingBlockId,
-      isAddingDeadline: this.isAddingDeadline,
-      isPendingSelectorOpen: this.isPendingSelectorOpen,
-      selectedPendingTaskIds: this.selectedPendingTaskIds,
-      markMigratedInSource: this.markMigratedInSource,
-    };
+  public getDayDetailState(): DayDetailState {
+    const state = {} as DayDetailState;
+    Object.defineProperties(state, {
+      selectedCalendarDate: {
+        get: () => this.selectedCalendarDate,
+        set: (val: string) => {
+          this.selectedCalendarDate = val;
+        },
+        enumerable: true,
+      },
+      isAddingTimeBlock: {
+        get: () => this.isAddingTimeBlock,
+        set: (val: boolean) => {
+          this.isAddingTimeBlock = val;
+        },
+        enumerable: true,
+      },
+      editingBlockId: {
+        get: () => this.editingBlockId,
+        set: (val: string | null) => {
+          this.editingBlockId = val;
+        },
+        enumerable: true,
+      },
+      isAddingDeadline: {
+        get: () => this.isAddingDeadline,
+        set: (val: boolean) => {
+          this.isAddingDeadline = val;
+        },
+        enumerable: true,
+      },
+      isPendingSelectorOpen: {
+        get: () => this.isPendingSelectorOpen,
+        set: (val: boolean) => {
+          this.isPendingSelectorOpen = val;
+        },
+        enumerable: true,
+      },
+      selectedPendingTaskIds: {
+        value: this.selectedPendingTaskIds,
+        enumerable: true,
+        writable: true,
+      },
+      markMigratedInSource: {
+        get: () => this.markMigratedInSource,
+        set: (val: boolean) => {
+          this.markMigratedInSource = val;
+        },
+        enumerable: true,
+      },
+    });
+    return state;
   }
 
   private getDayDetailCallbacks(): DayDetailCallbacks {
@@ -115,11 +161,19 @@ export class CalendarTab implements TabComponent {
 
   async render(container: HTMLElement): Promise<void> {
     this.container = container;
-    container.empty();
-
-    if (this.plugin.taskIndex) {
-      this.allDeadlines = this.plugin.taskIndex.getAllDeadlines();
+    if (this.isRendering) {
+      this.pendingRender = true;
+      return;
     }
+
+    this.isRendering = true;
+    try {
+      this.gridComponent.destroy();
+      container.empty();
+
+      if (this.plugin.taskIndex) {
+        this.allDeadlines = this.plugin.taskIndex.getAllDeadlines();
+      }
 
     const card = container.createDiv({ cls: 'study-flow-card study-flow-calendar-main-card' });
 
@@ -272,6 +326,15 @@ export class CalendarTab implements TabComponent {
         );
       }
     }
+    } finally {
+      this.isRendering = false;
+      if (this.pendingRender) {
+        this.pendingRender = false;
+        if (this.container) {
+          void this.render(this.container);
+        }
+      }
+    }
   }
 
   private async renderCalendarMonthGrid(card: HTMLElement, tabContainer: HTMLElement): Promise<void> {
@@ -292,10 +355,20 @@ export class CalendarTab implements TabComponent {
     const matrix = getCalendarMonthMatrix(this.calendarYear, this.calendarMonth, undefined, weekStart);
     const grid = gridWrapper.createDiv({ cls: 'study-flow-calendar-grid' });
 
+    const scheduleItems = await loadScheduleItems(
+      this.app,
+      this.plugin.settings.scheduleFilePath || 'StudyFlow/Schedule.md'
+    );
     const dayBlocksMap = new Map<string, CalendarTimeBlock[]>();
     await Promise.all(
       matrix.map(async (cell) => {
-        const blocks = await getTimeBlocksForDate(this.app, this.plugin.settings, cell.dateStr);
+        const blocks = await getTimeBlocksForDate(
+          this.app,
+          this.plugin.settings,
+          cell.dateStr,
+          true,
+          scheduleItems
+        );
         dayBlocksMap.set(cell.dateStr, blocks);
       })
     );
@@ -303,6 +376,11 @@ export class CalendarTab implements TabComponent {
     matrix.forEach((cell) => {
       const cellEl = grid.createDiv({
         cls: `study-flow-calendar-cell ${cell.isCurrentMonth ? '' : 'is-other-month'} ${cell.isToday ? 'is-today' : ''} ${cell.dateStr === this.selectedCalendarDate ? 'is-selected' : ''}`,
+        attr: {
+          role: 'button',
+          tabindex: '0',
+          'aria-label': `${cell.dateStr}${cell.isToday ? ' (today)' : ''}`,
+        },
       });
 
       const topRow = cellEl.createDiv({ cls: 'study-flow-calendar-cell-top' });
@@ -339,15 +417,23 @@ export class CalendarTab implements TabComponent {
         blChip.createSpan({ text: ` ${dayBlocks.length}` });
       }
 
+      const selectDate = async () => {
+        this.selectedCalendarDate = cell.dateStr;
+        if (!cell.isCurrentMonth) {
+          this.calendarYear = cell.year;
+          this.calendarMonth = cell.month;
+        }
+        if (this.container) await this.render(this.container);
+      };
+
       cellEl.addEventListener('click', () => {
-        void (async () => {
-          this.selectedCalendarDate = cell.dateStr;
-          if (!cell.isCurrentMonth) {
-            this.calendarYear = cell.year;
-            this.calendarMonth = cell.month;
-          }
-          if (this.container) await this.render(this.container);
-        })();
+        void selectDate();
+      });
+      cellEl.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          void selectDate();
+        }
       });
     });
   }
@@ -366,7 +452,9 @@ export class CalendarTab implements TabComponent {
   }
 
   destroy(): void {
-    this.grid?.destroy();
+    this.isRendering = false;
+    this.pendingRender = false;
+    this.gridComponent.destroy();
     this.container = null;
   }
 }

@@ -2,7 +2,7 @@ import { App, Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import {
   type BlockLayout,
-  CalendarTimeBlock,
+  type CalendarTimeBlock,
   computeBlockLayouts,
   deleteTimeBlock,
   formatDateKey,
@@ -14,9 +14,10 @@ import {
   timeStringToMinutes,
   toggleTimeBlockCompletion,
 } from '../calendar.ts';
+import { loadScheduleItems } from '../schedule.ts';
 import { getDailyNotePath } from '../utils.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
-import { PromptModal } from './prompt-modal';
+import { PromptModal } from './prompt-modal.ts';
 
 export { type BlockLayout, snapTo15Minutes, minutesToTimeString, computeBlockLayouts };
 
@@ -90,6 +91,11 @@ export class CalendarGridComponent {
     days.forEach((day) => {
       const dayHeaderEl = daysHeaderWrap.createDiv({
         cls: `study-flow-grid-day-header ${day.isToday ? 'is-today' : ''} ${day.isSelected ? 'is-selected' : ''}`,
+        attr: {
+          role: 'button',
+          tabindex: '0',
+          'aria-label': `${day.label} (${day.dateStr})`,
+        },
       });
       dayHeaderEl.createSpan({ text: day.label, cls: 'study-flow-grid-day-header-title' });
 
@@ -97,12 +103,20 @@ export class CalendarGridComponent {
         dayHeaderEl.createSpan({ text: t('common.today'), cls: 'study-flow-grid-today-badge' });
       }
 
+      const selectDay = async () => {
+        if (day.dateStr !== selectedDateStr) {
+          await this.callbacks.onSelectDate(day.dateStr);
+        }
+      };
+
       dayHeaderEl.addEventListener('click', () => {
-        void (async () => {
-          if (day.dateStr !== selectedDateStr) {
-            await this.callbacks.onSelectDate(day.dateStr);
-          }
-        })();
+        void selectDay();
+      });
+      dayHeaderEl.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          void selectDay();
+        }
       });
     });
 
@@ -121,10 +135,20 @@ export class CalendarGridComponent {
     const columnsWrap = contentRow.createDiv({ cls: 'study-flow-grid-columns-wrap' });
 
     // Load blocks for each day in parallel
+    const scheduleItems = await loadScheduleItems(
+      this.app,
+      this.plugin.settings.scheduleFilePath || 'StudyFlow/Schedule.md'
+    );
     const blocksMap = new Map<string, CalendarTimeBlock[]>();
     await Promise.all(
       days.map(async (d) => {
-        const bl = await getTimeBlocksForDate(this.app, this.plugin.settings, d.dateStr);
+        const bl = await getTimeBlocksForDate(
+          this.app,
+          this.plugin.settings,
+          d.dateStr,
+          true,
+          scheduleItems
+        );
         blocksMap.set(d.dateStr, bl);
       })
     );
@@ -208,12 +232,12 @@ export class CalendarGridComponent {
         const rect = col.getBoundingClientRect();
         const relativeY = Math.max(0, e.clientY - rect.top);
         const clickedMins = startHour * 60 + (relativeY / this.hourHeight) * 60;
-        const startMin = snapTo15Minutes(clickedMins);
 
         const pomos = taskData?.estimatedPomodoros && taskData.estimatedPomodoros > 0 ? taskData.estimatedPomodoros : 1;
         const pomoDuration = this.plugin.settings.pomodoroWorkDuration || 25;
         const durationMins = Math.max(15, pomos * pomoDuration);
-        const endMin = startMin + durationMins;
+        const startMin = Math.min(1439 - 15, snapTo15Minutes(clickedMins));
+        const endMin = Math.min(1439, startMin + durationMins);
 
         const newBlock: CalendarTimeBlock = {
           id: String(Date.now()),
@@ -242,37 +266,48 @@ export class CalendarGridComponent {
         return;
       }
       if (e.button !== 0) return; // Left click only
+      if (e.pointerType === 'touch') return; // Do not start drag creation on touch to allow native vertical scroll
 
+      const startY = e.clientY;
       const rect = col.getBoundingClientRect();
-      const startY = e.clientY - rect.top;
-      const startMins = snapTo15Minutes(startHour * 60 + (startY / this.hourHeight) * 60);
+      const relativeStartY = e.clientY - rect.top;
+      const startMins = Math.min(1439 - 15, snapTo15Minutes(startHour * 60 + (relativeStartY / this.hourHeight) * 60));
 
-      // Create interactive preview placeholder
-      const preview = col.createDiv({ cls: 'study-flow-grid-block is-creation-preview' });
-      preview.style.top = `${((startMins - startHour * 60) / 60) * this.hourHeight}px`;
-      preview.style.height = `${(30 / 60) * this.hourHeight}px`;
-      preview.setText(t('calendar.newBlock') || 'Nuevo bloque');
-
-      let currentEndMins = startMins + 30;
+      let didDrag = false;
+      let preview: HTMLElement | null = null;
+      let currentEndMins = Math.min(1439, startMins + 30);
 
       const onPointerMove = (moveEv: PointerEvent) => {
+        if (!didDrag) {
+          if (Math.abs(moveEv.clientY - startY) < 6) {
+            return;
+          }
+          didDrag = true;
+          preview = col.createDiv({ cls: 'study-flow-grid-block is-creation-preview' });
+          preview.style.top = `${((startMins - startHour * 60) / 60) * this.hourHeight}px`;
+          preview.style.height = `${(30 / 60) * this.hourHeight}px`;
+          preview.setText(t('calendar.newBlock') || 'Nuevo bloque');
+        }
+
         const moveY = moveEv.clientY - rect.top;
         const rawMins = startHour * 60 + (moveY / this.hourHeight) * 60;
         const snapped = snapTo15Minutes(rawMins);
         if (snapped > startMins) {
-          currentEndMins = snapped;
+          currentEndMins = Math.min(1439, snapped);
         } else {
-          currentEndMins = startMins + 15;
+          currentEndMins = Math.min(1439, startMins + 15);
         }
         const heightMins = currentEndMins - startMins;
-        preview.style.height = `${(heightMins / 60) * this.hourHeight}px`;
+        if (preview) {
+          preview.style.height = `${(heightMins / 60) * this.hourHeight}px`;
+        }
       };
 
       const cleanupDrag = () => {
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerCancel);
-        if (preview.parentElement) {
+        if (preview && preview.parentElement) {
           preview.remove();
         }
         if (this.activeDragCleanup === cleanupDrag) {
@@ -287,9 +322,10 @@ export class CalendarGridComponent {
 
       const onPointerUp = () => {
         cleanupDrag();
+        if (!didDrag) return;
 
         const startTime = minutesToTimeString(startMins);
-        const endTime = minutesToTimeString(currentEndMins);
+        const endTime = minutesToTimeString(Math.min(1439, currentEndMins));
 
         new PromptModal(
           this.app,
@@ -316,7 +352,8 @@ export class CalendarGridComponent {
               );
               await this.callbacks.onRefresh();
             })();
-          }
+          },
+          { defaultValueOnEmpty: t('calendar.defaultBlockTitle') }
         ).open();
       };
 
@@ -383,7 +420,7 @@ export class CalendarGridComponent {
 
     if (block.isVirtual) {
       topMeta.createSpan({
-        text: 'H',
+        text: t('calendar.virtualSchedulePillLetter'),
         cls: 'study-flow-grid-virtual-pill',
         attr: { title: t('calendar.virtualScheduleBadge') || 'Horario recurrente' },
       });
@@ -410,6 +447,7 @@ export class CalendarGridComponent {
     const cb = actionsBar.createEl('input', {
       type: 'checkbox',
       cls: 'study-flow-timeblock-cb',
+      attr: { 'aria-label': t('calendar.timeBlockCheckboxAria', { title: block.title }) },
     });
     cb.checked = !!block.completed;
     cb.addEventListener('change', (e) => {
@@ -459,7 +497,8 @@ export class CalendarGridComponent {
               await this.callbacks.onRefresh();
             }
           })();
-        }
+        },
+        { initialValue: block.title }
       ).open();
     });
 
@@ -541,22 +580,22 @@ export class CalendarGridComponent {
 
       if (activeMode === 'move') {
         const minAllowed = startHour * 60;
-        const maxAllowed = (endHour + 1) * 60 - origDuration;
+        const maxAllowed = Math.min(1439, (endHour + 1) * 60) - origDuration;
         const newStart = Math.max(minAllowed, Math.min(maxAllowed, initialStartMins + deltaMins));
         const newTop = ((newStart - startHour * 60) / 60) * this.hourHeight;
         blockEl.style.top = `${newTop}px`;
       } else if (activeMode === 'resize-top') {
         const minAllowed = startHour * 60;
-        const maxAllowed = initialEndMins - 15; // At least 15 mins duration
+        const maxAllowed = Math.min(1439, initialEndMins) - 15; // At least 15 mins duration
         const newStart = Math.max(minAllowed, Math.min(maxAllowed, initialStartMins + deltaMins));
         const newTop = ((newStart - startHour * 60) / 60) * this.hourHeight;
-        const newHeight = ((initialEndMins - newStart) / 60) * this.hourHeight;
+        const newHeight = ((Math.min(1439, initialEndMins) - newStart) / 60) * this.hourHeight;
         blockEl.style.top = `${newTop}px`;
         blockEl.style.height = `${newHeight}px`;
       } else if (activeMode === 'resize-bottom') {
         const minAllowed = initialStartMins + 15; // At least 15 mins duration
-        const maxAllowed = (endHour + 1) * 60;
-        const newEnd = Math.max(minAllowed, Math.min(maxAllowed, initialEndMins + deltaMins));
+        const maxAllowed = Math.min(1439, (endHour + 1) * 60);
+        const newEnd = Math.min(1439, Math.max(minAllowed, Math.min(maxAllowed, initialEndMins + deltaMins)));
         const newHeight = ((newEnd - initialStartMins) / 60) * this.hourHeight;
         blockEl.style.height = `${newHeight}px`;
       }
@@ -582,17 +621,18 @@ export class CalendarGridComponent {
 
       if (mode === 'move') {
         const minAllowed = startHour * 60;
-        const maxAllowed = (endHour + 1) * 60 - origDuration;
+        const maxAllowed = Math.min(1439, (endHour + 1) * 60) - origDuration;
         finalStartMins = Math.max(minAllowed, Math.min(maxAllowed, initialStartMins + deltaMins));
-        finalEndMins = finalStartMins + origDuration;
+        finalEndMins = Math.min(1439, finalStartMins + origDuration);
       } else if (mode === 'resize-top') {
         const minAllowed = startHour * 60;
-        const maxAllowed = initialEndMins - 15;
+        const maxAllowed = Math.min(1439, initialEndMins) - 15;
         finalStartMins = Math.max(minAllowed, Math.min(maxAllowed, initialStartMins + deltaMins));
+        finalEndMins = Math.min(1439, initialEndMins);
       } else if (mode === 'resize-bottom') {
         const minAllowed = initialStartMins + 15;
-        const maxAllowed = (endHour + 1) * 60;
-        finalEndMins = Math.max(minAllowed, Math.min(maxAllowed, initialEndMins + deltaMins));
+        const maxAllowed = Math.min(1439, (endHour + 1) * 60);
+        finalEndMins = Math.min(1439, Math.max(minAllowed, Math.min(maxAllowed, initialEndMins + deltaMins)));
       }
 
       // If changed, persist updated block

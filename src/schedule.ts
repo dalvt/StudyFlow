@@ -14,6 +14,20 @@ export interface ScheduleItem {
   linkedNote?: string;
 }
 
+export type ScheduleEntry = ScheduleItem;
+
+interface ScheduleCacheEntry {
+  mtime: number;
+  contentHash?: string;
+  items: ScheduleItem[];
+}
+
+const scheduleCache = new Map<string, ScheduleCacheEntry>();
+
+export function clearScheduleCache(): void {
+  scheduleCache.clear();
+}
+
 const DAY_NAMES_MAP: Record<string, number> = {
   // Spanish
   domingo: 0,
@@ -212,7 +226,7 @@ export function getVirtualBlocksForDate(
 }
 
 /**
- * Reads and parses StudyFlow/Schedule.md from vault.
+ * Reads and parses StudyFlow/Schedule.md from vault with in-memory caching by mtime / content.
  */
 export async function loadScheduleItems(
   app: App,
@@ -222,8 +236,24 @@ export async function loadScheduleItems(
   try {
     const file = app.vault.getAbstractFileByPath(normalizedPath);
     if (file instanceof TFile) {
+      const cached = scheduleCache.get(normalizedPath);
+      const mtime = file.stat?.mtime;
+      if (cached && mtime !== undefined && cached.mtime === mtime) {
+        return cached.items;
+      }
+
       const content = await app.vault.read(file);
-      return parseScheduleMarkdown(content);
+      if (cached && cached.contentHash === content) {
+        return cached.items;
+      }
+
+      const items = parseScheduleMarkdown(content);
+      scheduleCache.set(normalizedPath, {
+        mtime: mtime ?? 0,
+        contentHash: content,
+        items,
+      });
+      return items;
     }
     return [];
   } catch (err) {

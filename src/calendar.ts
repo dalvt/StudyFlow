@@ -31,6 +31,7 @@ export interface DeadlineItem extends PendingTaskItem {
 
 import { findOverlappingBlocks, parseTimeBlocksFromMarkdown } from './calendar-utils.ts';
 import { loadScheduleItems, getVirtualBlocksForDate } from './schedule.ts';
+import type { ScheduleItem } from './schedule.ts';
 
 /**
  * Retrieves time blocks for a given date directly from its Daily Note (sole source of truth),
@@ -40,7 +41,8 @@ export async function getTimeBlocksForDate(
   app: App,
   settings: StudyFlowSettings,
   dateStr: string,
-  includeVirtual: boolean = true
+  includeVirtual: boolean = true,
+  preloadedScheduleItems?: ScheduleItem[]
 ): Promise<CalendarTimeBlock[]> {
   const dailyPath = getDailyNotePath(settings, dateStr);
   const file = app.vault.getAbstractFileByPath(dailyPath);
@@ -51,7 +53,7 @@ export async function getTimeBlocksForDate(
       const content = await app.vault.read(file);
       dailyBlocks = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
     } catch (err) {
-      console.error(`Study Flow: Error leyendo bloques desde ${dailyPath}`, err);
+      console.error(`Study Flow: Error reading time blocks from ${dailyPath}`, err);
     }
   }
 
@@ -61,7 +63,9 @@ export async function getTimeBlocksForDate(
 
   // Load virtual recurring blocks from StudyFlow/Schedule.md
   try {
-    const scheduleItems = await loadScheduleItems(app, settings.scheduleFilePath || 'StudyFlow/Schedule.md');
+    const scheduleItems =
+      preloadedScheduleItems ??
+      (await loadScheduleItems(app, settings.scheduleFilePath || 'StudyFlow/Schedule.md'));
     if (scheduleItems.length > 0) {
       const virtualBlocks = getVirtualBlocksForDate(scheduleItems, dateStr, settings.subjects || []);
       const mergedVirtual = virtualBlocks.filter((vb) => {
@@ -72,7 +76,7 @@ export async function getTimeBlocksForDate(
       return [...dailyBlocks, ...mergedVirtual].sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
   } catch (err) {
-    console.error('Study Flow: Error incorporando bloques recurrentes virtuales', err);
+    console.error('Study Flow: Error merging virtual recurring schedule blocks', err);
   }
 
   return dailyBlocks.sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -144,12 +148,13 @@ export async function toggleTimeBlockCompletion(
   dateStr: string,
   blockId: string,
   completed: boolean
-): Promise<void> {
+): Promise<boolean> {
   const dailyPath = getDailyNotePath(plugin.settings, dateStr);
   const sectionHeader = plugin.settings.timeBlocksSectionHeader || getDefaultConventions(getEffectiveLanguage()).timeBlocksSectionHeader;
   const allBlocksForDate = await getTimeBlocksForDate(plugin.app, plugin.settings, dateStr, true);
+  const cleanId = blockId.replace(/^block-/, '');
   const virtualCandidate = allBlocksForDate.find(
-    (b) => b.isVirtual && (b.id === blockId || `block-${b.id}` === blockId || b.id === `block-${blockId}`)
+    (b) => b.isVirtual && (b.id === blockId || b.id.replace(/^block-/, '') === cleanId)
   );
 
   if (virtualCandidate) {
@@ -158,22 +163,25 @@ export async function toggleTimeBlockCompletion(
       completed,
       isVirtual: false,
     });
-    return;
+    return true;
   }
 
   const file = plugin.app.vault.getAbstractFileByPath(dailyPath);
-  if (!(file instanceof TFile)) return;
+  if (!(file instanceof TFile)) return false;
 
+  let updated = false;
   await plugin.app.vault.process(file, (content) => {
     const existing = parseTimeBlocksFromMarkdown(content, dateStr, sectionHeader);
     const target = existing.find(
-      (b) => b.id === blockId || b.id === `block-${blockId}` || `block-${b.id}` === blockId
+      (b) => b.id === blockId || b.id.replace(/^block-/, '') === cleanId
     );
     if (target) {
       target.completed = completed;
+      updated = true;
     }
     return syncBlocksToMarkdown(content, existing, sectionHeader);
   });
+  return updated;
 }
 
 /**
@@ -195,7 +203,7 @@ export async function syncTimeBlocksToDailyNote(
     });
     return true;
   } catch (err) {
-    console.error('Error syncing blocks to daily note:', err);
+    console.error('Study Flow: Error syncing blocks to daily note:', err);
     return false;
   }
 }
@@ -316,7 +324,7 @@ export async function createDeadlineTask(
     });
     return true;
   } catch (err) {
-    console.error('Error creating deadline task:', err);
+    console.error('Study Flow: Error creating deadline task:', err);
     return false;
   }
 }

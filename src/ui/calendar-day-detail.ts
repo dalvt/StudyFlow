@@ -2,12 +2,14 @@ import { App, Notice, setIcon, TFile, normalizePath } from 'obsidian';
 import type StudyFlowPlugin from '../main';
 import type { ActiveTab } from './types.ts';
 import {
-  CalendarTimeBlock,
+  type CalendarTimeBlock,
   calculateBlockDurationMinutes,
   createDeadlineTask,
   deleteTimeBlock,
   formatLongDate,
   getTimeBlocksForDate,
+  isValidTimeInput,
+  parseTimeToMinutes,
   saveTimeBlock,
   syncTimeBlocksToDailyNote,
   toggleTimeBlockCompletion,
@@ -22,8 +24,8 @@ import {
   getCleanTaskDisplayTitle,
   getDailyNotePath,
   getOrCreateFile,
-  PendingTaskItem,
-  TaskPriority,
+  type PendingTaskItem,
+  type TaskPriority,
 } from '../utils.ts';
 import { t, getEffectiveLanguage } from '../i18n/index.ts';
 
@@ -327,6 +329,15 @@ export async function renderTimeBlocksColumn(
     if (startTime.length === 4 && startTime[1] === ':') startTime = '0' + startTime;
     if (endTime.length === 4 && endTime[1] === ':') endTime = '0' + endTime;
 
+    if (
+      !isValidTimeInput(startTime) ||
+      !isValidTimeInput(endTime) ||
+      parseTimeToMinutes(endTime) <= parseTimeToMinutes(startTime)
+    ) {
+      new Notice(t('calendar.invalidTimeRangeNotice'));
+      return;
+    }
+
     const blockId = state.editingBlockId || String(Date.now());
     const existing = blocks.find((b) => b.id === state.editingBlockId);
 
@@ -403,6 +414,7 @@ export async function renderTimeBlocksColumn(
       const cb = blockCard.createEl('input', {
         type: 'checkbox',
         cls: 'study-flow-timeblock-cb',
+        attr: { 'aria-label': t('calendar.timeBlockCheckboxAria', { title: block.title }) },
       });
       cb.checked = !!block.completed;
       cb.addEventListener('change', () => {
@@ -625,7 +637,7 @@ export async function renderDeadlinesColumn(
     type: 'number',
     cls: 'study-flow-number-input',
     attr: {
-      placeholder: 'Est.',
+      placeholder: t('calendar.pomodoroEstimateShortPlaceholder'),
       min: '0',
       max: '20',
       'aria-label': t('calendar.pomodoroEstimateAria'),
@@ -656,7 +668,9 @@ export async function renderDeadlinesColumn(
     }
   });
 
+  let isSavingDeadline = false;
   const handleSaveDeadline = async () => {
+    if (isSavingDeadline) return;
     const tVal = dlTitleInput.value.trim();
     if (!tVal) {
       new Notice(t('calendar.enterDeadlineTitleNotice'));
@@ -667,35 +681,44 @@ export async function renderDeadlinesColumn(
     if (timeVal && timeVal.length === 4 && timeVal[1] === ':') {
       timeVal = '0' + timeVal;
     }
+    if (timeVal && !isValidTimeInput(timeVal)) {
+      new Notice(t('calendar.invalidTimeRangeNotice'));
+      return;
+    }
     const prioVal = prioritySelect.value as TaskPriority;
     const pomoVal = pomoInput.value ? parseInt(pomoInput.value, 10) : undefined;
 
-    const ok = await createDeadlineTask(
-      app,
-      plugin.settings,
-      tVal,
-      targetDate,
-      timeVal,
-      prioVal,
-      pomoVal
-    );
-    if (ok) {
-      if (plugin.taskIndex) {
-        const inboxPath = normalizePath(plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md');
-        const file = app.vault.getAbstractFileByPath(inboxPath);
-        if (file instanceof TFile) {
-          await plugin.taskIndex.indexFile(file);
+    isSavingDeadline = true;
+    try {
+      const ok = await createDeadlineTask(
+        app,
+        plugin.settings,
+        tVal,
+        targetDate,
+        timeVal,
+        prioVal,
+        pomoVal
+      );
+      if (ok) {
+        if (plugin.taskIndex) {
+          const inboxPath = normalizePath(plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md');
+          const file = app.vault.getAbstractFileByPath(inboxPath);
+          if (file instanceof TFile) {
+            await plugin.taskIndex.indexFile(file);
+          }
+        }
+        state.isAddingDeadline = false;
+        addDlBtn.removeClass('is-active');
+        new Notice(t('calendar.deadlineCreatedNotice', { date: targetDate }));
+
+        if (callbacks.onDateChange && targetDate !== state.selectedCalendarDate) {
+          await callbacks.onDateChange(targetDate);
+        } else {
+          await callbacks.onRefresh();
         }
       }
-      state.isAddingDeadline = false;
-      addDlBtn.removeClass('is-active');
-      new Notice(t('calendar.deadlineCreatedNotice', { date: targetDate }));
-
-      if (callbacks.onDateChange && targetDate !== state.selectedCalendarDate) {
-        await callbacks.onDateChange(targetDate);
-      } else {
-        await callbacks.onRefresh();
-      }
+    } finally {
+      isSavingDeadline = false;
     }
   };
 
@@ -739,6 +762,7 @@ export async function renderDeadlinesColumn(
       const cb = itemCard.createEl('input', {
         type: 'checkbox',
         cls: 'study-flow-task-cb',
+        attr: { 'aria-label': t('calendar.deadlineCheckboxAria', { title: item.cleanTitle }) },
       });
       cb.checked = item.completed;
       cb.addEventListener('change', () => {
@@ -914,7 +938,10 @@ export function renderPendingTasksSelectorColumn(
       });
 
       const cbWrapper = itemEl.createDiv({ cls: 'study-flow-cb-wrapper' });
-      const checkbox = cbWrapper.createEl('input', { type: 'checkbox' });
+      const checkbox = cbWrapper.createEl('input', {
+        type: 'checkbox',
+        attr: { 'aria-label': t('calendar.selectTaskAria', { title: task.text }) },
+      });
       checkbox.checked = state.selectedPendingTaskIds.has(task.id);
 
       checkbox.addEventListener('change', () => {
@@ -955,7 +982,7 @@ export function renderPendingTasksSelectorColumn(
         itemEl.createSpan({
           text: `🍅 ${task.estimatedPomodoros}`,
           cls: 'study-flow-pomo-chip',
-          attr: { title: `${task.estimatedPomodoros} pomodoro(s)` },
+          attr: { title: t('calendar.pomodoroEstimateTooltip', { count: String(task.estimatedPomodoros) }) },
         });
       }
 
@@ -974,7 +1001,10 @@ export function renderPendingTasksSelectorColumn(
   const toggleWrap = actionsCard.createDiv({ cls: 'study-flow-planner-toggle-wrap' });
   const migrateCb = toggleWrap.createEl('input', {
     type: 'checkbox',
-    attr: { id: 'sf-mark-migrated-cb' },
+    attr: {
+      id: 'sf-mark-migrated-cb',
+      'aria-label': t('calendar.markMigratedLabel'),
+    },
   });
   migrateCb.checked = state.markMigratedInSource;
   migrateCb.addEventListener('change', () => {
