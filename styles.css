@@ -4184,7 +4184,7 @@ body.is-study-flow-zen .workspace-split {
 }
 
 /* Floating Cloud Modal for Tasks */
-.modal:has(.study-flow-cloud-modal) {
+.modal.study-flow-cloud-modal-container {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: var(--sf-shadow-m), 0 0 0 1px var(--background-modifier-border);

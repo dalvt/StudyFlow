@@ -50,6 +50,7 @@ export class TaskCreateModal extends Modal {
 
   onOpen(): void {
     this.previousActiveElement = document.activeElement as HTMLElement | null;
+    this.modalEl.addClass('study-flow-cloud-modal-container');
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-cloud-modal');
@@ -298,6 +299,7 @@ export class TaskCreateModal extends Modal {
   }
 
   onClose(): void {
+    this.modalEl.removeClass('study-flow-cloud-modal-container');
     const { contentEl } = this;
     contentEl.empty();
     if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
