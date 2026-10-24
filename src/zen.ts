@@ -1,6 +1,6 @@
 import { Notice, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import { shouldZenIgnoreEscape } from './utils';
+import { shouldZenIgnoreEscape } from './utils.ts';
 import { t } from './i18n/index.ts';
 
 export type ZenListener = (isActive: boolean) => void;
@@ -11,11 +11,13 @@ export class ZenModeManager {
   private previousLeftCollapsed: boolean = true;
   private previousRightCollapsed: boolean = true;
   private indicatorEl: HTMLElement | null = null;
-  private keydownHandler: ((evt: KeyboardEvent) => void) | null = null;
   private listeners: Set<ZenListener> = new Set();
 
   constructor(plugin: StudyFlowPlugin) {
     this.plugin = plugin;
+  }
+
+  public initialize(): void {
     this.plugin.registerDomEvent(window, 'keydown', (evt: KeyboardEvent) => {
       if (!this.isZenActive || evt.key !== 'Escape') {
         return;

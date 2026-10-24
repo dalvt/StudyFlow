@@ -6,9 +6,10 @@ import {
   formatTaskWithDeadline,
   formatTaskWithPomodoroEstimate,
   formatTaskWithPriority,
-  TaskPriority,
-} from './markdown-utils';
-import { getOrCreateFile } from './utils';
+  type TaskPriority,
+} from './markdown-utils.ts';
+import { getOrCreateFile } from './utils.ts';
+import { normalizeTag } from './subject-analytics.ts';
 import { t } from './i18n/index.ts';
 
 export class TaskCreateModal extends Modal {
@@ -314,8 +315,8 @@ export class TaskCreateModal extends Modal {
 
       // Append Subject if provided
       if (this.selectedSubject) {
-        const tag = this.selectedSubject.startsWith('#') ? this.selectedSubject : `#${this.selectedSubject}`;
-        if (!finalLine.includes(tag)) {
+        const tag = normalizeTag(this.selectedSubject);
+        if (tag && !finalLine.includes(tag)) {
           finalLine = `${finalLine} ${tag}`;
         }
       }

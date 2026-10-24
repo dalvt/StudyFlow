@@ -11,7 +11,7 @@ export class PomodoroClosingReviewModal extends Modal {
   private plugin: StudyFlowPlugin;
   private task: ActivePomodoroTask | null;
   private sessionRecord: FocusSessionRecord | null;
-  private isCompleted: boolean = true;
+  private isCompleted: boolean = false;
   private accomplishedNote: string = '';
   private distractions: number = 0;
   private previousActiveElement: HTMLElement | null = null;

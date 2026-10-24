@@ -215,3 +215,46 @@ test('TaskIndex: handles delete and rename events reactively', async () => {
 
   index.destroy();
 });
+
+test('TaskIndex: interleaved modify and delete does not cancel dirtyFiles processing and leaves no stuck files', async () => {
+  const fileA = createFakeFile('StudyFlow/Inbox.md', '## Tareas\n- [ ] Tarea original A');
+  const fileB = createFakeFile('StudyFlow/Other.md', '## Tareas\n- [ ] Tarea en B');
+  const { plugin, fileMap, triggerVaultEvent } = createFakeApp([fileA, fileB]);
+
+  const index = new TaskIndex(plugin);
+  index.init();
+  await index.scanVault();
+  assert.equal(index.getAllTasks().length, 2);
+
+  // 1. Modify fileA
+  fileA.content = '## Tareas\n- [ ] Tarea A modificada';
+  await triggerVaultEvent('modify', fileA);
+
+  // 2. Wait 50ms, then delete fileB (which triggers debounced notify)
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  fileMap.delete(fileB.path);
+  await triggerVaultEvent('delete', fileB);
+
+  // 3. Wait for debounced processing and notify to complete
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  // File B should be deleted, and File A should have its modified task indexed
+  const tasksAfter = index.getAllTasks();
+  assert.equal(tasksAfter.length, 1);
+  assert.equal(tasksAfter[0].text, 'Tarea A modificada');
+
+  // dirtyFiles must be cleared and not blocked
+  assert.equal(index.dirtyFiles.size, 0, 'dirtyFiles must be empty');
+
+  // 4. Verify fileA can be modified again and indexed properly (not stuck)
+  fileA.content = '## Tareas\n- [ ] Tarea A segunda modificacion';
+  await triggerVaultEvent('modify', fileA);
+  await new Promise((resolve) => setTimeout(resolve, 350));
+
+  const tasksFinal = index.getAllTasks();
+  assert.equal(tasksFinal.length, 1);
+  assert.equal(tasksFinal[0].text, 'Tarea A segunda modificacion');
+  assert.equal(index.dirtyFiles.size, 0);
+
+  index.destroy();
+});

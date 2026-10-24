@@ -162,8 +162,25 @@ export interface SpacedRepetitionNoteItem {
   daysOverdue: number;
 }
 
+interface CachedSpacedNote {
+  mtime: number;
+  item: {
+    path: string;
+    title: string;
+    repasarSiguiente: string;
+    interval: number;
+  } | null;
+}
+
+const spacedNoteCache = new Map<string, CachedSpacedNote>();
+
+export function clearSpacedRepetitionCache(): void {
+  spacedNoteCache.clear();
+}
+
 /**
  * Scans vault markdown files and returns all spaced repetition notes due today or earlier.
+ * Uses in-memory caching keyed by file path and mtime to avoid synchronous re-scanning.
  */
 export async function getSpacedRepetitionQueue(
   app: App,
@@ -173,43 +190,61 @@ export async function getSpacedRepetitionQueue(
   const files = app.vault.getMarkdownFiles();
   const queue: SpacedRepetitionNoteItem[] = [];
 
+  const userConfig = plugin?.settings ? {
+    tag: plugin.settings.spacedRepetitionTag,
+    nextKey: plugin.settings.spacedRepetitionNextKey,
+    intervalKey: plugin.settings.spacedRepetitionIntervalKey,
+    reviewedKey: plugin.settings.spacedRepetitionReviewedKey,
+  } : undefined;
+
   for (const file of files) {
-    const cache = app.metadataCache.getFileCache(file);
-    if (!cache) continue;
+    const mtime = file.stat?.mtime;
+    let cached = spacedNoteCache.get(file.path);
 
-    const tags: string[] = [];
-    if (cache.tags) {
-      for (const t of cache.tags) {
-        tags.push(t.tag);
+    if (!cached || mtime === undefined || cached.mtime !== mtime) {
+      const cache = app.metadataCache.getFileCache(file);
+      if (!cache) continue;
+
+      const tags: string[] = [];
+      if (cache.tags) {
+        for (const t of cache.tags) {
+          tags.push(t.tag);
+        }
       }
+
+      const fm = cache.frontmatter;
+      if (!isSpacedRepetitionNote(tags, fm, userConfig)) {
+        spacedNoteCache.set(file.path, { mtime: mtime ?? 0, item: null });
+        continue;
+      }
+
+      const { nextReviewDate, interval } = getSpacedRepetitionFrontmatter(fm, userConfig);
+      const nextDate = nextReviewDate || '';
+      const item = {
+        path: file.path,
+        title: file.basename,
+        repasarSiguiente: nextDate,
+        interval,
+      };
+      spacedNoteCache.set(file.path, { mtime: mtime ?? 0, item });
+      cached = spacedNoteCache.get(file.path);
     }
 
-    const fm = cache.frontmatter;
-    const userConfig = plugin?.settings ? {
-      tag: plugin.settings.spacedRepetitionTag,
-      nextKey: plugin.settings.spacedRepetitionNextKey,
-      intervalKey: plugin.settings.spacedRepetitionIntervalKey,
-      reviewedKey: plugin.settings.spacedRepetitionReviewedKey,
-    } : undefined;
+    if (!cached || !cached.item) continue;
 
-    if (!isSpacedRepetitionNote(tags, fm, userConfig)) {
-      continue;
-    }
-
-    const { nextReviewDate, interval } = getSpacedRepetitionFrontmatter(fm, userConfig);
-    const nextDate = nextReviewDate || '';
-    const isDue = nextDate <= targetDateStr;
+    const { repasarSiguiente, interval } = cached.item;
+    const isDue = repasarSiguiente <= targetDateStr;
 
     // Calculate days overdue
     const targetTime = new Date(`${targetDateStr}T00:00:00`).getTime();
-    const nextTime = new Date(`${nextDate}T00:00:00`).getTime();
+    const nextTime = new Date(`${repasarSiguiente}T00:00:00`).getTime();
     const daysOverdue = Math.max(0, Math.floor((targetTime - nextTime) / (24 * 60 * 60 * 1000)));
 
     queue.push({
       file,
       path: file.path,
       title: file.basename,
-      repasarSiguiente: nextDate,
+      repasarSiguiente,
       interval,
       isDueToday: isDue,
       daysOverdue,
@@ -232,6 +267,11 @@ export async function getSpacedRepetitionQueue(
 
   return queue;
 }
+
+/**
+ * Alias for getSpacedRepetitionQueue
+ */
+export const getNotesForReview = getSpacedRepetitionQueue;
 
 /**
  * Reviews a spaced repetition note, updating its frontmatter with new interval and next date.
@@ -286,6 +326,7 @@ export async function reviewSpacedNote(
     }
   });
 
+  spacedNoteCache.delete(file.path);
   return nextState;
 }
 
@@ -325,4 +366,6 @@ export async function initSpacedRepetitionForFile(
       }
     }
   });
+
+  spacedNoteCache.delete(file.path);
 }

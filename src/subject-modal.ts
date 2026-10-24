@@ -106,13 +106,25 @@ export class SubjectEditModal extends Modal {
     PRESET_COLORS.forEach((c) => {
       const swatch = palette.createDiv({
         cls: `study-flow-color-swatch ${c === this.color ? 'is-active' : ''}`,
+        attr: {
+          role: 'button',
+          tabindex: '0',
+          'aria-label': c,
+        },
       });
       swatch.style.backgroundColor = c;
-      swatch.addEventListener('click', () => {
+      const selectColor = () => {
         this.color = c;
         colorInput.value = c;
         palette.querySelectorAll('.study-flow-color-swatch').forEach((s) => s.removeClass('is-active'));
         swatch.addClass('is-active');
+      };
+      swatch.addEventListener('click', selectColor);
+      swatch.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectColor();
+        }
       });
     });
 

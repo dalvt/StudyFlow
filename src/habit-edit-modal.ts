@@ -1,7 +1,7 @@
 import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import type { HabitFrequency, HabitFrequencyType, HabitItem } from './habits.ts';
-import { getEffectiveLanguage, t } from './i18n/index.ts';
+import { t } from './i18n/index.ts';
 
 export class HabitEditModal extends Modal {
   private plugin: StudyFlowPlugin;
@@ -109,20 +109,19 @@ export class HabitEditModal extends Modal {
     }
 
     // Specific days picker setting
-    const isEn = getEffectiveLanguage() === 'en';
     specificDaysSetting = new Setting(contentEl)
       .setName(t('habits.freqWeekdaysOption'))
-      .setDesc(isEn ? 'Select active days of the week' : 'Selecciona los días activos de la semana');
+      .setDesc(t('habits.selectDaysDesc'));
 
     const pillsContainer = specificDaysSetting.controlEl.createDiv({ cls: 'study-flow-days-picker' });
     const daysConfig = [
-      { day: 1, label: isEn ? 'Mon' : 'Lun' },
-      { day: 2, label: isEn ? 'Tue' : 'Mar' },
-      { day: 3, label: isEn ? 'Wed' : 'Mié' },
-      { day: 4, label: isEn ? 'Thu' : 'Jue' },
-      { day: 5, label: isEn ? 'Fri' : 'Vie' },
-      { day: 6, label: isEn ? 'Sat' : 'Sáb' },
-      { day: 0, label: isEn ? 'Sun' : 'Dom' },
+      { day: 1, label: t('common.weekdayMon') },
+      { day: 2, label: t('common.weekdayTue') },
+      { day: 3, label: t('common.weekdayWed') },
+      { day: 4, label: t('common.weekdayThu') },
+      { day: 5, label: t('common.weekdayFri') },
+      { day: 6, label: t('common.weekdaySat') },
+      { day: 0, label: t('common.weekdaySun') },
     ];
 
     daysConfig.forEach(({ day, label }) => {

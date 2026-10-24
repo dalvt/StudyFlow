@@ -195,11 +195,11 @@ export function parsePomodoroLogLine(line: string): ParsedPomodoroLog | null {
 }
 
 /**
- * Normalizes a tag string by ensuring a leading `#` and converting to lowercase.
+ * Normalizes a tag string by ensuring a leading `#`, converting to lowercase, and replacing spaces with dashes.
  */
 export function normalizeTag(tag: string): string {
-  const clean = tag.trim().replace(/^#+/, '');
-  return clean ? `#${clean.toLowerCase()}` : '';
+  const clean = tag.trim().replace(/^#+/, '').trim().replace(/\s+/g, '-').toLowerCase();
+  return clean ? `#${clean}` : '';
 }
 
 /**

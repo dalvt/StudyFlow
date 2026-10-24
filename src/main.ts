@@ -12,6 +12,7 @@ import type { FocusSessionRecord } from './analytics';
 import { t, setLanguage, setObsidianLanguageResolver, getEffectiveLanguage } from './i18n/index.ts';
 import { getDefaultConventions } from './conventions.ts';
 import { handleStudyFlowProtocol } from './protocol-handler';
+import { cleanupAudio } from './audio.ts';
 
 export default class StudyFlowPlugin extends Plugin {
   settings: StudyFlowSettings = cloneDefaultSettings();
@@ -25,11 +26,20 @@ export default class StudyFlowPlugin extends Plugin {
     await this.loadSettings();
     setLanguage(this.settings.language || 'auto');
 
+    this.zen.initialize();
+
+    // Initialize Pomodoro Manager with status bar element
+    const statusBarEl = this.addStatusBarItem();
+    this.pomodoro = new PomodoroManager(this);
+    this.pomodoro.initStatusBar(statusBarEl);
+
     this.app.workspace.onLayoutReady(async () => {
       await migratePluginFilesToDedicatedFolder(this.app, this.settings);
       await runStartupMigration(this);
       await this.saveSettings();
       this.focusSessions = await loadFocusSessionsFromFile(this.app);
+      await this.pomodoro.restoreState();
+      this.refreshViews();
     });
 
     // Initialize reactive TaskIndex
@@ -41,12 +51,6 @@ export default class StudyFlowPlugin extends Plugin {
       VIEW_TYPE_STUDY_FLOW,
       (leaf: WorkspaceLeaf) => new StudyFlowView(leaf, this)
     );
-
-    // Initialize Pomodoro Manager with status bar element
-    const statusBarEl = this.addStatusBarItem();
-    this.pomodoro = new PomodoroManager(this);
-    this.pomodoro.initStatusBar(statusBarEl);
-    await this.pomodoro.restoreState();
 
     // Ribbon Icons
     this.addRibbonIcon('clock', t('ribbon.openView'), () => {
@@ -200,7 +204,7 @@ export default class StudyFlowPlugin extends Plugin {
             const { Notice } = await import('obsidian');
             new Notice(t('spaced.initializedNotice', { title: activeFile.basename }));
           } catch (err) {
-            console.error('Study Flow: Error iniciando repaso espaciado', err);
+            console.error('Study Flow: Error starting spaced repetition session', err);
           }
         })();
         return true;
@@ -218,6 +222,7 @@ export default class StudyFlowPlugin extends Plugin {
 
 
   onunload(): void {
+    cleanupAudio();
     if (this.pomodoro) {
       this.pomodoro.destroy();
     }
@@ -287,6 +292,14 @@ export default class StudyFlowPlugin extends Plugin {
     if (leaf && leaf.view instanceof StudyFlowView) {
       await leaf.view.openTomorrowWithPlanner();
     }
+  }
+
+  refreshViews(): void {
+    this.app.workspace.getLeavesOfType(VIEW_TYPE_STUDY_FLOW).forEach((leaf) => {
+      if (leaf.view instanceof StudyFlowView) {
+        void leaf.view.render();
+      }
+    });
   }
 
   async loadSettings(): Promise<void> {

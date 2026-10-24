@@ -1,17 +1,20 @@
 import { type App, Notice } from 'obsidian';
 import type StudyFlowPlugin from './main';
-import type { ActiveTab } from './ui/types';
-import { getOrCreateFile } from './utils';
-import { appendTaskToMarkdownSection } from './markdown-utils';
-import { TaskCreateModal } from './task-modal';
+import type { ActiveTab } from './ui/types.ts';
+import { getOrCreateFile } from './utils.ts';
+import {
+  appendTaskToMarkdownSection,
+  extractAllTasksFromContent,
+} from './markdown-utils.ts';
+import { TaskCreateModal } from './task-modal.ts';
 import { t } from './i18n/index.ts';
 import {
   parseProtocolAction,
   type ProtocolAction,
   type ParsedProtocolParams,
-} from './protocol-utils';
+} from './protocol-utils.ts';
 
-export { parseProtocolAction, ProtocolAction, ParsedProtocolParams };
+export { parseProtocolAction, type ProtocolAction, type ParsedProtocolParams };
 
 /**
  * Appends a task to the Inbox via quick capture without opening the UI modal.
@@ -49,10 +52,32 @@ export async function handleStudyFlowProtocol(
   switch (parsed.action) {
     case 'start': {
       if (parsed.task) {
+        const inboxPath = plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
+        const tasksHeader = plugin.settings.tasksSectionHeader || '## Tareas';
+        const iceboxHeader = plugin.settings.iceboxSectionHeader || '## Icebox';
+
+        const defaultContent = `# Inbox\n\n${tasksHeader}\n\n${iceboxHeader}\n\n`;
+        const file = await getOrCreateFile(plugin.app, inboxPath, defaultContent);
+
+        const content = await plugin.app.vault.read(file);
+        const existingTasks = extractAllTasksFromContent(content, inboxPath);
+        const taskExists = existingTasks.some(
+          (t) => t.text.trim().toLowerCase() === parsed.task!.trim().toLowerCase()
+        );
+
+        if (!taskExists) {
+          await plugin.app.vault.process(file, (c) => {
+            return appendTaskToMarkdownSection(c, parsed.task!, tasksHeader);
+          });
+          if (plugin.taskIndex) {
+            void plugin.taskIndex.indexFile(file);
+          }
+        }
+
         await plugin.pomodoro.setActiveTask({
           id: `protocol#${parsed.task}`,
           text: parsed.task,
-          sourceFile: plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md',
+          sourceFile: inboxPath,
         });
       }
 
@@ -101,9 +126,10 @@ export async function handleStudyFlowProtocol(
     case 'complete-task': {
       const activeTask = plugin.pomodoro.getActiveTask();
       if (activeTask) {
-        const taskName = activeTask.text;
-        await plugin.pomodoro.completeActiveTask();
-        new Notice(t('protocol.taskCompletedNotice', { task: taskName }));
+        const completed = await plugin.pomodoro.completeActiveTask();
+        if (!completed) {
+          new Notice(t('pomodoro.taskCompleteError'));
+        }
       } else {
         new Notice(t('protocol.noActiveTaskNotice'));
       }

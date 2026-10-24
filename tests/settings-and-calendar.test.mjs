@@ -182,3 +182,113 @@ test('getDailyNotePath normalizes paths with and without trailing slashes in dai
   const pathEmpty = getDailyNotePath(settingsEmptyFolder, '2026-10-19');
   assert.equal(pathEmpty, '2026-10-19.md');
 });
+
+test('StudyFlowSettingTab: getSettingDefinitions returns declarative single source of truth', async () => {
+  const { StudyFlowSettingTab } = await import('../src/settings.ts');
+  const mockPlugin = {
+    settings: { ...DEFAULT_SETTINGS },
+    saveSettings: async () => {},
+    refreshViews: () => {},
+  };
+  const tab = new StudyFlowSettingTab({}, mockPlugin);
+  const defs = tab.getSettingDefinitions();
+
+  assert.ok(Array.isArray(defs));
+  assert.ok(defs.length >= 7, 'Must have at least 7 groups');
+
+  const headings = defs.filter((g) => g.type === 'group').map((g) => g.heading);
+  assert.ok(headings.length >= 7);
+
+  // Check that pomodoro section has workDuration
+  const pomodoroGroup = defs.find((g) => g.heading?.includes('Pomodoro') || g.heading?.includes('enfoque'));
+  assert.ok(pomodoroGroup);
+  const workDef = pomodoroGroup.items.find((item) => item.control?.key === 'pomodoroWorkDuration');
+  assert.ok(workDef);
+  assert.equal(workDef.control.type, 'number');
+});
+
+test('StudyFlowSettingTab: setControlValue triggers reindexAll for headers and file paths', async () => {
+  const { StudyFlowSettingTab } = await import('../src/settings.ts');
+  let reindexCount = 0;
+  const mockPlugin = {
+    settings: { ...DEFAULT_SETTINGS },
+    saveSettings: async () => {},
+    refreshViews: () => {},
+    pomodoro: { onSettingsUpdated: async () => {} },
+    taskIndex: {
+      reindexAll: async () => {
+        reindexCount++;
+      },
+    },
+  };
+  const tab = new StudyFlowSettingTab({}, mockPlugin);
+
+  // tasksSectionHeader
+  await tab.setControlValue('tasksSectionHeader', '## Mis Tareas');
+  assert.equal(mockPlugin.settings.tasksSectionHeader, '## Mis Tareas');
+  assert.equal(reindexCount, 1);
+
+  // iceboxSectionHeader
+  await tab.setControlValue('iceboxSectionHeader', '## Nevera');
+  assert.equal(mockPlugin.settings.iceboxSectionHeader, '## Nevera');
+  assert.equal(reindexCount, 2);
+
+  // habitsFilePath
+  await tab.setControlValue('habitsFilePath', 'Custom/Habitos.md');
+  assert.equal(mockPlugin.settings.habitsFilePath, 'Custom/Habitos.md');
+  assert.equal(reindexCount, 3);
+
+  // dailyNotesFolder
+  await tab.setControlValue('dailyNotesFolder', 'Diario');
+  assert.equal(mockPlugin.settings.dailyNotesFolder, 'Diario');
+  assert.equal(reindexCount, 4);
+
+  // inboxFilePath
+  await tab.setControlValue('inboxFilePath', 'Buzon.md');
+  assert.equal(mockPlugin.settings.inboxFilePath, 'Buzon.md');
+  assert.equal(reindexCount, 5);
+
+  // scheduleFilePath
+  await tab.setControlValue('scheduleFilePath', 'Horario.md');
+  assert.equal(mockPlugin.settings.scheduleFilePath, 'Horario.md');
+  assert.equal(reindexCount, 6);
+
+  // taskIncludedFolders
+  await tab.setControlValue('taskIncludedFolders', 'FolderA, FolderB');
+  assert.deepEqual(mockPlugin.settings.taskIncludedFolders, ['FolderA', 'FolderB']);
+  assert.equal(reindexCount, 7);
+});
+
+test('StudyFlowSettingTab: display iterates over declarative definitions cleanly', async () => {
+  const { StudyFlowSettingTab } = await import('../src/settings.ts');
+  const containerEl = {
+    empty: () => {},
+    createDiv: () => ({
+      createEl: () => ({}),
+    }),
+  };
+  const mockPlugin = {
+    settings: {
+      ...DEFAULT_SETTINGS,
+      subjects: [
+        { id: '1', name: 'Calculo', tag: '#calc', color: '#ff0000', weeklyGoalHours: 5 },
+      ],
+      pomodoroPresets: [
+        { id: 'custom-1', name: 'Custom 45/15', workMinutes: 45, breakMinutes: 15, isCustom: true },
+      ],
+    },
+    saveSettings: async () => {},
+    refreshViews: () => {},
+    pomodoro: {
+      addCustomPreset: async () => ({}),
+      deleteCustomPreset: async () => {},
+    },
+  };
+
+  const tab = new StudyFlowSettingTab({}, mockPlugin);
+  tab.containerEl = containerEl;
+
+  assert.doesNotThrow(() => {
+    tab.display();
+  });
+});

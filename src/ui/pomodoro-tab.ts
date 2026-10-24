@@ -21,6 +21,7 @@ export class PomodoroAdjustModal extends Modal {
   private onSaved: () => void;
   private workMinutes: number;
   private breakMinutes: number;
+  private previousActiveElement: HTMLElement | null = null;
 
   constructor(app: App, plugin: StudyFlowPlugin, onSaved: () => void) {
     super(app);
@@ -31,6 +32,7 @@ export class PomodoroAdjustModal extends Modal {
   }
 
   onOpen(): void {
+    this.previousActiveElement = document.activeElement as HTMLElement | null;
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass('study-flow-modal');
@@ -112,6 +114,9 @@ export class PomodoroAdjustModal extends Modal {
 
   onClose(): void {
     this.contentEl.empty();
+    if (this.previousActiveElement && typeof this.previousActiveElement.focus === 'function') {
+      this.previousActiveElement.focus();
+    }
   }
 }
 export const PomodoroCreatePresetModal = PomodoroAdjustModal;
@@ -332,7 +337,7 @@ export class PomodoroTab implements TabComponent {
       });
       const plusIcon = add5Btn.createSpan();
       setIcon(plusIcon, 'plus');
-      add5Btn.createSpan({ text: '5m', cls: 'study-flow-deck-btn-label' });
+      add5Btn.createSpan({ text: t('pomodoro.add5mLabel'), cls: 'study-flow-deck-btn-label' });
       add5Btn.addEventListener('click', () => {
         void this.plugin.pomodoro.addMinutes(5);
       });
@@ -341,7 +346,7 @@ export class PomodoroTab implements TabComponent {
       this.updateProgressRing(status);
     } catch (err) {
       console.error('[Study Flow Pomodoro] Error rendering pomodoro tab:', err);
-      new Notice(`Pomodoro Render Error: ${(err as Error).message}`);
+      new Notice(t('pomodoro.renderErrorNotice', { error: (err as Error).message }));
     }
   }
 
@@ -366,9 +371,14 @@ export class PomodoroTab implements TabComponent {
       if (!isHabit) {
         const { estimated, completed } = parseTaskPomodoroEstimate(status.activeTask.text);
         if (estimated || (completed && completed > 0)) {
-          const estText = (completed && completed > 0 && estimated)
-            ? ` • 🍅 ${completed}/${estimated}`
-            : (estimated ? ` • 🍅 ${estimated} est.` : ` • 🍅 ${completed}`);
+          let estText = '';
+          if (completed && completed > 0 && estimated) {
+            estText = t('pomodoro.activeTaskPomoHint', { completed: String(completed), estimated: String(estimated) });
+          } else if (estimated) {
+            estText = t('pomodoro.activeTaskEstimateHint', { estimated: String(estimated) });
+          } else {
+            estText = t('pomodoro.activeTaskCompletedHint', { completed: String(completed) });
+          }
           textWrap.createSpan({ text: estText, cls: 'study-flow-active-task-pomo-hint' });
         }
       }
@@ -519,7 +529,9 @@ export class PomodoroTab implements TabComponent {
           const val = quickInput.value.trim();
           if (!val) return;
           const inboxPath = this.plugin.settings.inboxFilePath || 'StudyFlow/Inbox.md';
-          const defaultContent = `# Inbox\n\n## Tareas\n\n## Icebox\n\n`;
+          const tasksH = this.plugin.settings.tasksSectionHeader || '## Tareas';
+          const iceboxH = this.plugin.settings.iceboxSectionHeader || '## Icebox';
+          const defaultContent = `# Inbox\n\n${tasksH}\n\n${iceboxH}\n\n`;
           const file = await getOrCreateFile(this.app, inboxPath, defaultContent);
           await this.app.vault.process(file, (content) => {
             return appendTaskToMarkdownSection(content, val, this.plugin.settings.tasksSectionHeader);
@@ -584,7 +596,9 @@ export class PomodoroTab implements TabComponent {
 
   private loadPendingInboxTasks(): void {
     if (this.plugin.taskIndex) {
-      this.pendingInboxTasks = this.plugin.taskIndex.getPendingTasks();
+      this.pendingInboxTasks = this.plugin.taskIndex
+        .getPendingTasks()
+        .filter((t) => !t.isIdea);
     } else {
       this.pendingInboxTasks = [];
     }

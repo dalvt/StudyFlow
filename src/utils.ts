@@ -60,7 +60,7 @@ export function getDailyNotePath(
   settings: StudyFlowSettings,
   targetDateOrOffset: number | string | Date = 0
 ): string {
-  const fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat, targetDateOrOffset);
+  const fileName = formatDailyNoteFileName(settings.dailyNoteDateFormat || 'YYYY-MM-DD', targetDateOrOffset);
   const folder = settings.dailyNotesFolder.trim().replace(/\/+$/, '');
   if (!folder) {
     return normalizePath(fileName);

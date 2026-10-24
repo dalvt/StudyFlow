@@ -780,21 +780,21 @@ body,
 }
 
 .study-flow-link-habit-btn:hover {
-  color: #ea580c;
-  border-color: color-mix(in srgb, #ea580c 40%, transparent);
+  color: var(--color-orange);
+  border-color: color-mix(in srgb, var(--color-orange) 40%, transparent);
 }
 
 .study-flow-link-habit-btn:hover svg {
-  color: #ea580c;
+  color: var(--color-orange);
 }
 
 .study-flow-link-subject-btn:hover {
-  color: #8b5cf6;
-  border-color: color-mix(in srgb, #8b5cf6 40%, transparent);
+  color: var(--color-purple);
+  border-color: color-mix(in srgb, var(--color-purple) 40%, transparent);
 }
 
 .study-flow-link-subject-btn:hover svg {
-  color: #8b5cf6;
+  color: var(--color-purple);
 }
 
 .study-flow-task-picker-box {
@@ -2989,7 +2989,6 @@ body.is-study-flow-zen .workspace-split {
   position: relative;
   border-right: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
-  touch-action: none;
 }
 
 .study-flow-grid-day-col:last-child {
@@ -3100,6 +3099,7 @@ body.is-study-flow-zen .workspace-split {
   height: 6px;
   z-index: 6;
   cursor: ns-resize;
+  touch-action: none;
 }
 
 .study-flow-grid-resize-top {
@@ -3495,7 +3495,7 @@ body.is-study-flow-zen .workspace-split {
   -moz-appearance: none;
   appearance: none;
   background-color: var(--background-secondary);
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23888888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 12px 12px;
@@ -4005,7 +4005,7 @@ body.is-study-flow-zen .workspace-split {
   -moz-appearance: none;
   appearance: none;
   background-color: var(--background-primary);
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23888888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 12px 12px;
@@ -4859,16 +4859,16 @@ body.is-study-flow-zen .workspace-split {
 }
 
 .study-flow-active-habit-banner {
-  border-left: 3px solid #ea580c;
+  border-left: 3px solid var(--color-orange);
 }
 
 .study-flow-active-habit-banner .study-flow-task-target-icon svg {
-  color: #ea580c;
+  color: var(--color-orange);
 }
 
 .study-flow-habit-modal-icon {
-  background: color-mix(in srgb, #ea580c 15%, transparent);
-  color: #ea580c;
+  background: color-mix(in srgb, var(--color-orange) 15%, transparent);
+  color: var(--color-orange);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4877,7 +4877,7 @@ body.is-study-flow-zen .workspace-split {
 .study-flow-habit-modal-icon svg {
   width: 14px;
   height: 14px;
-  color: #ea580c;
+  color: var(--color-orange);
 }
 
 .study-flow-habit-streak-badge {
@@ -4885,8 +4885,8 @@ body.is-study-flow-zen .workspace-split {
   align-items: center;
   font-size: 11px;
   font-weight: 600;
-  color: #ea580c;
-  background-color: color-mix(in srgb, #ea580c 15%, transparent);
+  color: var(--color-orange);
+  background-color: color-mix(in srgb, var(--color-orange) 15%, transparent);
   border-radius: var(--radius-s);
   padding: 2px 6px;
   margin-left: auto;
@@ -4913,7 +4913,8 @@ body.is-study-flow-zen .workspace-split {
   margin-top: 14px;
 }
 
-.study-flow-subject-progress-item {
+.study-flow-subject-progress-item,
+.study-flow-subject-progress-row {
   background: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
@@ -4988,7 +4989,8 @@ body.is-study-flow-zen .workspace-split {
   font-weight: 600;
 }
 
-.study-flow-subject-track {
+.study-flow-subject-track,
+.study-flow-subject-progress-bar-bg {
   width: 100%;
   height: 8px;
   background: var(--background-modifier-border);
@@ -4996,7 +4998,8 @@ body.is-study-flow-zen .workspace-split {
   overflow: hidden;
 }
 
-.study-flow-subject-fill {
+.study-flow-subject-fill,
+.study-flow-subject-progress-bar-fill {
   height: 100%;
   background: var(--sf-accent, var(--color-accent, var(--text-accent, #38bdf8)));
   border-radius: 4px;
@@ -5183,7 +5186,7 @@ body.is-study-flow-zen .workspace-split {
   -moz-appearance: none;
   appearance: none;
   background-color: var(--background-secondary);
-  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23888888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
   background-repeat: no-repeat;
   background-position: right 8px center;
   background-size: 12px 12px;

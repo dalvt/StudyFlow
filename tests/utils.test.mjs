@@ -1112,3 +1112,28 @@ test('appendClosingNoteToDailyContent returns unchanged content when note is emp
   assert.equal(appendClosingNoteToDailyContent(content, 'Tarea', '   '), content);
 });
 
+test('ZenModeManager: initialize() registers DOM event and constructor does not eagerly register', async () => {
+  const { ZenModeManager } = await import('../src/zen.ts');
+  const domEvents = [];
+  const fakePlugin = {
+    registerDomEvent: (target, type, cb) => {
+      domEvents.push({ target, type, cb });
+    },
+    app: {
+      workspace: {},
+    },
+  };
+
+  const zen = new ZenModeManager(fakePlugin);
+  assert.equal(domEvents.length, 0, 'Constructor must not register DOM event');
+
+  zen.initialize();
+  assert.equal(domEvents.length, 1, 'initialize() must register keydown event');
+  assert.equal(domEvents[0].type, 'keydown');
+
+  // Simulate plugin reload
+  zen.destroy();
+  zen.initialize();
+  assert.equal(domEvents.length, 2, 'initialize() can be re-invoked upon plugin reload');
+});
+
