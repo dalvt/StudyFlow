@@ -1,4 +1,4 @@
-import { App, Notice, normalizePath, TFile } from 'obsidian';
+import { App, Notice, normalizePath, TFile, TFolder } from 'obsidian';
 import type StudyFlowPlugin from './main';
 import type { FocusSessionRecord } from './analytics';
 import { syncBlocksToMarkdown } from './markdown-utils.ts';
@@ -177,7 +177,16 @@ export async function syncHistoricalSessionsFromVault(
   settings: StudyFlowSettings,
   plugin?: { focusSessions: FocusSessionRecord[] }
 ): Promise<number> {
-  const files = app.vault.getMarkdownFiles();
+  let files: TFile[] = [];
+  if (settings.dailyNotesFolder) {
+    const folder = app.vault.getAbstractFileByPath(settings.dailyNotesFolder);
+    if (folder instanceof TFolder) {
+      files = folder.children.filter((f): f is TFile => f instanceof TFile && f.extension === 'md');
+    }
+  }
+  if (files.length === 0) {
+    files = app.vault.getMarkdownFiles();
+  }
   const existingSessions = await loadFocusSessionsFromFile(app);
 
   const existingKeys = new Set(
