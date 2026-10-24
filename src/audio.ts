@@ -1,6 +1,29 @@
 import type { PomodoroSoundType } from './settings-utils.ts';
 export type { PomodoroSoundType };
 
+let activeAudioContext: AudioContext | null = null;
+let activeTimeoutId: number | null = null;
+
+/**
+ * Cleans up any running AudioContext and clears active timeouts.
+ */
+export function cleanupAudio(): void {
+  if (activeTimeoutId !== null) {
+    window.clearTimeout(activeTimeoutId);
+    activeTimeoutId = null;
+  }
+  if (activeAudioContext) {
+    try {
+      if (activeAudioContext.state !== 'closed') {
+        activeAudioContext.close().catch(() => {});
+      }
+    } catch {
+      // Ignore audio context close error
+    }
+    activeAudioContext = null;
+  }
+}
+
 /**
  * Web Audio API synthesizer for StudyFlow Assistant.
  * Synthesizes peaceful tones and tactile audio without external audio dependencies.
@@ -10,6 +33,7 @@ export function playPomodoroSound(
   type: 'work' | 'break' = 'work',
   volume: number = 0.7
 ): void {
+  cleanupAudio();
   if (sound === 'silent') return;
 
   try {
@@ -19,6 +43,7 @@ export function playPomodoroSound(
     if (!AudioContextClass) return;
 
     const ctx = new AudioContextClass();
+    activeAudioContext = ctx;
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
@@ -47,14 +72,8 @@ export function playPomodoroSound(
       osc.start(now);
       osc.stop(now + 0.03);
 
-      window.setTimeout(() => {
-        try {
-          ctx.close().catch(() => {
-            // Ignore audio context close error
-          });
-        } catch {
-          // Ignore audio context close error
-        }
+      activeTimeoutId = window.setTimeout(() => {
+        cleanupAudio();
       }, 100);
       return;
     }
@@ -83,14 +102,8 @@ export function playPomodoroSound(
         osc.stop(now + duration + 0.05);
       });
 
-      window.setTimeout(() => {
-        try {
-          ctx.close().catch(() => {
-            // Ignore audio context close error
-          });
-        } catch {
-          // Ignore audio context close error
-        }
+      activeTimeoutId = window.setTimeout(() => {
+        cleanupAudio();
       }, 2000);
       return;
     }
@@ -124,14 +137,8 @@ export function playPomodoroSound(
       osc.stop(startTime + noteDuration + 0.05);
     });
 
-    window.setTimeout(() => {
-      try {
-        ctx.close().catch(() => {
-          // Ignore audio context close error
-        });
-      } catch {
-        // Ignore audio context close error
-      }
+    activeTimeoutId = window.setTimeout(() => {
+      cleanupAudio();
     }, 3200);
   } catch (err) {
     console.warn('StudyFlow: Error synthesizing audio sound:', err);
