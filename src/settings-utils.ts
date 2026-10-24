@@ -44,6 +44,45 @@ export interface TodayTabSectionsConfig {
   showSpacedRepetition: boolean;
 }
 
+export type SettingControlType =
+  | 'toggle'
+  | 'dropdown'
+  | 'text'
+  | 'folder'
+  | 'file'
+  | 'slider'
+  | 'button'
+  | 'number';
+
+export interface AppSettingControl {
+  type: SettingControlType;
+  key?: string;
+  defaultValue?: unknown;
+  placeholder?: string;
+  options?: Record<string, string>;
+  min?: number;
+  max?: number;
+  step?: number;
+  validate?: (val: unknown) => string | null | undefined | void | Promise<string | void>;
+}
+
+export interface AppSettingDefinition {
+  name?: string | DocumentFragment;
+  desc?: string | DocumentFragment;
+  control?: AppSettingControl;
+  render?: (setting: import('obsidian').Setting, ...args: unknown[]) => void | (() => void);
+  action?: (el: HTMLElement, index: number) => void;
+  visible?: boolean | (() => boolean);
+}
+
+export interface AppSettingGroup {
+  type: 'group';
+  heading: string;
+  items: AppSettingDefinition[];
+}
+
+export type AppSettingDefinitionItem = AppSettingGroup | AppSettingDefinition;
+
 
 export interface StudyFlowSettings {
   schemaVersion: number;
