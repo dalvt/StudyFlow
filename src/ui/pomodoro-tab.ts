@@ -345,7 +345,7 @@ export class PomodoroTab implements TabComponent {
 
       this.updateProgressRing(status);
     } catch (err) {
-      console.error('[Study Flow Pomodoro] Error rendering pomodoro tab:', err);
+      console.error('Study Flow: Error rendering pomodoro tab:', err);
       new Notice(t('pomodoro.renderErrorNotice', { error: (err as Error).message }));
     }
   }
