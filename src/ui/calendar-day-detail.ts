@@ -1095,7 +1095,7 @@ export async function applySelectedTasksToDate(
     );
     await callbacks.onRefresh();
   } catch (err) {
-    console.error('Study Flow: Error incorporando tareas pendientes al calendario', err);
+    console.error('Study Flow: Error merging pending tasks into calendar', err);
     new Notice(t('calendar.tasksIncorporatedError'));
   }
 }
