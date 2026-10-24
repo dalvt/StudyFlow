@@ -1,6 +1,6 @@
 {
   "name": "study-flow-assistant",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Comprehensive academic study assistant: customizable Pomodoro timer, task and habit tracker, time blocking calendar, metrics, and distraction-free Zen mode.",
   "main": "main.js",
   "scripts": {
